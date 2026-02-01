@@ -1,3 +1,9 @@
 /venv
 /temp
 .env
+/raw_data
+/backend/.cache
+.cache
+/backend/app/__pycache__
+/backend/app/services/__pycache__
+/backend/app/scripts/__pycache__
