@@ -1,1 +1,0 @@
-Welcome to the Streamline Node!

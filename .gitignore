@@ -1,6 +1,16 @@
 /venv
 /temp
 .env
+
+# Frontend
 /frontend/node_modules
 /frontend/.next
-/frontend/.env
+/frontend/.env.local
+
+# Backend
+/raw_data
+/backend/.cache
+.cache
+/backend/app/__pycache__
+/backend/app/services/__pycache__
+/backend/app/scripts/__pycache__
