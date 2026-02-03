@@ -1,6 +1,13 @@
 /venv
 /temp
 .env
+
+# Frontend
+/frontend/node_modules
+/frontend/.next
+/frontend/.env.local
+
+# Backend
 /raw_data
 /backend/.cache
 .cache
