@@ -3,10 +3,8 @@
 import { useState, useEffect, useRef } from "react";
 import { MessageBubble } from "./MessageBubble";
 import { InputArea } from "./InputArea";
-import { Header } from "../header/Header";
-import { AlertCircle } from "lucide-react";
 
-type Mode = "general" | "workflow_planning";
+type Mode = "general" | "workflow_planning" | "workflow_creation";
 
 interface Message {
     id: string;
@@ -18,16 +16,13 @@ interface Message {
 interface ChatInterfaceProps {
     conversationId?: string;
     initialMessages?: Message[];
-    initialMode?: Mode;
 }
 
 export function ChatInterface({
     conversationId,
     initialMessages = [],
-    initialMode = "general",
 }: ChatInterfaceProps) {
     const [messages, setMessages] = useState<Message[]>(initialMessages);
-    const [mode, setMode] = useState<Mode>(initialMode);
     const [isLoading, setIsLoading] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -36,7 +31,7 @@ export function ChatInterface({
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    const handleSendMessage = async (content: string) => {
+    const handleSendMessage = async (content: string, mode?: Mode) => {
         const userMessage: Message = {
             id: Date.now().toString(),
             sender: "user",
@@ -55,7 +50,7 @@ export function ChatInterface({
                 content:
                     mode === "workflow_planning"
                         ? `I'll help you plan this workflow. Here's a structured approach:\n\n1. Identify the trigger\n2. Define the data flow\n3. Map API endpoints\n4. Set up error handling\n\nLet me know which step you'd like to explore first!`
-                        : `This is a simulated response. In production, this would connect to your AI backend to provide intelligent assistance with workflow automation and n8n concepts.`,
+                        : `This is a simulated response in ${mode || 'general'} mode. In production, this would connect to your AI backend to provide intelligent assistance with workflow automation and n8n concepts.`,
                 createdAt: new Date().toISOString(),
             };
             setMessages((prev) => [...prev, assistantMessage]);
@@ -63,56 +58,50 @@ export function ChatInterface({
         }, 1000);
     };
 
-    const handleModeChange = (newMode: Mode) => {
-        setMode(newMode);
-    };
-
     return (
-        <div className="flex flex-col h-screen">
-            <Header mode={mode} onModeChange={handleModeChange} />
-
-            {/* Mode Indicator */}
-            {mode === "workflow_planning" && (
-                <div className="bg-purple-100 dark:bg-purple-950 border-b border-purple-200 dark:border-purple-900 px-6 py-3">
-                    <div className="max-w-4xl mx-auto flex items-center gap-2 text-sm text-purple-900 dark:text-purple-200">
-                        <AlertCircle size={16} />
-                        <span className="font-medium">Workflow Planning Mode</span>
-                        <span className="text-purple-700 dark:text-purple-400">
-                            - Structured planning for automation workflows
-                        </span>
-                    </div>
-                </div>
-            )}
-
+        <div className="flex flex-col h-full">
             {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto bg-white dark:bg-gray-950">
+            <div className="flex-1 overflow-y-auto bg-gradient-to-b from-white to-gray-50/50 dark:from-gray-950 dark:to-gray-900/50">
                 <div className="max-w-4xl mx-auto px-6 py-8">
                     {messages.length === 0 ? (
-                        <div className="text-center py-12">
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                        <div className="text-center py-16">
+                            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-600 mb-4 shadow-lg shadow-purple-500/30">
+                                <span className="text-3xl">🤖</span>
+                            </div>
+                            <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-2">
                                 Welcome to Workflow Orchestrator
                             </h2>
-                            <p className="text-gray-600 dark:text-gray-400">
-                                {mode === "general"
-                                    ? "Ask me anything about workflow automation and n8n"
-                                    : "Let's plan your workflow step by step"}
+                            <p className="text-gray-600 dark:text-gray-400 max-w-md mx-auto">
+                                Chat with your AI assistant to plan and create powerful workflow automations.
+                                Type @ to switch modes or select a model above.
                             </p>
+                            <div className="mt-6 flex flex-wrap justify-center gap-2">
+                                <div className="px-3 py-1.5 rounded-lg bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 text-sm font-medium">
+                                    Workflow Planning
+                                </div>
+                                <div className="px-3 py-1.5 rounded-lg bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm font-medium">
+                                    n8n Integration
+                                </div>
+                                <div className="px-3 py-1.5 rounded-lg bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 text-sm font-medium">
+                                    Automation Guidance
+                                </div>
+                            </div>
                         </div>
                     ) : (
                         <>
                             {messages.map((message) => (
-                                <MessageBubble key={message.id} message={message} mode={mode} />
+                                <MessageBubble key={message.id} message={message} />
                             ))}
                             {isLoading && (
-                                <div className="flex gap-4 mb-6">
-                                    <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                                <div className="flex gap-4 mb-6 animate-in fade-in duration-300">
+                                    <div className="flex-shrink-0 w-9 h-9 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
                                         <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
                                     </div>
-                                    <div className="bg-gray-100 dark:bg-gray-800 rounded-2xl rounded-tl-none px-4 py-3">
-                                        <div className="flex gap-1">
-                                            <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                                            <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                                            <span className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                                    <div className="bg-gray-100 dark:bg-gray-800/50 rounded-2xl rounded-tl-sm px-5 py-3 backdrop-blur-sm border border-gray-200/50 dark:border-gray-700/50">
+                                        <div className="flex gap-1.5">
+                                            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                                            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                                            <span className="w-2 h-2 bg-gray-400 dark:bg-gray-500 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
                                         </div>
                                     </div>
                                 </div>

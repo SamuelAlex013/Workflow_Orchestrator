@@ -1,12 +1,14 @@
 import { ChatInterface } from "@/components/chat/ChatInterface";
 
 interface ChatPageProps {
-    params: {
+    params: Promise<{
         chatId: string;
-    };
+    }>;
 }
 
-export default function ChatPage({ params }: ChatPageProps) {
+export default async function ChatPage({ params }: ChatPageProps) {
+    const { chatId } = await params;
+
     // Mock messages - in production, fetch from API based on chatId
     const mockMessages = [
         {
@@ -26,9 +28,8 @@ export default function ChatPage({ params }: ChatPageProps) {
 
     return (
         <ChatInterface
-            conversationId={params.chatId}
+            conversationId={chatId}
             initialMessages={mockMessages}
-            initialMode="general"
         />
     );
 }
