@@ -1,4 +1,5 @@
 import type { Config } from "tailwindcss";
+import typography from "@tailwindcss/typography";
 
 export default {
     content: [
@@ -11,6 +12,28 @@ export default {
             colors: {
                 background: "var(--background)",
                 foreground: "var(--foreground)",
+                surface: "var(--surface)",
+                // Deep Sea Tech / Modern Minimalist color system
+                primary: {
+                    DEFAULT: "var(--primary)",
+                    hover: "var(--primary-hover)",
+                    light: "var(--primary-light)",
+                },
+                accent: {
+                    DEFAULT: "var(--accent)",
+                    hover: "var(--accent-hover)",
+                },
+                success: {
+                    DEFAULT: "var(--success)",
+                    hover: "var(--success-hover)",
+                },
+                error: {
+                    DEFAULT: "var(--error)",
+                    hover: "var(--error-hover)",
+                },
+                info: {
+                    DEFAULT: "var(--info)",
+                },
             },
             keyframes: {
                 "fade-in": {
@@ -27,6 +50,6 @@ export default {
             },
         },
     },
-    plugins: [],
+    plugins: [typography],
     darkMode: "class",
 } satisfies Config;

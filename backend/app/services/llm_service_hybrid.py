@@ -42,7 +42,7 @@ class LLMService:
                 # Priority: deepseek-r1:1.5b > phi3 > gemma3
                 if any("llama3.2" in m.get("name", "") for m in models):
                     self.ollama_available = True
-                    self.model = "llama3.2"
+                    self.model = "deepseek-r1:1.5b"
                     print(f"✅ Ollama detected with DeepSeek-R1 1.5B (memory-efficient)")
                 elif any("phi3" in m.get("name", "") for m in models):
                     self.ollama_available = True
@@ -66,7 +66,7 @@ class LLMService:
                 genai.configure(api_key=self.api_key)
                 self.genai = genai
                 self.gemini_available = True
-                self.gemini_model = "gemini-2.0-flash-exp"
+                self.gemini_model = "gemini-2.5-flash"
                 print(f"✅ Gemini API available")
             except Exception as e:
                 print(f"⚠️  Gemini not available: {e}")
@@ -271,6 +271,137 @@ Answer:"""
             "backend": "error"
         }
     
+    def synthesize_answer_stream(
+        self,
+        query: str,
+        context_chunks: List[Dict],
+        max_tokens: int = 1000,
+        temperature: float = 0.7
+    ):
+        """
+        Stream answer tokens from RAG context using available LLM.
+        Yields tokens as they are generated.
+        """
+        # Build context
+        context_parts = []
+        for i, chunk in enumerate(context_chunks[:5], 1):
+            metadata = chunk.get('metadata', {})
+            text = chunk.get('text', '')
+            header_path = metadata.get('header_path', 'Unknown')
+            context_parts.append(f"[Source {i}: {header_path}]\n{text}")
+        
+        context = "\n\n".join(context_parts)
+        
+        # Build prompts
+        system_prompt = """You are an expert n8n workflow automation assistant. Your role is to help users understand how to build workflows in n8n by providing clear, accurate answers based on the official documentation.
+
+Guidelines:
+1. Answer the user's question using ONLY the provided documentation context
+2. Be specific and actionable - include configuration steps, node names, and parameters
+3. If the context contains code examples or templates, include them
+4. If multiple approaches exist, mention all of them
+5. If the context doesn't fully answer the question, acknowledge what's missing
+6. For workflow-building questions, suggest a step-by-step approach
+7. Always cite which documentation sections you're referencing"""
+
+        user_prompt = f"""User Question: {query}
+
+Documentation Context:
+{context}
+
+Please provide a comprehensive answer to the user's question based on the documentation above. If this is a workflow-building question (e.g., "I want to take messages from X and store in Y"), provide:
+1. Required nodes and their configuration
+2. Step-by-step workflow structure
+3. Any authentication/credentials needed
+4. Example configurations if available
+
+Note: Do NOT make up information not present in the documentation context.
+Also avoid using phrases like "from the documentation" in your answer.
+
+
+Answer:"""
+
+        # Stream from appropriate backend
+        if self.active_backend == "ollama":
+            yield from self._stream_ollama(user_prompt, system_prompt, max_tokens, temperature)
+        else:
+            yield from self._stream_gemini(user_prompt, system_prompt, max_tokens, temperature)
+    
+    def _stream_ollama(self, prompt: str, system_prompt: str, max_tokens: int, temperature: float):
+        """Stream from Ollama API."""
+        token_count = 0
+        try:
+            response = requests.post(
+                f"{self.ollama_url}/api/generate",
+                json={
+                    "model": self.model,
+                    "prompt": f"{system_prompt}\n\n{prompt}",
+                    "stream": True,
+                    "options": {
+                        "temperature": temperature,
+                        "num_predict": max_tokens,
+                        "num_ctx": 4096  # Increase context window
+                    }
+                },
+                stream=True,
+                timeout=(10, 600)  # (connect timeout, read timeout) - even longer for big responses
+            )
+            
+            if response.status_code != 200:
+                yield f"Error: Ollama API returned {response.status_code}"
+                return
+            
+            import json
+            # Use iter_lines with decode_unicode for better streaming
+            for line in response.iter_lines(decode_unicode=True):
+                if line:
+                    try:
+                        data = json.loads(line)
+                        token = data.get("response", "")
+                        if token:
+                            token_count += 1
+                            yield token
+                        if data.get("done", False):
+                            print(f"\n✅ Ollama stream completed: {token_count} tokens")
+                            break
+                    except json.JSONDecodeError:
+                        continue
+            
+            # If we exit without 'done', log it
+            print(f"\n⚠️ Ollama stream ended (total tokens: {token_count})")
+                        
+        except requests.exceptions.Timeout:
+            yield "\n\n[Response timed out. Please try a shorter query.]"
+        except requests.exceptions.ConnectionError:
+            yield "\n\n[Connection lost to Ollama. Please check if Ollama is running.]"
+        except Exception as e:
+            yield f"\n\n[Error streaming from Ollama: {str(e)}]"
+    
+    def _stream_gemini(self, prompt: str, system_prompt: str, max_tokens: int, temperature: float):
+        """Stream from Gemini API."""
+        try:
+            model = self.genai.GenerativeModel(
+                model_name=self.gemini_model,
+                generation_config=self.genai.GenerationConfig(
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                ),
+                system_instruction=system_prompt
+            )
+            
+            response = model.generate_content(prompt, stream=True)
+            
+            for chunk in response:
+                try:
+                    if chunk.text:
+                        yield chunk.text
+                except ValueError:
+                    # Handle safety filter or other issues with individual chunks
+                    continue
+                    
+        except Exception as e:
+            yield f"\n\n[Error streaming from Gemini: {str(e)}]"
+
     def generate_workflow_description(
         self,
         query: str,
@@ -311,7 +442,11 @@ NODES:
 STEPS:
 1. Step description with node config
 2. Step description with node config
-3. Step description with node config"""
+3. Step description with node config
+
+Note: Do NOT make up information not present in the documentation context.
+Also avoid using phrases like "from the documentation" in your answer.
+"""
 
         try:
             if self.active_backend == "ollama":

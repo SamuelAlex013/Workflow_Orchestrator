@@ -1,4 +1,4 @@
-// File: D:\Major Project\AI Workflow Orchestrator\Workflow_Orchestrator\frontend\src\app\chat\layout.tsx
+// File: F:\college\projects\Workflow_Orchestrator\frontend\src\app\chat\layout.tsx
 import * as entry from '../../../../src/app/chat/layout.js'
 import type { ResolvingMetadata, ResolvingViewport } from 'next/dist/lib/metadata/types/metadata-interface.js'
 

@@ -7,7 +7,7 @@ export function Header() {
     const { theme, toggleTheme } = useTheme();
 
     return (
-        <div className="h-14 border-b border-gray-200/50 dark:border-gray-800/50 bg-white/80 dark:bg-gray-950/80 backdrop-blur-sm flex items-center justify-between px-6">
+        <div className="h-14 border-b border-slate-200 dark:border-slate-700/50 bg-white dark:bg-[#1E293B] flex items-center justify-between px-6">
             {/* Logo */}
             <div className="flex items-center gap-3">
                 <h1 className="text-lg font-semibold text-gray-900 dark:text-white">

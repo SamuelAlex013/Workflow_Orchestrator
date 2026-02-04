@@ -12,7 +12,7 @@ export default function Icon() {
         (
             <div
                 style={{
-                    background: 'linear-gradient(135deg, #a855f7 0%, #9333ea 100%)',
+                    background: 'linear-gradient(135deg, #38BDF8 0%, #6366F1 100%)',
                     width: '100%',
                     height: '100%',
                     display: 'flex',
@@ -35,7 +35,7 @@ export default function Icon() {
                         opacity="0.9"
                     />
                     {/* Center circle */}
-                    <circle cx="12" cy="8.5" r="2.5" fill="#9333ea" />
+                    <circle cx="12" cy="8.5" r="2.5" fill="#6366F1" />
                     {/* Automation arrows */}
                     <path
                         d="M8 14L12 17L16 14"
