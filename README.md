@@ -7,7 +7,6 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
 [![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
 [![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-blue?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com)
-[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
 
 *Stop searching through endless documentation. Start building workflows with AI that understands n8n.*
 
@@ -27,7 +26,6 @@
 - [Getting Started](#-getting-started)
 - [Usage](#-usage)
 - [Future Roadmap](#-future-roadmap)
-- [Contributing](#-contributing)
 
 ---
 
