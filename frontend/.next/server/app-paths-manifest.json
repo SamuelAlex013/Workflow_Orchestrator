@@ -1,0 +1,8 @@
+{
+  "/api/webhooks/clerk/route": "app/api/webhooks/clerk/route.js",
+  "/_not-found/page": "app/_not-found/page.js",
+  "/page": "app/page.js",
+  "/chat/page": "app/chat/page.js",
+  "/chat/[chatId]/page": "app/chat/[chatId]/page.js",
+  "/icon/route": "app/icon/route.js"
+}
