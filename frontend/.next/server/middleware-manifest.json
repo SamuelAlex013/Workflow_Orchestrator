@@ -4,24 +4,28 @@
     "/": {
       "files": [
         "server/edge-runtime-webpack.js",
-        "server/middleware.js"
+        "server/src/middleware.js"
       ],
-      "name": "middleware",
+      "name": "src/middleware",
       "page": "/",
       "matchers": [
         {
-          "regexp": "^/.*$",
-          "originalSource": "/:path*"
+          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?(?:\\/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*))(\\.json)?[\\/#\\?]?$",
+          "originalSource": "/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)"
+        },
+        {
+          "regexp": "^(?:\\/(_next\\/data\\/[^/]{1,}))?(?:\\/(api|trpc))(.*)(\\.json)?[\\/#\\?]?$",
+          "originalSource": "/(api|trpc)(.*)"
         }
       ],
       "wasm": [],
       "assets": [],
       "env": {
-        "__NEXT_BUILD_ID": "development",
+        "__NEXT_BUILD_ID": "XXrxu8L--zKUDAlcBRqJ-",
         "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "2cSGupBU076anW4WNng11fKtQrq4f2haI5DQTG+pXg8=",
-        "__NEXT_PREVIEW_MODE_ID": "58c735245cae98813b5c6ffbce397f1f",
-        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "3a12a2ef04845d91946bcf17dcface18cfa632737b1ad76c450c5ce333fe183a",
-        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "67b9b2a6fe0d3796d762d7020758aa000d8ecf8fd3c4eb2a935a909e2a01fa8f"
+        "__NEXT_PREVIEW_MODE_ID": "654ca6bb1a22312778f8665ed744b7dc",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "edc6a9f3afa6f1bcd34357398a608fce4fde4ca9fab6af66faa911c42c4fc1a2",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "092ee61c7dfe00162d0e9ded48b7ec033ce3a997e202204bd53ffaf34c208b03"
       }
     }
   },
@@ -60,11 +64,11 @@
         }
       ],
       "env": {
-        "__NEXT_BUILD_ID": "development",
+        "__NEXT_BUILD_ID": "XXrxu8L--zKUDAlcBRqJ-",
         "NEXT_SERVER_ACTIONS_ENCRYPTION_KEY": "2cSGupBU076anW4WNng11fKtQrq4f2haI5DQTG+pXg8=",
-        "__NEXT_PREVIEW_MODE_ID": "58c735245cae98813b5c6ffbce397f1f",
-        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "3a12a2ef04845d91946bcf17dcface18cfa632737b1ad76c450c5ce333fe183a",
-        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "67b9b2a6fe0d3796d762d7020758aa000d8ecf8fd3c4eb2a935a909e2a01fa8f"
+        "__NEXT_PREVIEW_MODE_ID": "654ca6bb1a22312778f8665ed744b7dc",
+        "__NEXT_PREVIEW_MODE_SIGNING_KEY": "edc6a9f3afa6f1bcd34357398a608fce4fde4ca9fab6af66faa911c42c4fc1a2",
+        "__NEXT_PREVIEW_MODE_ENCRYPTION_KEY": "092ee61c7dfe00162d0e9ded48b7ec033ce3a997e202204bd53ffaf34c208b03"
       }
     }
   },

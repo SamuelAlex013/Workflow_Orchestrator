@@ -10,18 +10,21 @@ const MODE_OPTIONS = [
     {
         id: "general",
         label: "General Automation",
+        shortLabel: "General",
         icon: "💬",
         description: "General information, FAQs, and explanations about n8n automation"
     },
     {
         id: "workflow_planning",
         label: "Workflow Planning",
+        shortLabel: "Planning",
         icon: "📋",
         description: "Planning, structuring, and discussing n8n workflows conceptually"
     },
     {
         id: "advanced_automation",
         label: "Advanced Automation",
+        shortLabel: "Advanced",
         icon: "🔒",
         locked: true,
         description: "Workflow visualization and creation - Authorized users only"
@@ -40,15 +43,11 @@ export function InputArea({ onSendMessage, disabled = false }: InputAreaProps) {
     const [cursorPosition, setCursorPosition] = useState(0);
     const textareaRef = useRef<HTMLTextAreaElement>(null);
     const modeDropdownRef = useRef<HTMLDivElement>(null);
-    const modeSelectorRef = useRef<HTMLDivElement>(null);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (modeDropdownRef.current && !modeDropdownRef.current.contains(event.target as Node)) {
-                setShowModeDropdown(false);
-            }
-            if (modeSelectorRef.current && !modeSelectorRef.current.contains(event.target as Node)) {
                 setShowModeDropdown(false);
             }
         };
@@ -98,23 +97,34 @@ export function InputArea({ onSendMessage, disabled = false }: InputAreaProps) {
     const selectedModeOption = MODE_OPTIONS.find(m => m.id === selectedMode) || MODE_OPTIONS[0];
 
     return (
-        <div className="border-t border-slate-200 dark:border-slate-700/50 bg-white dark:bg-[#1E293B] p-6">
-            <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-                <div className="flex flex-col gap-3">
-                    {/* Mode Selector (replaces Model Selector) */}
-                    <div className="relative" ref={modeSelectorRef}>
+        <div className="bg-transparent px-4 py-4 md:px-6 w-full">
+            <form onSubmit={handleSubmit} className="w-full">
+                {/* Unified Input Bar: Mode Selector + Input + Send Button */}
+                <div className="relative flex items-stretch gap-2 w-full" ref={modeDropdownRef}>
+                    {/* Mode Selector (Left of Input) */}
+                    <div className="relative flex-shrink-0 flex">
                         <button
                             type="button"
                             onClick={() => setShowModeDropdown(!showModeDropdown)}
-                            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-sm font-medium text-gray-700 dark:text-gray-300"
+                            className={cn(
+                                "flex items-center justify-center gap-1.5 px-3 rounded-xl self-stretch",
+                                "bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm",
+                                "border border-slate-200/80 dark:border-slate-600/80",
+                                "hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-500",
+                                "transition-all text-sm font-medium text-gray-700 dark:text-gray-300"
+                            )}
                         >
-                            <span>{selectedModeOption.icon}</span>
-                            {selectedModeOption.label}
-                            <ChevronDown size={14} />
+                            <span className="text-base">{selectedModeOption.icon}</span>
+                            <span className="hidden sm:inline">{selectedModeOption.shortLabel || selectedModeOption.label}</span>
+                            <ChevronDown size={14} className={cn(
+                                "transition-transform",
+                                showModeDropdown && "rotate-180"
+                            )} />
                         </button>
 
+                        {/* Mode Dropdown */}
                         {showModeDropdown && (
-                            <div className="absolute bottom-full left-0 mb-2 w-80 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
+                            <div className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
                                 <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                                     <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
                                         Select Mode
@@ -160,59 +170,59 @@ export function InputArea({ onSendMessage, disabled = false }: InputAreaProps) {
                         )}
                     </div>
 
-                    {/* Input Area with @mention */}
-                    <div className="relative flex items-end gap-3">
-                        <div className="flex-1 relative" ref={modeDropdownRef}>
-                            <textarea
-                                ref={textareaRef}
-                                value={input}
-                                onChange={(e) => {
-                                    setInput(e.target.value);
-                                    setCursorPosition(e.target.selectionStart);
-                                }}
-                                onKeyDown={handleKeyDown}
-                                placeholder="Type @ to switch modes or start typing..."
-                                disabled={disabled}
-                                rows={1}
-                                className={cn(
-                                    "w-full resize-none rounded-3xl px-5 py-4 pr-12",
-                                    "bg-white dark:bg-[#1E293B]",
-                                    "border border-slate-200 dark:border-slate-600",
-                                    "focus:border-indigo-400 dark:focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-sky-900/30",
-                                    "text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500",
-                                    "transition-all duration-200",
-                                    "disabled:opacity-50 disabled:cursor-not-allowed",
-                                    "max-h-40 overflow-y-auto text-[15px] leading-relaxed"
-                                )}
-                                style={{
-                                    height: "auto",
-                                    minHeight: "60px",
-                                }}
-                                onInput={(e) => {
-                                    const target = e.target as HTMLTextAreaElement;
-                                    target.style.height = "auto";
-                                    target.style.height = Math.min(target.scrollHeight, 160) + "px";
-                                }}
-                            />
-                        </div>
-
-                        <button
-                            type="submit"
-                            disabled={!input.trim() || disabled}
+                    {/* Text Input */}
+                    <div className="flex-1 relative flex">
+                        <textarea
+                            ref={textareaRef}
+                            value={input}
+                            onChange={(e) => {
+                                setInput(e.target.value);
+                                setCursorPosition(e.target.selectionStart);
+                            }}
+                            onKeyDown={handleKeyDown}
+                            placeholder="Type @ to switch modes or start typing..."
+                            disabled={disabled}
+                            rows={1}
                             className={cn(
-                                "flex-shrink-0 w-12 h-12 rounded-2xl",
-                                "bg-indigo-500 hover:bg-indigo-600 dark:bg-sky-500 dark:hover:bg-sky-400",
-                                "disabled:bg-slate-300 dark:disabled:bg-slate-700",
-                                "disabled:cursor-not-allowed",
-                                "flex items-center justify-center",
+                                "w-full resize-none rounded-xl px-4 py-3.5",
+                                "bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm",
+                                "border border-slate-200/80 dark:border-slate-600/80",
+                                "focus:bg-white dark:focus:bg-slate-800",
+                                "focus:border-indigo-400 dark:focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-indigo-100 dark:focus:ring-sky-900/30",
+                                "text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500",
                                 "transition-all duration-200",
-                                "hover:scale-105 active:scale-95",
-                                "shadow-lg shadow-indigo-500/25 dark:shadow-sky-500/25 disabled:shadow-none"
+                                "disabled:opacity-50 disabled:cursor-not-allowed",
+                                "max-h-40 overflow-y-auto text-[15px] leading-relaxed"
                             )}
-                        >
-                            <Send size={18} className="text-white" />
-                        </button>
+                            style={{
+                                height: "auto",
+                                minHeight: "48px",
+                            }}
+                            onInput={(e) => {
+                                const target = e.target as HTMLTextAreaElement;
+                                target.style.height = "auto";
+                                target.style.height = Math.min(target.scrollHeight, 160) + "px";
+                            }}
+                        />
                     </div>
+
+                    {/* Send Button */}
+                    <button
+                        type="submit"
+                        disabled={!input.trim() || disabled}
+                        className={cn(
+                            "flex-shrink-0 w-12 rounded-xl self-stretch min-h-[48px]",
+                            "bg-indigo-500 hover:bg-indigo-600 dark:bg-sky-500 dark:hover:bg-sky-400",
+                            "disabled:bg-slate-300 dark:disabled:bg-slate-700",
+                            "disabled:cursor-not-allowed",
+                            "flex items-center justify-center",
+                            "transition-all duration-200",
+                            "hover:scale-105 active:scale-95",
+                            "shadow-lg shadow-indigo-500/25 dark:shadow-sky-500/25 disabled:shadow-none"
+                        )}
+                    >
+                        <Send size={18} className="text-white" />
+                    </button>
                 </div>
             </form>
         </div>
