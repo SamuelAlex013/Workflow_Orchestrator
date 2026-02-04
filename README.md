@@ -4,9 +4,9 @@
 
 ### Your Private, AI-Powered Assistant for n8n Automation
 
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-009688?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Next.js](https://img.shields.io/badge/Next.js-15-black?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
-[![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-blue?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.100+-FF6C37?style=for-the-badge&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![Next.js](https://img.shields.io/badge/Next.js-15-1A1F36?style=for-the-badge&logo=next.js&logoColor=white)](https://nextjs.org)
+[![Ollama](https://img.shields.io/badge/Ollama-Local_LLM-6340FF?style=for-the-badge&logo=ollama&logoColor=white)](https://ollama.com)
 
 *Stop searching through endless documentation. Start building workflows with AI that understands n8n.*
 
