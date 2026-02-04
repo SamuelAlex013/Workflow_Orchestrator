@@ -2,32 +2,83 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 
+ * Workflow Orchestrator Color System
+ * Light Mode: "Modern Minimalist" - Clean, approachable, fast
+ * Dark Mode: "Deep Sea Tech" - Developer-focused, reduces eye strain
+ * Following the 60-30-10 rule for balanced UI
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --gray-50: #f9fafb;
-  --gray-100: #f3f4f6;
-  --gray-200: #e5e7eb;
-  --gray-300: #d1d5db;
-  --gray-700: #374151;
-  --gray-800: #1f2937;
-  --gray-900: #111827;
-  --primary: #4f46e5;
-  --primary-hover: #4338ca;
+  /* Modern Minimalist - Light Mode */
+  --background: #F8FAFC;           /* Main canvas (Off-white) - 60% */
+  --foreground: #0F172A;           /* High-contrast headings */
+  
+  /* Surface colors - 30% */
+  --surface: #FFFFFF;              /* Cards, content areas */
+  --surface-hover: #F1F5F9;        /* Hover states */
+  
+  /* Neutrals for text and borders */
+  --gray-50: #F8FAFC;
+  --gray-100: #F1F5F9;
+  --gray-200: #E2E8F0;
+  --gray-300: #CBD5E1;
+  --gray-400: #94A3B8;
+  --gray-500: #64748B;
+  --gray-600: #475569;             /* Body text - readable */
+  --gray-700: #334155;
+  --gray-800: #1E293B;
+  --gray-900: #0F172A;
+  
+  /* Primary Action - 10% accent */
+  --primary: #6366F1;              /* Indigo - Brand/Primary buttons */
+  --primary-hover: #4F46E5;
+  --primary-light: #A5B4FC;
+  
+  /* Semantic colors */
+  --accent: #F59E0B;               /* Warnings, "Pending" states */
+  --accent-hover: #D97706;
+  --success: #10B981;              /* Success states */
+  --success-hover: #059669;
+  --error: #F43F5E;                /* Error logs, delete buttons */
+  --error-hover: #E11D48;
+  --info: #38BDF8;                 /* Info states */
 }
 
 .dark {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --gray-50: #18181b;
-  --gray-100: #27272a;
-  --gray-200: #3f3f46;
-  --gray-300: #52525b;
-  --gray-700: #a1a1aa;
-  --gray-800: #d4d4d8;
-  --gray-900: #fafafa;
-  --primary: #6366f1;
-  --primary-hover: #818cf8;
+  /* Deep Sea Tech - Dark Mode */
+  --background: #0F172A;           /* Main app background (Slate 900) - 60% */
+  --foreground: #F8FAFC;           /* High-contrast text */
+  
+  /* Surface colors - 30% */
+  --surface: #1E293B;              /* Sidebars, modals, cards */
+  --surface-hover: #334155;        /* Hover states */
+  
+  /* Neutrals - inverted for dark mode */
+  --gray-50: #1E293B;
+  --gray-100: #334155;
+  --gray-200: #475569;
+  --gray-300: #64748B;
+  --gray-400: #94A3B8;             /* Subtext and inactive icons */
+  --gray-500: #94A3B8;
+  --gray-600: #CBD5E1;
+  --gray-700: #E2E8F0;
+  --gray-800: #F1F5F9;
+  --gray-900: #F8FAFC;
+  
+  /* Primary Action - 10% accent (Sky Blue for dark mode) */
+  --primary: #38BDF8;              /* Buttons, active states, links */
+  --primary-hover: #7DD3FC;
+  --primary-light: #0EA5E9;
+  
+  /* Semantic colors - slightly brighter for dark mode */
+  --accent: #FBBF24;               /* Warnings */
+  --accent-hover: #F59E0B;
+  --success: #34D399;              /* Success/Online status */
+  --success-hover: #10B981;
+  --error: #FB7185;                /* Errors */
+  --error-hover: #F43F5E;
+  --info: #38BDF8;                 /* Info */
 }
 
 body {
@@ -37,13 +88,26 @@ body {
   transition: background-color 0.3s ease, color 0.3s ease;
 }
 
+/* Text color utilities following accessibility guidelines */
+.text-body {
+  color: var(--gray-600);  /* Readable paragraph text */
+}
+
+.text-heading {
+  color: var(--foreground);  /* High-contrast headings */
+}
+
+.text-muted {
+  color: var(--gray-400);  /* Subtext and inactive elements */
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;
   }
 }
 
-/* Custom scrollbar */
+/* Custom scrollbar - Minimal style */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -58,15 +122,48 @@ body {
   border-radius: 4px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-  background: var(--gray-200);
-}
-
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--gray-700);
+  background: var(--gray-400);
 }
 
 /* Smooth animations */
 * {
   @apply transition-colors duration-200;
+}
+
+/* Surface/Card utility classes */
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--gray-200);
+}
+
+.dark .surface {
+  border-color: var(--gray-100);
+}
+
+/* Primary button gradient */
+.btn-primary {
+  background: var(--primary);
+  color: white;
+}
+
+.btn-primary:hover {
+  background: var(--primary-hover);
+}
+
+/* Status indicators */
+.status-success {
+  color: var(--success);
+}
+
+.status-error {
+  color: var(--error);
+}
+
+.status-warning {
+  color: var(--accent);
+}
+
+.status-info {
+  color: var(--info);
 }

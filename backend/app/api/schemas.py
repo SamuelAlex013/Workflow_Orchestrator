@@ -53,7 +53,7 @@ class WorkflowAskRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)
     top_k: int = Field(5, ge=1, le=10)
     temperature: float = Field(0.7, ge=0, le=1)
-    max_answer_tokens: int = Field(1000, ge=100, le=2000)
+    max_answer_tokens: int = Field(2000, ge=100, le=4000)
     include_sources: bool = True
 
 

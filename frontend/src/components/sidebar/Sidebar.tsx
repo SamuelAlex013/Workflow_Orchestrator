@@ -44,14 +44,14 @@ export function Sidebar({ conversations }: SidebarProps) {
 
             {/* Sidebar */}
             <div className={cn(
-                "w-72 h-screen bg-white dark:bg-gray-900 border-r border-gray-200/50 dark:border-gray-800/50 flex flex-col transition-transform duration-300 z-50",
+                "w-72 h-screen bg-white dark:bg-[#1E293B] border-r border-slate-200 dark:border-slate-700/50 flex flex-col transition-transform duration-300 z-50",
                 "md:relative md:translate-x-0",
                 isCollapsed ? "-translate-x-full fixed" : "translate-x-0 fixed md:relative"
             )}>
                 {/* Header with App Icon */}
                 <div className="p-5 border-b border-gray-200/50 dark:border-gray-800/50">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center shadow-md">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-500 dark:bg-sky-500 flex items-center justify-center shadow-md">
                             <span className="text-white font-bold text-base">WO</span>
                         </div>
                         <h1 className="text-base font-semibold text-gray-900 dark:text-white">
@@ -65,7 +65,7 @@ export function Sidebar({ conversations }: SidebarProps) {
                     <Link
                         href="/chat"
                         onClick={() => setIsCollapsed(true)}
-                        className="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 text-white font-medium transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-purple-500/30"
+                        className="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-600 dark:bg-sky-500 dark:hover:bg-sky-400 text-white font-medium transition-all hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-indigo-500/25 dark:shadow-sky-500/25"
                     >
                         <MessageSquarePlus size={18} />
                         <span className="text-sm">New Conversation</span>
@@ -85,8 +85,8 @@ export function Sidebar({ conversations }: SidebarProps) {
                                     className={cn(
                                         "block px-4 py-3 rounded-xl transition-all",
                                         isActive
-                                            ? "bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300"
-                                            : "hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                                            ? "bg-indigo-50 dark:bg-sky-900/20 text-indigo-700 dark:text-sky-300 border-l-2 border-indigo-500 dark:border-sky-500"
+                                            : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
                                     )}
                                 >
                                     <div className="flex items-start justify-between">

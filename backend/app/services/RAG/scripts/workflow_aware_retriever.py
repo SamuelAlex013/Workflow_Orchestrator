@@ -3,7 +3,7 @@ Smart multi-concept workflow retrieval.
 Detects when user needs multiple node types (trigger + action) and retrieves both.
 """
 
-from rag_retriever_reranked import RAGRetrieverWithReranking
+from .rag_retriever_reranked import RAGRetrieverWithReranking
 from typing import List, Dict
 import re
 
