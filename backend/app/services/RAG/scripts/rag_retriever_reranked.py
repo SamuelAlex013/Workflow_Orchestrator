@@ -190,9 +190,9 @@ class RAGRetrieverWithReranking:
         # Step 1: Query expansion (optional)
         search_query = self.expand_query(query) if expand_query else query
         
-        print(f"Original query: {query}")
-        if expand_query:
-            print(f"Expanded query: {search_query}")
+        #print(f"Original query: {query}")
+        # if expand_query:
+        #     print(f"Expanded query: {search_query}")
         
         # Step 2: Initial FAISS retrieval (get more candidates for re-ranking)
         retrieve_count = initial_candidates if use_reranking else top_k
@@ -218,7 +218,7 @@ class RAGRetrieverWithReranking:
         
         # Step 3: Cross-encoder re-ranking (if enabled)
         if use_reranking and len(candidates) > 0:
-            print(f"\n🔍 Re-ranking {len(candidates)} candidates with cross-encoder...")
+           # print(f"\n🔍 Re-ranking {len(candidates)} candidates with cross-encoder...")
             
             # Prepare pairs for re-ranking
             pairs = [[query, candidate['text'][:1000]] for candidate in candidates]
@@ -260,17 +260,17 @@ class RAGRetrieverWithReranking:
                         # Heavy penalty for pure config docs
                         candidate['rerank_score'] -= 8.0
                         candidate['config_penalty'] = -8.0
-                        print(f"   ⚠️ Config doc penalty: {header_lower[:60]}")
+                       # print(f"   ⚠️ Config doc penalty: {header_lower[:60]}")
                     elif has_db_node_ref:
                         # Boost chunks that reference actual database nodes
                         candidate['rerank_score'] += 3.0
                         candidate['node_boost'] = 3.0
-                        print(f"   ✅ DB node boost: {header_lower[:60]}")
+                       # print(f"   ✅ DB node boost: {header_lower[:60]}")
             
             # Step 3.5: Apply keyword boost - boost chunks that contain important query keywords
             query_keywords = self._extract_important_keywords(query)
             if query_keywords:
-                print(f"   Applying keyword boost for: {query_keywords}")
+                #print(f"   Applying keyword boost for: {query_keywords}")
                 for candidate in candidates:
                     text_lower = candidate['text'].lower()
                     header_lower = candidate['metadata'].get('header_path', '').lower()
@@ -286,14 +286,14 @@ class RAGRetrieverWithReranking:
             # Sort by rerank score (higher is better)
             candidates.sort(key=lambda x: x['rerank_score'], reverse=True)
             
-            print(f"✅ Re-ranking complete")
-            print("\nTop 5 after re-ranking:")
+            # print(f"✅ Re-ranking complete")
+            # print("\nTop 5 after re-ranking:")
             for i, c in enumerate(candidates[:5], 1):
                 header = c['metadata'].get('header_path', 'Unknown')
                 node_type = c['metadata'].get('node_type', 'unknown')
                 boost = c.get('keyword_boost', 0)
-                print(f"  {i}. {header[:60]}")
-                print(f"     Score: {c['rerank_score']:.3f} (keyword boost: +{boost:.1f}) | Type: {node_type}")
+               # print(f"  {i}. {header[:60]}")
+                #print(f"     Score: {c['rerank_score']:.3f} (keyword boost: +{boost:.1f}) | Type: {node_type}")
         
         # Return top k results
         return candidates[:top_k]

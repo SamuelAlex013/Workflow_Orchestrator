@@ -42,8 +42,8 @@ class LLMService:
                 # Priority: deepseek-r1:1.5b > phi3 > gemma3
                 if any("llama3.2" in m.get("name", "") for m in models):
                     self.ollama_available = True
-                    self.model = "deepseek-r1:1.5b"
-                    print(f"✅ Ollama detected with DeepSeek-R1 1.5B (memory-efficient)")
+                    self.model = "llama3.2"
+                    print(f"✅ Ollama detected with Llama 3.2")
                 elif any("phi3" in m.get("name", "") for m in models):
                     self.ollama_available = True
                     self.model = "phi3"
@@ -52,10 +52,10 @@ class LLMService:
                     self.ollama_available = True
                     self.model = "gemma3:270m"
                     print(f"✅ Ollama detected with Gemma3 270M")
-                elif any("llama3.2" in m.get("name", "") for m in models):
+                elif any("deepseek-r1:1.5b" in m.get("name", "") for m in models):
                     self.ollama_available = True
-                    self.model = "llama3.2"
-                    print(f"⚠️  Using Llama 3.2 (may require more RAM)")
+                    self.model = "deepseek-r1:1.5b"
+                    print(f"⚠️  Using DeepSeek-R1 1.5B (may require more RAM)")
         except Exception as e:
             print(f"⚠️  Ollama not available: {e}")
         
@@ -185,7 +185,9 @@ class LLMService:
         confidence = "high" if avg_distance < 0.5 else ("medium" if avg_distance < 0.8 else "low")
         
         # Build prompts
-        system_prompt = """You are an expert n8n workflow automation assistant. Your role is to help users understand how to build workflows in n8n by providing clear, accurate answers based on the official documentation.
+        system_prompt = """You are an expert n8n workflow automation assistant. 
+        Your role is to help users understand how to build workflows in n8n by 
+        providing clear, accurate answers based on the official documentation.
 
 Guidelines:
 1. Answer the user's question using ONLY the provided documentation context
@@ -201,7 +203,10 @@ Guidelines:
 Documentation Context:
 {context}
 
-Please provide a comprehensive answer to the user's question based on the documentation above. If this is a workflow-building question (e.g., "I want to take messages from X and store in Y"), provide:
+Please provide a comprehensive answer to the user's question based on the 
+documentation above. 
+If this is a workflow-building question 
+(e.g., "I want to take messages from X and store in Y"), provide:
 1. Required nodes and their configuration
 2. Step-by-step workflow structure
 3. Any authentication/credentials needed
@@ -362,13 +367,13 @@ Answer:"""
                             token_count += 1
                             yield token
                         if data.get("done", False):
-                            print(f"\n✅ Ollama stream completed: {token_count} tokens")
+                            #print(f"\n✅ Ollama stream completed: {token_count} tokens")
                             break
                     except json.JSONDecodeError:
                         continue
             
             # If we exit without 'done', log it
-            print(f"\n⚠️ Ollama stream ended (total tokens: {token_count})")
+            #print(f"\n⚠️ Ollama stream ended (total tokens: {token_count})")
                         
         except requests.exceptions.Timeout:
             yield "\n\n[Response timed out. Please try a shorter query.]"

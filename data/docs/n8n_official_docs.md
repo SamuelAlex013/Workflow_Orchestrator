@@ -143,7 +143,7 @@ n8n provides various transformation functions that operate on dates. These funct
 
 To identify any workflows and nodes that might be impacted by this change, you can use this [utility workflow](https://n8n.io/workflows/1929-v1-helper-find-params-with-affected-expressions/).
 
-For more information about date transformation functions, please refer to the [official documentation](../code/builtin/data-transformation-functions/dates/).
+For more information about date transformation functions, please refer to the [official documentation](../data/expression-reference/).
 
 [PR #6435](https://github.com/n8n-io/n8n/pull/6435)
 
@@ -191,7 +191,7 @@ We would like to take a moment to express our gratitude to all of our users for 
 
 # n8n v2.0 breaking changes
 
-n8n v2.0 will be released soon. This document highlights important breaking changes and actions you should take to prepare for the transition. These updates improve security, simplify configuration, and remove legacy features.
+n8n v2.0 has been released, and with it came some important changes. This document highlights breaking changes and actions you should take to prepare for the transition. These updates improve security, simplify configuration, and remove legacy features.
 
 The release of n8n 2.0 continues n8n's commitment to providing a secure, reliable, and production-ready automation platform. This major version includes important security enhancements and cleanup of deprecated features.
 
@@ -363,7 +363,7 @@ The `N8N_CONFIG_FILES` environment variable has been removed.
 The `update:workflow` CLI command will be deprecated and replaced by two new commands to deliver similar functionality and more clarity:
 
 - `publish:workflow` with parameters `id` and `versionId` (optional)
-- The `--all` parameter will be removed to prevent accidental publishing of workflows in production environments
+  - The `--all` parameter will be removed to prevent accidental publishing of workflows in production environments
 - `unpublish:workflow` with parameters `id` and `all`
 
 **Migration path:** Use the new `publish:workflow` command to publish workflows individually by ID, optionally specifying a version. For unpublishing, use the new `unpublish:workflow` command. This provides better clarity and control over workflow publishing states.
@@ -401,7 +401,7 @@ There are different ways to set up n8n depending on how you intend to use it:
   - [npm](../hosting/installation/npm/)
   - [Docker](../hosting/installation/docker/)
   - [Server setup guides](../hosting/installation/server-setups/) for popular platforms
-- [Embed](../embed/): n8n Embed allows you to white label n8n and build it into your own product. Contact n8n on the [Embed website](https://n8n.io/embed/) for pricing and support.
+- [OEM deployment](../hosting/oem-deployment/): Surface n8n's interface inside your own product's UI. Requires an OEM agreement - [contact n8n](mailto:license@n8n.io) for details.
 
 Self-hosting knowledge prerequisites
 
@@ -441,12 +441,14 @@ For details of the Cloud plans and contact details for Enterprise Self-hosted, r
 Feature availability
 
 - External secrets are available on Enterprise Self-hosted and Enterprise Cloud plans.
-- n8n supports AWS Secrets Manager, Azure Key Vault, GCP Secrets Manager, Infisical and HashiCorp Vault.
+- n8n supports the following secret providers: 1Password (via [Connect Server](https://developer.1password.com/docs/connect/get-started/)), AWS Secrets Manager, Azure Key Vault, GCP Secrets Manager, and HashiCorp Vault.
+- From n8n version 2.10.0 you can connect multiple vaults per secret provider. Older versions only support one vault per provider.
+- From version `2.13.0`, if enabled, project editors can use external secrets within their projects, and project admins can also manage project vaults.
 - n8n doesn't support [HashiCorp Vault Secrets](https://developer.hashicorp.com/hcp/docs/vault-secrets).
 
 Infisical deprecation
 
-Infisical is deprecated and is no longer recommended. Use an alternative external secrets provider.
+Infisical is deprecated. From version 2.10.0, you can't connect new Infisical vaults. Existing ones remain for now.
 
 You can use an external secrets store to manage [credentials](../glossary/#credential-n8n) for n8n.
 
@@ -454,101 +456,152 @@ n8n stores all credentials encrypted in its database, and restricts access to th
 
 ## Connect n8n to your secrets store
 
-Secret names
+Secret values
 
-Your secret names can't contain spaces, hyphens, or other special characters. n8n supports secret names containing alphanumeric characters (`a-z`, `A-Z`, and `0-9`), and underscores. n8n currently only supports plaintext values for secrets, not JSON objects or key-value pairs.
+n8n only supports plaintext values for secrets, not JSON objects.
 
 1. In n8n, go to **Settings** > **External Secrets**.
-
-1. Select **Set Up** for your store provider.
-
-1. Enter the credentials for your provider:
-
-   - Azure Key Vault: Provide your **vault name**, **tenant ID**, **client ID**, and **client secret**. Refer to the Azure documentation to [register a Microsoft Entra ID app and create a service principal](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal). n8n supports only single-line values for secrets.
-
-   - AWS Secrets Manager: provide your **access key ID**, **secret access key**, and **region**. The IAM user must have the `secretsmanager:ListSecrets`, `secretsmanager:BatchGetSecretValue`, and `secretsmanager:GetSecretValue` permissions.
-
-     To give n8n access to all secrets in your AWS Secrets Manager, you can attach the following policy to the IAM user:
-
-     ```
-     {
-     	"Version": "2012-10-17",
-     	"Statement": [
-     		{
-     			"Sid": "AccessAllSecrets",
-     			"Effect": "Allow",
-     			"Action": [
-     				"secretsmanager:ListSecrets",
-     				"secretsmanager:BatchGetSecretValue",
-     				"secretsmanager:GetResourcePolicy",
-     				"secretsmanager:GetSecretValue",
-     				"secretsmanager:DescribeSecret",
-     				"secretsmanager:ListSecretVersionIds",
-     			],
-     			"Resource": "*"
-     		}
-     	]
-     }
-     ```
-
-     You can also be more restrictive and give n8n access to select specific AWS Secret Manager secrets. You still need to allow the `secretsmanager:ListSecrets` and `secretsmanager:BatchGetSecretValue` permissions to access all resources. These permissions allow n8n to retrieve ARN-scoped secrets, but don't provide access to the secret values.
-
-     Next, you need set the scope for the `secretsmanager:GetSecretValue` permission to the specific Amazon Resource Names (ARNs) for the secrets you wish to share with n8n. Ensure you use the correct region and account ID in each resource ARNs. You can find the ARN details in the AWS dashboard for your secrets.
-
-     For example, the following IAM policy only allows access to secrets with a name starting with `n8n` in your specified AWS account and region:
-
-     ```
-     {
-     	"Version": "2012-10-17",
-     	"Statement": [
-     		{
-     			"Sid": "ListingSecrets",
-     			"Effect": "Allow",
-     			"Action": [
-     				"secretsmanager:ListSecrets",
-     				"secretsmanager:BatchGetSecretValue"
-     			],
-     			"Resource": "*"
-     		},
-     		{
-     			"Sid": "RetrievingSecrets",
-     			"Effect": "Allow",
-     			"Action": [
-     				"secretsmanager:GetSecretValue",
-     				"secretsmanager:DescribeSecret"
-     			],
-     			"Resource": [
-     				"arn:aws:secretsmanager:us-west-2:123456789000:secret:n8n*"
-     			]
-     		}
-     	]
-     }
-     ```
-
-     For more IAM permission policy examples, consult the [AWS documentation](https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access_iam-policies.html#auth-and-access_examples_batch).
-
-   - HashiCorp Vault: provide the **Vault URL** for your vault instance, and select your **Authentication Method**. Enter your authentication details. Optionally provide a namespace.
-
-     - Refer to the HashiCorp documentation for your authentication method: [Token auth method](https://developer.hashicorp.com/vault/docs/auth/token)\
-       [AppRole auth method](https://developer.hashicorp.com/vault/docs/auth/approle)\
-       [Userpass auth method](https://developer.hashicorp.com/vault/docs/auth/userpass)
-     - If you use vault namespaces, you can enter the namespace n8n should connect to. Refer to [Vault Enterprise namespaces](https://developer.hashicorp.com/vault/docs/enterprise/namespaces) for more information on HashiCorp Vault namespaces.
-
-   - Infisical: provide a **Service Token**. Refer to Infisical's [Service token](https://infisical.com/docs/documentation/platform/token) documentation for information on getting your token. If you self-host Infisical, enter the **Site URL**.
-
-     Infisical environment
-
-     Make sure you select the correct Infisical environment when creating your token. n8n will load secrets from this environment, and won't have access to secrets in other Infisical environments. n8n only support service tokens that have access to a single environment.
-
-     Infisical folders
-
-     n8n doesn't support [Infisical folders](https://infisical.com/docs/documentation/platform/folder).
-
-   - Google Cloud Platform: provide a **Service Account Key** (JSON) for a service account that has at least these roles: `Secret Manager Secret Accessor` and `Secret Manager Secret Viewer`. Refer to Google's [service account documentation](https://cloud.google.com/iam/docs/service-account-overview) for more information.
-
+1. Click **Add secrets vault**.
+1. Enter a unique name for your vault. This will be the first segment when referencing this vault in a `{{ $secrets.<vault-name>... }}` expression in a credential.
+1. Select one of the supported secret providers.
+1. Enter the credentials for your provider. Refer to the provider-specific sections below for details.
 1. **Save** your configuration.
 
-1. Enable the provider using the **Disabled / Enabled** toggle.
+As long as this store is connected, you can reference its secrets in credentials.
+
+### 1Password
+
+1Password Connect Server required
+
+n8n integrates with [1Password Connect Server](https://developer.1password.com/docs/connect/get-started/), a self-hosted API for machine access to 1Password. This isn't the same as a personal or team 1Password account. You must deploy and run a Connect Server to use this provider.
+
+Provide your **Connect Server URL** and **Access Token**. The Connect Server URL is the address where your server is accessible (for example, `http://localhost:8080`). The Access Token is the token you created for the Connect Server integration.
+
+n8n reads all vaults and items accessible to the token. Each 1Password item becomes a secret, with the item's fields accessible as properties. Use `{{ $secrets.<vault-name>.<item-title>.<field-label> }}` to access a specific field value.
+
+### AWS Secrets Manager
+
+Provide your **access key ID**, **secret access key**, and **region**. The IAM user must have the `secretsmanager:ListSecrets`, `secretsmanager:BatchGetSecretValue`, and `secretsmanager:GetSecretValue` permissions.
+
+To give n8n access to all secrets in your AWS Secrets Manager, you can attach the following policy to the IAM user:
+
+```
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "AccessAllSecrets",
+			"Effect": "Allow",
+			"Action": [
+				"secretsmanager:ListSecrets",
+				"secretsmanager:BatchGetSecretValue",
+				"secretsmanager:GetResourcePolicy",
+				"secretsmanager:GetSecretValue",
+				"secretsmanager:DescribeSecret",
+				"secretsmanager:ListSecretVersionIds"
+			],
+			"Resource": "*"
+		}
+	]
+}
+```
+
+You can also be more restrictive and give n8n access to select specific AWS Secret Manager secrets. You still need to allow the `secretsmanager:ListSecrets` and `secretsmanager:BatchGetSecretValue` permissions to access all resources. These permissions allow n8n to retrieve ARN-scoped secrets, but don't provide access to the secret values.
+
+Next, you need set the scope for the `secretsmanager:GetSecretValue` permission to the specific Amazon Resource Names (ARNs) for the secrets you wish to share with n8n. Ensure you use the correct region and account ID in each resource ARNs. You can find the ARN details in the AWS dashboard for your secrets.
+
+For example, the following IAM policy only allows access to secrets with a name starting with `n8n` in your specified AWS account and region:
+
+```
+{
+	"Version": "2012-10-17",
+	"Statement": [
+		{
+			"Sid": "ListingSecrets",
+			"Effect": "Allow",
+			"Action": [
+				"secretsmanager:ListSecrets",
+				"secretsmanager:BatchGetSecretValue"
+			],
+			"Resource": "*"
+		},
+		{
+			"Sid": "RetrievingSecrets",
+			"Effect": "Allow",
+			"Action": [
+				"secretsmanager:GetSecretValue",
+				"secretsmanager:DescribeSecret"
+			],
+			"Resource": [
+				"arn:aws:secretsmanager:us-west-2:123456789000:secret:n8n*"
+			]
+		}
+	]
+}
+```
+
+For more IAM permission policy examples, consult the [AWS documentation](https://docs.aws.amazon.com/secretsmanager/latest/userguide/auth-and-access_iam-policies.html#auth-and-access_examples_batch).
+
+### Azure Key Vault
+
+Provide your **vault name**, **tenant ID**, **client ID**, and **client secret**. Refer to the Azure documentation to [register a Microsoft Entra ID app and create a service principal](https://learn.microsoft.com/en-us/entra/identity-platform/howto-create-service-principal-portal). n8n supports only single-line values for secrets.
+
+### GCP Secrets Manager
+
+Provide a **Service Account Key** (JSON) for a service account that has at least these roles: `Secret Manager Secret Accessor` and `Secret Manager Secret Viewer`. Refer to Google's [service account documentation](https://cloud.google.com/iam/docs/service-account-overview) for more information.
+
+### HashiCorp Vault
+
+Provide the **Vault URL** for your vault instance, and select your **Authentication Method**. Enter your authentication details. Optionally provide a namespace.
+
+- Refer to the HashiCorp documentation for your authentication method:
+  - [Token auth method](https://developer.hashicorp.com/vault/docs/auth/token)
+  - [AppRole auth method](https://developer.hashicorp.com/vault/docs/auth/approle)
+  - [Userpass auth method](https://developer.hashicorp.com/vault/docs/auth/userpass)
+- If you use vault namespaces, you can enter the namespace n8n should connect to. Refer to [Vault Enterprise namespaces](https://developer.hashicorp.com/vault/docs/enterprise/namespaces) for more information on HashiCorp Vault namespaces.
+
+#### Manual KV mount configuration
+
+By default, n8n autodiscovers KV secret engines by reading `sys/mounts`. If your Vault token doesn't have access to `sys/mounts`, you can manually specify the KV engine mount path and version instead:
+
+- **KV Mount Path**: The mount path of your KV secret engine (for example, `secret/`). When set, n8n skips `sys/mounts` autodiscovery and uses this path directly. Leave blank to use autodiscovery.
+- **KV Version**: The KV engine version (`v1` or `v2`). Defaults to `v2`. Only applies when you specify a **KV Mount Path**.
+
+Your Vault token still needs read and list access to the KV path itself. The following example shows a minimal Vault policy for a KV v2 mount at `secret/`:
+
+```
+# Read and list secrets at the "secret/" KV v2 mount
+path "secret/data/*" {
+  capabilities = ["read"]
+}
+path "secret/metadata/*" {
+  capabilities = ["read", "list"]
+}
+```
+
+For KV v1, you only need a single policy path:
+
+```
+# Read and list secrets at the "kv/" KV v1 mount
+path "kv/*" {
+  capabilities = ["read", "list"]
+}
+```
+
+## Share vault
+
+By default, a secrets vault is **global**: users across the instance can use credentials that reference secrets from that vault.
+
+Instance admins can share a vault with a specific [project](../user-management/rbac/projects/). Once you assign a vault to a project, only that project’s credentials can reference its secrets. You can choose to tie a vault to a single project or keep it global.
+
+To change the vault scope:
+
+1. In n8n, go to **Settings** > **External Secrets**.
+1. Find the vault you want to configure and select **Edit**.
+1. Under **Share**, choose one of the following:
+   - **Global**: Share this vault across your entire n8n instance. This allows credentials across the instance to reference these secrets.
+   - **Project**: Restrict this vault to a specific project. Choosing a project limits secret access to only that project's credentials.
+1. **Save** your configuration.
 
 ## Use secrets in n8n credentials
 
@@ -567,29 +620,64 @@ To use a secret from your store in an n8n credential:
    {{ $secrets.<vault-name>.<secret-name> }}
    ```
 
-   `<vault-name>` is either `vault` (for HashiCorp) or `infisical` or `awsSecretsManager`. Replace `<secret-name>` with the name as it appears in your vault.
+   `<vault-name>` is the one you entered when you added the store. Replace `<secret-name>` with the name as it appears in your vault.
 
 ## Using external secrets with n8n environments
 
-n8n's [Source control and environments](../source-control-environments/) feature allows you to create different n8n environments, backed by Git. The feature doesn't support using different credentials in different instances. You can use an external secrets vault to provide different credentials for different environments by connecting each n8n instance to a different vault or project environment.
-
-For example, you have two n8n instances, one for development and one for production. You use Infisical for your vault. In Infisical, create a project with two environments, development and production. Generate a token for each Infisical environment. Use the token for the development environment to connect your development n8n instance, and the token for your production environment to connect your production n8n instance.
+n8n's [Source control and environments](../source-control-environments/) feature allows you to create different n8n environments, backed by Git. The feature doesn't support using different credentials in different instances. You can use an external secrets vault to provide different credentials for different environments by connecting each n8n instance to a different vault or project environment. \
+For example, you have two n8n instances, one for development and one for production. In your secrets provider, create a project with two environments, development and production. Generate a token for each environment of your secrets provider. Use the token for the development environment to connect your development n8n instance, and the token for your production environment to connect your production n8n instance.
 
 ## Using external secrets in projects
 
-To use external secrets in an [RBAC project](../user-management/rbac/), you must have an [instance owner or instance admin](../user-management/account-types/) as a member of the project.
+You can share a vault with a project so that only that project's credentials can reference its secrets. Refer to [Share vault](#share-vault) for setup steps. Project-scoped vaults are available from version `2.11.0`.
+
+### Access for project roles
+
+Version `2.13.0` and later
+
+Before version `2.13.0`, using external secrets in an [RBAC project](../user-management/rbac/) required an [instance owner or instance admin](../user-management/account-types/) as a member of the project.
+
+From version `2.13.0`, instance owners and admins can grant [project editors](../user-management/rbac/role-types/#project-editor) and [project admins](../user-management/rbac/role-types/#project-admin) access to external secrets.
+
+To enable this:
+
+1. Go to **Settings** > **External Secrets**.
+1. Turn on **Enable external secrets for project roles**.
+
+When enabled, **Project Editors** can:
+
+- View available external secret vaults shared with the project (in **Project** > **Settings**).
+- Use secrets from the project's vaults in credentials.
+
+**Project Admins** get the same access, plus they can:
+
+- Create new vaults for the project (in **Project** > **Settings**).
+- Update and delete vaults assigned to the project.
+
+Global vault access
+
+Global vaults created in **Settings** > **External Secrets** are visible in **Project** > **Settings** but are read-only for project roles. Only instance admins can modify or delete global vaults.
+
+### Custom roles
+
+For more fine-grained access control, instance owners and admins can create a [custom project role](../user-management/rbac/custom-roles/). Go to **Settings** > **Project roles** > **Create role**. In the list of permissions, configure:
+
+- **Secrets vaults**: Controls vault management (create, view, edit, delete, and sync vaults).
+- **Secrets**: Controls whether the role can use secrets in credential expressions.
+
+Both permissions are independent. For example, a role may need only the **Secrets** permission to use secrets in credentials without managing vaults. Refer to [Secret vault scopes](../user-management/rbac/custom-roles/#secret-vault-scopes) for the full list of available scopes.
 
 ## Troubleshooting
 
-### Infisical version changes
+### Secrets don't resolve in production
 
-Infisical version upgrades can introduce problems connecting to n8n. If your Infisical connection stops working, check if there was a recent version change. If so, report the issue to help@n8n.io.
+Version `2.13.0` and later
 
-### Only set external secrets on credentials owned by an instance owner or admin
+From version `2.13.0`, project editors and admins with [secrets access enabled](#access-for-project-roles) can use external secrets in their own credentials. The restriction below applies only to older versions or when the opt-in toggle is off.
 
-Due to the permissions that instance owners and admins have, it's possible for owners and admins to update credentials owned by another user with a secrets expression. This will appear to work in preview for an instance owner or admin, but the secret won't resolve when the workflow runs in production.
+In versions before `2.13.0` (or when **Enable external secrets for project roles** is off), only instance owners and admins can resolve secrets at runtime. If an owner or admin updates another user's credential with a secrets expression, it may appear to work in preview but fail in production.
 
-Only use external secrets for credentials that are owned by an instance admin or owner. This ensures they resolve correctly in production.
+In this case, only use external secrets in credentials owned by an instance owner or admin.
 
 #### AI agent
 
@@ -713,13 +801,13 @@ An n8n workflow is a collection of nodes that automate a process. Workflows begi
 
 Insights gives instance owners and admins visibility into how workflows perform over time. This feature consists of three parts:
 
-- [**Insights summary banner**](#insights-summary-banner): Shows key metrics about your instance from the last 7 days at the top of the overview space.
+- [**Insights summary banner**](#insights-summary-banner): Shows key metrics about your instance from the last 7 days at the top of the **Overview** space.
 - [**Insights dashboard**](#insights-dashboard): A more detailed visual breakdown with per-workflow metrics and historical comparisons.
 - [**Time saved (Workflow ROI)**](#setting-the-time-saved-by-a-workflow): For each workflow, you can choose to set a fixed amount of time saved per workflow, or dynamically calculate time saved based on the execution path taken on a specific workflow.
 
 Feature availability
 
-The insights summary banner displays activity from the last 7 days for all plans. The insights dashboard is only available on Pro (with limited date ranges) and Enterprise plans.
+The insights summary banner displays activity from the last 7 days for all plans. The insights dashboard is only available on Pro, Business, and Enterprise plans.
 
 ## Insights summary banner
 
@@ -733,7 +821,7 @@ n8n collects several metrics for both the insights summary banner and dashboard.
 
 ## Insights dashboard
 
-Those on the Pro and Enterprise plans can access the **Insights** section from the side navigation. Each metric from the summary banner is also clickable, taking you to the corresponding chart.
+Access the **Insights** section from the side navigation. Each metric from the summary banner is also clickable, taking you to the corresponding chart.
 
 The insights dashboard also has a table showing individual insights from each workflow including total production executions, failed production executions, failure rate, time saved, and run time average.
 
@@ -742,6 +830,7 @@ The insights dashboard also has a table showing individual insights from each wo
 By default, the insights summary banner and dashboard show a rolling 7 day window with a comparison to the previous period to identify increases or decreases for each metric. On the dashboard, paid plans also display data for other date ranges:
 
 - Pro: 7 and 14 days
+- Business: 24 hours, 7 days, 14 days, 30 days.
 - Enterprise: 24 hours, 7 days, 14 days, 30 days, 90 days, 6 months, 1 year
 
 ## Setting the time saved by a workflow
@@ -857,7 +946,7 @@ n8n provides keyboard shortcuts for some actions.
 
 ## Node panel
 
-- **Tab**: open the Node Panel
+- **N**: open the Node Panel
 - **Enter**: insert selected node into workflow
 - **Escape**: close Node panel
 
@@ -995,10 +1084,13 @@ The following events are available. You can choose which events to stream in **S
   - Started
   - Success
   - Failed
+  - Cancelled
 - Node executions
   - Started
   - Finished
 - Audit
+  - User login success
+  - User login failed
   - User signed up
   - User updated
   - User deleted
@@ -1014,16 +1106,40 @@ The following events are available. You can choose which events to stream in **S
   - User credentials deleted
   - User API created
   - User API deleted
+  - User MFA enabled
+  - User MFA disabled
+  - User execution deleted
+  - Execution data revealed
+  - Execution data reveal failed
+  - Workflow executed
   - Package installed
   - Package updated
   - Package deleted
   - Workflow created
   - Workflow deleted
   - Workflow updated
+  - Workflow archived
+  - Workflow unarchived
+  - Workflow activated
+  - Workflow deactivated
+  - Workflow version updated
+  - Variable created
+  - Variable updated
+  - Variable deleted
+  - External secrets provider settings saved
+  - External secrets provider reloaded
+  - Personal publishing restricted enabled
+  - Personal publishing restricted disabled
+  - Personal sharing restricted enabled
+  - Personal sharing restricted disabled
+  - 2FA enforcement enabled
+  - 2FA enforcement disabled
+- Worker
+  - Started
+  - Stopped
 - AI node logs
   - Memory get messages
   - Memory added message
-  - Output parser get instructions
   - Output parser parsed
   - Retriever get relevant documents
   - Embeddings embedded document
@@ -1033,7 +1149,9 @@ The following events are available. You can choose which events to stream in **S
   - Tool called
   - Vector store searched
   - LLM generated
+  - LLM error
   - Vector store populated
+  - Vector store updated
 - Runner
   - Task requested
   - Response received
@@ -1084,9 +1202,9 @@ Shows breaking changes that affect specific workflows in your instance. What you
 
 - **Issue title:** A clear name for the problem
 - **Severity badge (Critical/Medium/Low):** How urgent this is to fix
-- **Critical:** Fix before upgrading or workflows will fail
-- **Medium:** May cause unexpected behavior or require attention soon
-- **Low:** Minor changes or deprecations that won't break functionality
+  - **Critical:** Fix before upgrading or workflows will fail
+  - **Medium:** May cause unexpected behavior or require attention soon
+  - **Low:** Minor changes or deprecations that won't break functionality
 - **Description:** Explanation of what's changing and why it matters
 - **Documentation link:** Click to read detailed migration explanations
 - **Affected workflow count:** How many of your workflows have this issue
@@ -1170,7 +1288,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## How to update n8n
 
@@ -1193,14 +1311,594 @@ Older versions
 
 You can find the release notes for older versions of n8n: [1.x](1-x/) and [0.x](0-x/)
 
+## n8n@2.16.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.15.0...n8n@2.16.0) for this version.\
+**Release date:** 2026-04-07
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.15.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.14.0...n8n@2.15.0) for this version.\
+**Release date:** 2026-03-30
+
+This release contains bug fixes.
+
+### Contributors
+
+[manusjs](https://github.com/manusjs)
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.14.2
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.14.1...n8n@2.14.2) for this version.\
+**Release date:** 2026-03-26
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.14.1
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.14.0...n8n@2.14.1) for this version.\
+**Release date:** 2026-03-25
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.14.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.13.2...n8n@2.14.0) for this version.\
+**Release date:** 2026-03-24
+
+This release contains bug fixes.
+
+### Contributors
+
+[pkaya89](https://github.com/pkaya89)\
+[kesku](https://github.com/kesku)
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.13.4
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.13.3...n8n@2.13.4) for this version.\
+**Release date:** 2026-03-26
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.13.3
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.13.2...n8n@2.13.3) for this version.\
+**Release date:** 2026-03-25
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.13.2
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.13.1...n8n@2.13.2) for this version.\
+**Release date:** 2026-03-20
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.13.1
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.13.0...n8n@2.13.1) for this version.\
+**Release date:** 2026-03-18
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.13.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.12.0...n8n@2.13.0) for this version.\
+**Release date:** 2026-03-16
+
+This release contains bug fixes and features.
+
+### Visual diff comes to version history
+
+Open version history, click **Compare changes**, pick any two versions, and the canvas renders both side by side with changed nodes highlighted. A change count badge on each version helps you spot significant edits at a glance.
+
+Visual diff is available on Cloud Pro and above.
+
+### Project-scoped external secrets: full team access (Enterprise)
+
+What's new:
+
+- Project admins manage their own vault connections from project settings.
+- Project editors can use project-scoped secrets in credentials once the instance admin enables access.
+- [Custom roles](../user-management/rbac/custom-roles/) now include five secrets scopes: list, read, create, update, and delete.
+- Instance admins/owners no longer need to be project members for secrets to resolve.
+
+**For instance admins:** go to **Settings > External Secrets** and enable the **System Roles** toggle, or use custom roles for more granular control.
+
+**For project admins:** go to **Project Settings > External Secrets** to create and manage project-level connections. Instance-level connections shared with you appear as read-only.
+
+Refer to [External secrets](../external-secrets/) for more information. Project-scoped external secrets are available on n8n Enterprise.
+
+### Folder-based filtering in the push and pull dialog (Enterprise)
+
+The push and pull dialogs now include a **Folder** filter alongside Status and Owner. Selecting a folder scopes the list to workflows in that folder and its subfolders, shown as a hierarchical tree with folder-level checkboxes. Text search also matches folder names.
+
+Folder-based filtering is available on n8n Enterprise (requires [Environments](../source-control-environments/setup/) configured).
+
+### Contributors
+
+[tbigby-kristin](https://github.com/tbigby-kristin)\
+[ajuijas](https://github.com/ajuijas)\
+[ByteEVM](https://github.com/ByteEVM)\
+[mjain](https://github.com/mjain)\
+[bram2w](https://github.com/bram2w)
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.12.2
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.12.1...n8n@2.12.2) for this version.\
+**Release date:** 2026-03-13
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.12.1
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.12.0...n8n@2.12.1) for this version.\
+**Release date:** 2026-03-11
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.12.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.11.0...n8n@2.12.0) for this version.\
+**Release date:** 2026-03-09
+
+This release contains bug fixes and features.
+
+### 1Password is now available as an external secrets provider (Enterprise)
+
+n8n now supports 1Password Connect Server as an [external secrets](../external-secrets/) provider, alongside HashiCorp Vault, AWS Secrets Manager, Azure Key Vault, and GCP Secret Manager.
+
+Secrets are fetched at runtime and never stored in n8n: 1Password stays the single source of truth. Multi-field items are available as structured sub-paths: `$secrets.<vault>.<item>.<field>`.
+
+#### How to connect
+
+1. Deploy a 1Password Connect Server and create an access token scoped to the vaults n8n should read.
+1. In n8n, go to **Settings > External Secrets**, select **1Password**, and enter your Connect Server URL and token.
+
+Requires self-hosted 1Password Connect Server with read-only access. 1Password as an external secrets provider is available on n8n Enterprise.
+
+### Contributors
+
+`github-actions[bot]` [amenk](https://github.com/amenk)\
+[bpk9](https://github.com/bpk9)
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.11.4
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.11.3...n8n@2.11.4) for this version.\
+**Release date:** 2026-03-13
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.11.3
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.11.2...n8n@2.11.3) for this version.\
+**Release date:** 2026-03-13
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.11.2
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.11.1...n8n@2.11.2) for this version.\
+**Release date:** 2026-03-06
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.11.1
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.11.0...n8n@2.11.1) for this version.\
+**Release date:** 2026-03-04
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.11.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.10.0...n8n@2.11.0) for this version.\
+**Release date:** 2026-03-02
+
+This release contains bug fixes and features.
+
+### Easier credential setup on Cloud
+
+Setting up credentials on n8n Cloud is now much simpler. For supported services, just click the **Connect** button, authenticate with the service, and you're ready to go. Skip the manual setup for Slack, Firecrawl, HubSpot, GitHub, Google Calendar, PagerDuty, Apify, and more.
+
+Setting up Slack credentials with managed OAuth.
+
+#### Things to keep in mind
+
+- If you prefer to use your own OAuth configuration, you can still switch to manual setup from the auth mode dropdown at any time.
+- This feature is only available on n8n Cloud, where n8n manages the OAuth apps on your behalf.
+
+### Custom roles: Assignments tab (Enterprise)
+
+Instance admins now have a dedicated **Assignments** tab on each [custom role](../user-management/rbac/custom-roles/) showing every user assigned to that role, which project they're in, and a direct link to manage them — no more navigating project by project.
+
+Custom roles are available on n8n Enterprise.
+
+### Project-scoped external secrets: instance admin setup (Enterprise)
+
+Instance admins can now create vault connections scoped to a specific project. Secrets from that connection appear only within that project's credentials, not across the instance. Instance-level connections are unaffected.
+
+Refer to [External secrets](../external-secrets/) for more information. Project-scoped external secrets are available on n8n Enterprise.
+
+### Workflow execute as a separate permission scope (Enterprise)
+
+`workflow:execute` is now a distinct scope in [custom project roles](../user-management/rbac/custom-roles/), separate from editing and publishing. Users can be granted run access without being able to modify the workflow, which is a common compliance requirement for sensitive workflows.
+
+This scope is available on n8n Enterprise.
+
+### Contributors
+
+[ByteEVM](https://github.com/ByteEVM)\
+[onyxraven](https://github.com/onyxraven)
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.10.4
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.10.3...n8n@2.10.4) for this version.\
+**Release date:** 2026-03-06
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.10.3
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.10.2...n8n@2.10.3) for this version.\
+**Release date:** 2026-03-04
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.10.2
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.10.1...n8n@2.10.2) for this version.\
+**Release date:** 2026-02-27
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.10.1
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.10.0...n8n@2.10.1) for this version.\
+**Release date:** 2026-02-25
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.10.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.9.0...n8n@2.10.0) for this version.\
+**Release date:** 2026-02-23
+
+This release contains bug fixes and features.
+
+### Multiple connections per external secrets provider
+
+You can now set up more than one connection for a single [external secrets](../external-secrets/) provider. The updated UI makes it easier to configure and manage multiple connections under the same provider type.
+
+### Performance improvements for large workflow and credential volumes
+
+Improved the reliability of the workflows and credentials listing pages for large-scale instances, reducing loading times by 30% to 80%.
+
+### Contributors
+
+[peteawood](https://github.com/peteawood)\
+[horiyee](https://github.com/horiyee)
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.9.4
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.9.3...n8n@2.9.4) for this version.\
+**Release date:** 2026-02-25
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.9.4-exp.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.9.4...n8n@2.9.4-exp.0) for this version.\
+**Release date:** 2026-02-27
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.9.3
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.9.2...n8n@2.9.3) for this version.\
+**Release date:** 2026-02-25
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.9.3-exp.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.9.3...n8n@2.9.3-exp.0) for this version.\
+**Release date:** 2026-02-25
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.9.2
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.9.1...n8n@2.9.2) for this version.\
+**Release date:** 2026-02-23
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.9.1
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.9.0...n8n@2.9.1) for this version.\
+**Release date:** 2026-02-18
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.9.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.8.0...n8n@2.9.0) for this version.\
+**Release date:** 2026-02-16
+
+This release contains bug fixes.
+
+### Contributors
+
+[ByteEVM](https://github.com/ByteEVM) [LudwigGerdes](https://github.com/LudwigGerdes)
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.8.4
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.8.3...n8n@2.8.4) for this version.\
+**Release date:** 2026-02-23
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.8.3
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.8.2...n8n@2.8.3) for this version.\
+**Release date:** 2026-02-13
+
+This release contains a bug fix and features.
+
+### Personal space policies (Enterprise)
+
+A new **Security & policies** settings section provides a central place for enforcing security requirements on your instance. In addition to the existing two-factor authentication enforcement, admins can now control what users can do in their personal spaces.
+
+Available policies include:
+
+- **Sharing**: control whether users can share workflows and credentials from their personal space.
+- **Workflow publishing**: control whether users can publish workflows from their personal space.
+
+This release builds on the recent updates to the permissions model, including [custom project roles](../user-management/rbac/custom-roles/), to better support policy-driven governance.
+
+Personal space policies are available on n8n Enterprise.
+
+The new Security & policies settings section.
+
+### Custom roles: improved discoverability and permission visibility (Enterprise)
+
+The project role selector now separates built-in system roles and custom roles into distinct sections, making it easier to find and choose the right role. Hovering over a role shows a summary of its configured permissions, with an option to view the full permission details.
+
+System roles and custom roles are now displayed in separate sections.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.8.2
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.8.1...n8n@2.8.2) for this version.\
+**Release date:** 2026-02-12
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.8.1
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.8.0...n8n@2.8.1) for this version.\
+**Release date:** 2026-02-11
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.7.5
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.7.4...n8n@2.7.5) for this version.\
+**Release date:** 2026-02-13
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.7.4
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.7.3...n8n@2.7.4) for this version.\
+**Release date:** 2026-02-11
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.7.3
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.7.2...n8n@2.7.3) for this version.\
+**Release date:** 2026-02-09
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.6.4
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.6.3...n8n@2.6.4) for this version.\
+**Release date:** 2026-02-06
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.8.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.7.0...n8n@2.8.0) for this version.\
+**Release date:** 2026-02-09
+
+This release contains bug fixes and features.
+
+### Stronger external secrets validation (Enterprise)
+
+n8n now verifies that the current user has access to the referenced vaults before allowing a credential that uses **$secrets...** expressions to be saved. If access is missing, the save operation fails. This prevents secret values from being exposed through guessed secret paths.
+
+### Improved API auditability (Enterprise)
+
+API endpoints have been expanded to provide clearer visibility into project membership and credentials:
+
+- `GET /projects/{projectId}/users` returns all members of a project including their assigned role.
+- `GET /credentials` returns a paginated list of all credentials across the instance, including the project they belong to.
+
+This makes it easier to audit who has access to which projects and credentials without manually reviewing each one in the UI.
+
+### More granular workflow permissions
+
+Workflow publishing permissions for [custom roles](../user-management/rbac/custom-roles/) have been split into two separate scopes: **workflow:publish** and **workflow:unpublish**. This enables more precise access control in governance scenarios where unpublishing needs to be managed independently.
+
+### Performance and stability improvements
+
+- Improved performance for instances with very large user counts, reducing slowdowns caused by user-related operations.
+- Fixed a high-memory issue that could cause crashes during Source Control push flows in large deployments with many workflows and credentials.
+
+### Minor fixes
+
+- Canvas: improved node repositioning on insertion to reduce overlaps and spacing issues.
+- Log streaming: fixed proxy configuration handling for webhook destinations so requests work reliably when a proxy is configured.
+
+### Deprecated nodes
+
+#### Motorhead node
+
+The [Motorhead](../integrations/builtin/cluster-nodes/sub-nodes/n8n-nodes-langchain.memorymotorhead/) memory node is now deprecated because the Motorhead project is no longer maintained. The node is hidden from the nodes panel for new selections, but existing workflows using this node will continue to work.
+
+### Contributors
+
+[AmitAnveri](https://github.com/AmitAnveri)\
+[derandreas-dt](https://github.com/derandreas-dt)\
+[ongdisheng](https://github.com/ongdisheng)\
+[vCaisim](https://github.com/vCaisim)
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.7.2
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.7.1...n8n@2.7.2) for this version.\
+**Release date:** 2026-02-04
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.7.1
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.7.0...n8n@2.7.1) for this version.\
+**Release date:** 2026-02-03
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.7.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.6.0...n8n@2.7.0) for this version.\
+**Release date:** 2026-02-02
+
+This release contains bug fixes.
+
+### Contributors
+
+[LostInBrittany](https://github.com/LostInBrittany)\
+[adriencohen](https://github.com/adriencohen)\
+[ibex088](https://github.com/ibex088)\
+[rutgere-indeed](https://github.com/rutgere-indeed)
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.4.7-exp.0
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.4.7...n8n@2.4.7-exp.0) for this version.\
+**Release date:** 2026-01-29
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.6.3
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.6.2...n8n@2.6.3) for this version.\
+**Release date:** 2026-02-02
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@2.4.8
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.4.7...n8n@2.4.8) for this version.\
+**Release date:** 2026-01-29
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
 ## n8n@2.6.2
 
 View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.6.1...n8n@2.6.2) for this version.\
 **Release date:** 2026-01-28
-
-Beta version
-
-This is the `beta` version. n8n recommends using the `stable` version. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
 This release contains bug fixes.
 
@@ -1210,10 +1908,6 @@ For full release details, refer to [Releases](https://github.com/n8n-io/n8n/rele
 
 View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.4.6...n8n@2.4.7) for this version.\
 **Release date:** 2026-01-28
-
-Stable version
-
-This is the `stable` version. n8n recommends using the `stable` version. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
 This release contains a bug fix.
 
@@ -1253,6 +1947,33 @@ View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.5.0...n8n@2.6.0) 
 
 This release contains bug fixes.
 
+### Human-in-the-loop for AI tool calls
+
+You can now require explicit human approval before an AI Agent executes specific tools.
+
+Human-in-the-loop (HITL) for AI tool calls enforces review directly at the tool level. A gated tool cannot execute unless a human explicitly approves the action, giving you deterministic control over high-impact operations like deleting records, writing to production systems, or sending high-impact emails. This removes the uncertainty of prompt-based safeguards and insulates you from probabilistic agent behavior.
+
+Because the review step is implemented using standard n8n integrations, approvals are not limited to a single user or interface. Decisions can be routed across people and systems, enforcing approval from the right person using the channels they already work in.
+
+#### What you can do
+
+- Require explicit human approval for any tool the agent can call, including the MCP Client tool or sub-workflows exposed as tools
+- Apply approval selectively, so some tools execute autonomously while others require review
+- Route approvals across users and channels (for example, send a Slack-initiated action for approval by another user via email)
+- Add safety checks for high-impact or potentially destructive operations without complex workflow patterns or brittle prompt logic.
+
+#### How to use it
+
+Start with a workflow where an AI Agent is connected to one or more tools.
+
+1. On the connection from the AI Agent to the tool you want to gate, click the **+** icon and choose **Add human review step** (hovering over the icon shows the tooltip).
+1. The **Tools panel** opens with nodes you can use to handle the review step. Select the one you want to use.
+1. Configure the approval step in the added node’s parameters. Depending on the integration, you can define the approver, the message they receive, the available actions (for example, approve or deny), and the associated buttons.
+
+[](/_video/release-notes/HITLToolCalls.webm)
+
+Get precise control over where human judgment is required, without limiting what your agent can do. Learn more [here](../advanced-ai/human-in-the-loop-tools/).
+
 ### Contributors
 
 [ibex088](https://github.com/ibex088)\
@@ -1271,7 +1992,7 @@ View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.4.0...n8n@2.5.0) 
 
 This release contains bug fixes.
 
-### **Chat node: human-in-the-loop actions**
+### Chat node: human-in-the-loop actions
 
 The **Chat** node now includes two new Actions for human-in-the-loop interactions in agentic workflows:
 
@@ -1282,12 +2003,12 @@ These Actions can be used as deterministic workflow steps or as tools for an **A
 
 When used as an agent tool, the agent can ask for clarification before proceeding, helping it better interpret user intent and follow instructions. Agents can also send updates during long-running workflows using these Actions.
 
-### **How to**
+#### How to
 
 1. Trigger your workflow with the **Chat Trigger** node. In the node parameters, add the *Response Mode* option and set it to *Using Response Nodes*.
 1. Add a **Chat** node later in the workflow, or add it as a tool for an **AI Agent**. Select one of the following operations: *Send a message* or *Send a message and wait for response*.
 
-### **Keep in mind**
+#### Keep in mind
 
 - If you want an AI Agent to choose between sending a message or waiting for input, add two **Chat** tool nodes, one for each action.
 - For AI Agents triggered by the **Chat Trigger** node, adding **Send a message and wait for response** is recommended so the agent can request clarification when needed.
@@ -1300,7 +2021,6 @@ Learn more in the [Chat node documentation](https://docs.n8n.io/integrations/bui
 
 [AbdulTawabJuly](https://github.com/AbdulTawabJuly)\
 [ByteEVM](https://github.com/ByteEVM)\
-[aikido-autofix[bot]](https://github.com/aikido-autofix%5Bbot%5D)\
 [sudarshan12s](https://github.com/sudarshan12s)\
 [KaanAydinli](https://github.com/KaanAydinli)
 
@@ -1366,6 +2086,16 @@ View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.3.0...n8n@2.4.0) 
 **Release date:** 2026-01-12
 
 This release contains bug fixes.
+
+### TLS support for Syslog log streaming
+
+The Syslog log streaming destination now supports TLS over TCP for encrypted connections. This enables secure log streaming to enterprise SIEM and observability platforms that require encrypted transport. With this release, log streaming is now compatible with a broader range of enterprise SIEM platforms.
+
+### Update credentials via API
+
+n8n's public API now supports updating existing credentials by ID via a new *PATCH /credentials/:id* endpoint. Previously, credentials could only be created through the API so any changes required deleting and recreating the credential.
+
+When updating, you can either replace all credential data at once (useful for bulk updates) or set *isPartialData: true* to merge changes with existing data. Ideal for automated secret rotation or fixing individual values without losing your configuration.
 
 ### Contributors
 
@@ -1500,6 +2230,22 @@ View the [commits](https://github.com/n8n-io/n8n/compare/n8n@2.1.0...n8n@2.2.0) 
 **Release date:** 2025-12-22
 
 This release contains bug fixes.
+
+### More granular workflow permissions within Custom Project Roles (Enterprise)
+
+Custom Project Roles allow you to define fine-grained permissions at the project level. With this release, workflow permissions have been further refined by separating workflow editing from workflow publishing.
+
+This change makes it easier to align access controls with internal processes where building workflows and publishing them are handled by different users or teams.
+
+Custom Project Roles
+
+### Log streaming: More audit events for improved observability
+
+Log streaming now includes additional audit events to improve visibility into operational and security-relevant changes.
+
+This update adds events for manual workflow cancellations and workflow activation/deactivation (publish/unpublish), variable lifecycle events (create/update/delete), and user management actions (including enabling/disabling 2FA).
+
+Workflow settings updates are also logged with the specific parameters that changed (for example, selecting a new error workflow), instead of a generic “updated” event.
 
 For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
 
@@ -1671,6 +2417,72 @@ Older versions
 
 You can find the release notes for older versions of n8n: [1.x](1-x/) and [0.x](0-x/)
 
+# Security settings
+
+Feature availability
+
+Security settings are available on Business and Enterprise plans. Some settings require specific license features. Settings that aren't available on your plan display an **Upgrade** badge.
+
+Security settings let you manage instance-wide security policies. You can enforce two-factor authentication for all users and control what users can do in their personal spaces.
+
+To access security settings, navigate to **Settings** > **Security**.
+
+## Enforce two-factor authentication
+
+You can require all users on your instance to set up two-factor authentication (2FA) when they sign in with email and password.
+
+Applies to email and password logins only
+
+2FA enforcement applies to users authenticating with email and password. Users signing in through SSO (SAML or OIDC) aren't affected by this setting.
+
+To enforce 2FA:
+
+1. Navigate to **Settings** > **Security**.
+1. In the **Enforce two-factor authentication** section, toggle the switch on.
+
+When you enable this setting:
+
+- All users must set up 2FA before they can continue using the instance.
+- Users who haven't configured 2FA yet are prompted to do so on their next sign-in.
+
+To stop enforcing 2FA, toggle the switch off. Users who already set up 2FA keep it enabled but new users are no longer required to configure it.
+
+Refer to [Two-factor authentication](../user-management/two-factor-auth/) for more information on how individual users can set up 2FA.
+
+## Personal space policies
+
+Personal space policies let instance admins control whether users can share and publish workflows and credentials from their personal spaces.
+
+### Sharing workflows and credentials
+
+Controls whether users can share workflows and credentials from their personal space with other users or projects.
+
+To manage sharing:
+
+1. Navigate to **Settings** > **Security**.
+1. In the **Personal Space** section, find **Sharing workflows and credentials**.
+1. Toggle the switch to enable or disable sharing.
+
+When you disable sharing:
+
+- Existing shares remain in place. The setting only affects new sharing actions.
+- The number of currently shared workflows and credentials is displayed below the toggle.
+
+### Publishing workflows
+
+Controls whether users can publish workflows from their personal space to make them available for execution.
+
+To manage publishing:
+
+1. Navigate to **Settings** > **Security**.
+1. In the **Personal Space** section, find **Publishing workflows**.
+1. Toggle the switch to enable or disable publishing.
+
+When you disable publishing:
+
+- Currently published workflows remain published. The setting only affects new publish actions.
+- The number of currently published personal workflows is displayed below the toggle.
+
 # Sustainable Use License
 
 Proprietary licenses for Enterprise
@@ -1736,7 +2548,7 @@ Bob sets up n8n to embed an AI chatbot within the ACME app. The AI chatbot's cre
 
 ### What if I want to use n8n for something that's not permitted by the license?
 
-You must sign a separate commercial agreement with us. We actively encourage software creators to embed n8n within their products; we just ask them to sign an agreement laying out the terms of use, and the fees owed to n8n for using the product in this way. We call this mode of use n8n Embed. You can learn more, and contact us about it [here](https://n8n.io/embed).
+You must sign a separate commercial agreement with us. We actively encourage software creators to build with n8n in their products; we just ask them to sign an agreement laying out the terms of use, and the fees owed to n8n for using the product in this way. [Contact us](mailto:license@n8n.io) to learn more.
 
 If you are unsure whether the use case you have in mind constitutes an internal business purpose or not, take a look at [the examples](#what-is-and-isnt-allowed-under-the-license-in-the-context-of-n8ns-product), and if you're still unclear, email us at [license@n8n.io](mailto:license@n8n.io).
 
@@ -1900,333 +2712,6 @@ Use the [n8n Chat Trigger](../integrations/builtin/core-nodes/n8n-nodes-langchai
 ### Chatbot widget
 
 n8n provides a chatbot widget that you can use as a frontend for AI-powered chat workflows. Refer to the [@n8n/chat npm page](https://www.npmjs.com/package/@n8n/chat) for usage information.
-
-# Accessing n8n MCP server
-
-Connect supported MCP clients to your n8n workflows through n8n's built-in MCP server.
-
-The server allows clients such as Lovable or Claude Desktop to connect securely to an n8n instance. Once connected, these clients can:
-
-- Search within workflows marked as available in MCP
-- Retrieve metadata and trigger information for workflows
-- Trigger and run exposed workflows
-
-## Difference between instance-level MCP access and MCP Server Trigger node
-
-Instance-level MCP access lets you create one connection per n8n instance, use centralized authentication, and choose which workflows to enable for access. Enabled workflows are easy to find and run without extra setup for each workflow.
-
-In comparison, you configure an MCP Server Trigger node inside a single workflow. This node exposes tools only from that workflow, a useful approach when you want to craft a specific MCP server behavior within one workflow.
-
-### Key considerations when using instance-level MCP access
-
-- It isn't a way to build or edit workflows from an AI client; authoring remains in n8n.
-- It doesn't provide blanket exposure to all workflows in your instance. You must enable MCP at the instance level and then enable each workflow individually.
-- It's not scoped to each MCP client. Any connected client sees all workflows you’ve enabled for MCP access.
-
-## Enabling MCP access
-
-### For Cloud and self-hosted instances
-
-1. Navigate to **Settings > Instance-level MCP**
-1. Toggle **Enable MCP access** (requires instance owner or admin permissions).
-
-Once enabled, you'll see:
-
-1. List of workflows exposed to MCP clients
-1. List of connected OAuth clients
-1. Main MCP toggle to enable/disable instance-level access
-1. *Connection details* button that shows detailed instructions for connecting MCP clients
-
-**To disable:** Toggle the main MCP toggle off.
-
-### For self-hosted: Complete disablement
-
-To remove the feature entirely, set the environment variable:
-
-`N8N_DISABLED_MODULES=mcp`
-
-This action removes MCP endpoints and hides all related UI elements.
-
-## Setting up MCP authentication
-
-The **Connection details** popup menu provides two authentication options for MCP clients:
-
-- **OAuth2**
-- **Access Token**
-
-### Using OAuth2
-
-Copy your instance server URL from the **OAuth** tab and use it to configure your MCP client. After connecting, the client will redirect you to n8n to authorize access.
-
-#### Revoking client access
-
-To revoke access for connected MCP clients:
-
-1. Navigate to **Settings > Instance-level MCP**.
-1. Switch to the **Connected clients** tab. You should see a table of connected OAuth clients.
-1. Use the action menu in each client's row to revoke access for specific clients.
-
-### Using Access Token
-
-Use your instance server URL and your personal MCP Access Token from the **Access Token** tab on the *Connection details* menu.
-
-When you first visit the **MCP Access page**, n8n automatically generates a personal MCP Access Token tied to your user account.
-
-Info
-
-Copy your token right away. On future visits, you'll only see a redacted value and the copy button will be disabled.
-
-#### Rotating your token
-
-If you lose your token or need to rotate it:
-
-1. Navigate to **Settings > Instance-level MCP**.
-
-1. Open the *Connection details* menu by clicking the button in the top-right corner.
-
-1. Switch to the **Access Token** tab.
-
-1. Generate a new token using the button next to the redacted token value.
-
-   n8n revokes the previous token when you generate a new one.
-
-1. Update all connected MCP clients with the new value.
-
-## Exposing workflows to MCP clients
-
-### Workflow eligibility
-
-In order for a workflow to be available to MCP clients, it must meet the following criteria:
-
-1. Be published
-1. Contain one of the following trigger nodes:
-   - Webhook
-   - Schedule
-   - Chat
-   - Form
-
-By default, no workflows are visible to MCP clients. You must explicitly enable access for each eligible workflow you want to expose.
-
-When evaluating workflow eligibility, n8n will take into account only the published version of the workflow. Workflows that have a supported trigger added to a draft version won't be considered eligible until the version is published.
-
-Info
-
-Once you unpublish a workflow, n8n removes its MCP access. You will have to re-enable access when you publish the workflow again.
-
-### Enabling access
-
-#### Option 1: From MCP settings page (available from n8n v2.2.0)
-
-1. Click the **Enable workflows** button (in the workflows table header or in the table's empty state)
-1. Search for the desired workflow (by name or description) and select it from the list
-1. Click **Enable** button to confirm
-
-#### Option 2: From the workflow editor
-
-1. Open the workflow.
-1. Click the main workflow menu (`...`) in the top-right corner.
-1. Select **Settings**.
-1. Toggle **Available in MCP**.
-
-#### Option 3: From the workflows list
-
-1. Go to **Workflows**.
-1. Open the menu on a workflow card.
-1. Select **Enable MCP access**.
-
-### Managing access
-
-The **Instance-level MCP** settings page shows all workflows available to MCP clients. From this list you can:
-
-- Open a workflow, its home project or parent folder directly
-- Revoke access using the action menu (or use **Disable MCP access** from the workflow card menu)
-- Update workflow description using the action menu (or use the menu in the workflow editor)
-- Enable access for more workflows using the **Enable workflows** button (available from n8n v2.2.0)
-
-### Workflow descriptions
-
-To help MCP clients identify workflows, you can add free-text descriptions as follows:
-
-1. Option 1: From the **Instance-level MCP** page
-
-   1. Navigate to **Settings > Instance-level MCP**.
-   1. Make sure you are on the **Workflows** tab.
-   1. Use the action menu in the desired workflow's row and select the **Edit description** action.
-   1. Alternatively, click the description text directly to open the edit dialog.
-
-1. Option 2: From the workflow editor
-
-   1. Open the workflow.
-   1. Click the main workflow menu (`...`) in the top-right corner.
-   1. Select **Edit description**.
-
-## Executing workflows through MCP clients
-
-MCP clients can execute eligible workflows on your request. When a client triggers a workflow, it runs as usual in n8n, and you can monitor its execution in the **Executions** list. Once the execution is complete, the MCP client will retrieve the results.
-
-### Providing input data
-
-MCP clients are typically able to assess what inputs are expected by a workflow. If you have a webhook trigger and If you see a client struggling to determine the right inputs, we recommend you provide this information in the workflow description.
-
-### Workflow timeouts
-
-n8n enforces a 5-minute timeout for workflow executions triggered by MCP clients. If a workflow doesn't finish in time, n8n stops the execution and sends an error to the MCP client, ignoring any timeout you set in the workflow settings for MCP-triggered executions.
-
-### Limitations
-
-- If there are multiple supported triggers in a workflow, MCP clients may only be able to use one (first one) of them to trigger the workflow.
-- Executing workflows with multi-step forms or any kind of human-in-the-loop interactions isn't supported.
-- Binary input data isn't supported. MCP clients can only provide text-based inputs for your workflows.
-
-## Examples
-
-#### Connecting Lovable to n8n MCP server
-
-1. Configure MCP Server in Lovable (OAuth).
-   - Navigate to your workspace  **Settings > Integrations**.
-   - In the **MCP Servers** section, find **n8n** and click **Connect**.
-   - Enter your n8n server URL (shown on the **MCP Access** page).
-   - Save the connection. If successful, n8n redirects you to authorize Lovable.
-1. Verify connectivity.
-   - Once connected, Lovable can query for workflows with MCP access enabled.
-   - **Example:** Asking Lovable to build a workflow UI that lists users and allows deleting them.
-
-#### Connecting Claude Desktop to n8n MCP server
-
-##### Using OAuth2
-
-1. Navigate to **Settings** > **Connectors** in Claude Desktop.
-1. Click on **Add custom connector**.
-1. Enter the following details:
-   - **Name:** n8n MCP
-   - **Remote MCP Server URL**: Your n8n base URL (shown on the **Instance-level MCP** page)
-1. Save the connector.
-1. When prompted, authorize Claude Desktop to access your n8n instance.
-
-##### Using Access Token
-
-Info
-
-This requires the latest version of [Node.js](https://nodejs.org/en/download).
-
-Add the following entry to your `claude_desktop_config.json` file:
-
-```
-{
-  "mcpServers": {
-    "n8n-mcp": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "supergateway",
-        "--streamableHttp",
-        "https://<your-n8n-domain>/mcp-server/http",
-        "--header",
-        "authorization:Bearer <YOUR_N8N_MCP_TOKEN>"
-      ]
-    }
-  }
-}
-```
-
-Here, replace:
-
-- `<your-n8n-domain>`: Your n8n base URL (shown on the **Instance-level MCP** page)
-- `<YOUR_N8N_MCP_TOKEN>`: Your generated token
-
-### Connecting Claude Code to n8n MCP server
-
-Use the following CLI command:
-
-```
-claude mcp add --transport http n8n-mcp https://<your-n8n-domain>/mcp-server/http \
-  --header "Authorization: Bearer <YOUR_N8N_MCP_TOKEN>"
-```
-
-Alternatively, add the following entry to your `claude.json` file:
-
-```
-{
-    "mcpServers": {
-        "n8n-local": {
-            "type": "http",
-            "url": "https://<your-n8n-domain>/mcp-server/http",
-            "headers": {
-                "Authorization": "Bearer <YOUR_N8N_MCP_TOKEN>"
-            }
-        }
-    }
-}
-```
-
-Here, replace:
-
-- `<your-n8n-domain>`: Your n8n base URL (shown on the **Instance-level MCP** page)
-- `<YOUR_N8N_MCP_TOKEN>`: Your generated token
-
-### Connecting Codex CLI to n8n MCP server
-
-Add the following entry to your `~/.codex/config.toml` file:
-
-```
-[mcp_servers.n8n_mcp]
-command = "npx"
-args = [
-    "-y",
-    "supergateway",
-    "--streamableHttp",
-    "https://<your-n8n-domain>/mcp-server/http",
-    "--header",
-    "authorization:Bearer <YOUR_N8N_MCP_TOKEN>"
-]
-```
-
-Here, replace:
-
-- `<your-n8n-domain>`: Your n8n base URL (shown on the **Instance-level MCP** page)
-- `<YOUR_N8N_MCP_TOKEN>`: Your generated token
-
-### Connecting Google ADK agent to n8n MCP server
-
-Here's sample code to create an agent that connects to a remote n8n MCP server:
-
-```
-from google.adk.agents import Agent
-from google.adk.tools.mcp_tool import McpToolset
-from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams
-
-N8N_INSTANCE_URL = "https://localhost:5678"
-N8N_MCP_TOKEN = "YOUR_N8N_MCP_TOKEN"
-
-root_agent = Agent(
-    model="gemini-2.5-pro",
-    name="n8n_agent",
-    instruction="Help users manage and execute workflows in n8n",
-    tools=[
-        McpToolset(
-            connection_params=StreamableHTTPServerParams(
-                url=f"{N8N_INSTANCE_URL}/mcp-server/http",
-                headers={
-                    "Authorization": f"Bearer {N8N_MCP_TOKEN}",
-                },
-            ),
-        )
-    ],
-)
-```
-
-For more details, see [Connect ADK agent to n8n](https://google.github.io/adk-docs/tools/third-party/n8n/).
-
-## Troubleshooting
-
-If you encounter issues connecting MCP clients to your n8n instance, consider the following:
-
-- Ensure that your n8n instance is publicly accessible if you are using cloud-based MCP clients.
-- Verify that the MCP access is enabled in n8n settings.
-- Check that the workflows you want to access are marked as available in MCP.
-- Confirm that the authentication method (OAuth2 or Access Token) is correctly configured in your MCP client.
-- Review n8n server logs for any error messages related to MCP connections.
-- If you are using desktop MCP clients, make sure you have the latest [Node.js](https://nodejs.org/en/download) version installed.
 
 # AI Workflow Builder
 
@@ -2488,14 +2973,14 @@ Many people find it easier to take in new information in video format. This tuto
 
 If you're already familiar with AI, feel free to skip this section. This is a basic introduction to AI concepts and how they can be used in n8n workflows.
 
-An [AI agent](../../glossary/#ai-agent) builds on [Large Language Models (LLMs)](../../glossary/#large-language-model-llm), which generate text based on input by predicting the next word. While LLMs only process input to produce output, AI agents add goal-oriented functionality. They can use [tools](../../glossary/#ai-tool), process their outputs, and make decisions to complete tasks and solve problems.
+An [AI agent](../../glossary/#ai-agent) builds on [Large Language Models (LLMs)](../../glossary/#large-language-model-llm). LLMs generate text based on input by predicting the next word. They can be used to select the best tool to achieve a task, or even simulate complex decision-making, but they can't act on decisions or use tools themselves. AI agents add goal-oriented functionality. They can use [tools](../../glossary/#ai-tool), act on their outputs, complete tasks and solve problems.
 
 In n8n, the AI agent is represented as a node with some extra connections.
 
 | Feature             | LLM                        | AI Agent                           |
 | ------------------- | -------------------------- | ---------------------------------- |
 | Core Capability     | Text generation            | Goal-oriented task completion      |
-| Decision-Making     | None                       | Yes                                |
+| Decision-Making     | Simulates choices in text  | Selects and executes actions       |
 | Uses Tools/APIs     | No                         | Yes                                |
 | Workflow Complexity | Single-step                | Multi-step                         |
 | Scope               | Generates language         | Performs complex, real-world tasks |
@@ -2514,7 +2999,7 @@ When you open n8n, you'll see either:
 
 Every workflow needs somewhere to start. In n8n these are called ['trigger nodes'](../../glossary/#trigger-node-n8n). For this workflow, we want to start with a chat node.
 
-1. Select **Add first step** or press `Tab` to open the node menu.
+1. Select **Add first step** or press `N` to open the node menu.
 1. Search for **Chat Trigger**. n8n shows a list of nodes that match the search.
 1. Select **Chat Trigger** to add the node to the canvas. n8n opens the node.
 1. Close the node details view (Select **Back to canvas**) to return to the canvas.
@@ -3543,6 +4028,1077 @@ n8n provides a collection of nodes that implement LangChain's functionality. The
 - [Learning resources](../langchain-learning-resources/): n8n's documentation for LangChain assumes you're familiar with AI and LangChain concepts. This page provides links to learning resources.
 - [LangChain concepts and features in n8n](../langchain-n8n/): how n8n represents LangChain concepts and features.
 
+# Accessing and using n8n MCP server
+
+Connect supported MCP clients to your n8n workflows through n8n's built-in MCP server.
+
+The server allows clients such as Lovable or Claude Desktop to connect securely to an n8n instance. Once connected, these clients can:
+
+- Search for your workflows
+- Interact with workflows marked as available in MCP
+- Trigger and test exposed workflows
+- Create and edit workflows and data tables
+
+## Difference between instance-level MCP access and MCP Server Trigger node
+
+Instance-level MCP access lets you create one connection per n8n instance, use centralized authentication, and choose which workflows to enable for access. Enabled workflows are easy to find and run without extra setup for each workflow.
+
+In comparison, you configure an MCP Server Trigger node inside a single workflow. This node exposes tools only from that workflow, a useful approach when you want to craft a specific MCP server behavior within one workflow.
+
+### Key considerations when using instance-level MCP access
+
+- MCP supports two types of workflow interactions: running existing workflows with the workflow execution tools, and building or editing workflows (v2.13 onward).
+- It doesn’t provide blanket exposure to all workflows in your instance. You must enable MCP at the instance level and then enable each workflow individually. The only exception here is the `search_workflows` tool, which is able to access all workflows current user has access to but it will only be able to surface previews, not the full workflow data.
+- It’s not scoped to each MCP client. Any connected client sees all workflows you’ve enabled for MCP access.
+- Most MCP tools work on unpublished workflows. The exception is `execute_workflow`, which defaults to production mode and runs the published version of a workflow. It also supports a `manual` execution mode to run the current (unpublished) version.
+
+## Enabling MCP access
+
+### For Cloud and self-hosted instances
+
+1. Navigate to **Settings > Instance-level MCP**
+1. Toggle **Enable MCP access** (requires instance owner or admin permissions).
+
+Once enabled, you'll see:
+
+1. List of workflows exposed to MCP clients
+1. List of connected OAuth clients
+1. Main MCP toggle to enable/disable instance-level access
+1. *Connection details* button that shows detailed instructions for connecting MCP clients
+
+**To disable:** Toggle the main MCP toggle off.
+
+### For self-hosted: Complete disablement
+
+To remove the feature entirely, set the environment variable:
+
+`N8N_DISABLED_MODULES=mcp`
+
+This action removes MCP endpoints and hides all related UI elements.
+
+## Setting up MCP authentication
+
+The **Connection details** popup menu provides two authentication options for MCP clients:
+
+- **OAuth2**
+- **Access Token**
+
+### Using OAuth2
+
+Copy your instance server URL from the **OAuth** tab and use it to configure your MCP client. After connecting, the client will redirect you to n8n to authorize access.
+
+#### Revoking client access
+
+To revoke access for connected MCP clients:
+
+1. Navigate to **Settings > Instance-level MCP**.
+1. Switch to the **Connected clients** tab. You should see a table of connected OAuth clients.
+1. Use the action menu in each client's row to revoke access for specific clients.
+
+### Using Access Token
+
+Use your instance server URL and your personal MCP Access Token from the **Access Token** tab on the *Connection details* menu.
+
+When you first visit the **MCP Access page**, n8n automatically generates a personal MCP Access Token tied to your user account.
+
+Info
+
+Copy your token right away. On future visits, you'll only see a redacted value and the copy button will be disabled.
+
+#### Rotating your token
+
+If you lose your token or need to rotate it:
+
+1. Navigate to **Settings > Instance-level MCP**.
+
+1. Open the *Connection details* menu by clicking the button in the top-right corner.
+
+1. Switch to the **Access Token** tab.
+
+1. Generate a new token using the button next to the redacted token value.
+
+   n8n revokes the previous token when you generate a new one.
+
+1. Update all connected MCP clients with the new value.
+
+## Exposing workflows to MCP clients
+
+By default, no workflows are visible to MCP clients. You must explicitly enable MCP access for each workflow you want to expose.
+
+### Enabling access
+
+#### Option 1: From MCP settings page (available from n8n v2.2.0)
+
+1. Click the **Enable workflows** button (in the workflows table header or in the table's empty state)
+1. Search for the desired workflow (by name or description) and select it from the list
+1. Click **Enable** button to confirm
+
+#### Option 2: From the workflow editor
+
+1. Open the workflow.
+1. Click the main workflow menu (`...`) in the top-right corner.
+1. Select **Settings**.
+1. Toggle **Available in MCP**.
+
+#### Option 3: From the workflows list
+
+1. Go to **Workflows**.
+1. Open the menu on a workflow card.
+1. Select **Enable MCP access**.
+
+### Managing access
+
+The **Instance-level MCP** settings page shows all workflows available to MCP clients. From this list you can:
+
+- Open a workflow, its home project or parent folder directly
+- Revoke access using the action menu (or use **Disable MCP access** from the workflow card menu)
+- Update workflow description using the action menu (or use the menu in the workflow editor)
+- Enable access for more workflows using the **Enable workflows** button (available from n8n v2.2.0)
+
+### Workflow descriptions
+
+To help MCP clients identify workflows, you can add free-text descriptions as follows:
+
+1. Option 1: From the **Instance-level MCP** page
+
+   1. Navigate to **Settings > Instance-level MCP**.
+   1. Make sure you are on the **Workflows** tab.
+   1. Use the action menu in the desired workflow's row and select the **Edit description** action.
+   1. Alternatively, click the description text directly to open the edit dialog.
+
+1. Option 2: From the workflow editor
+
+   1. Open the workflow.
+   1. Click the main workflow menu (`...`) in the top-right corner.
+   1. Select **Edit description**.
+
+## Tools and resources
+
+Tip
+
+Consider using coding agents (such as Claude Code or Google ADK agents) instead of chat clients as your MCP clients. Coding agents are optimized for generating and validating TypeScript code, making them ideal for building workflows programmatically.
+
+The n8n MCP server exposes tools for workflow management, workflow building, and data tables. For a complete list of available tools and their parameters, refer to the [MCP server tools reference](../mcp_tools_reference/).
+
+## Examples
+
+#### Connecting Lovable to n8n MCP server
+
+1. Configure MCP Server in Lovable (OAuth).
+   - Navigate to your workspace  **Settings > Integrations**.
+   - In the **MCP Servers** section, find **n8n** and click **Connect**.
+   - Enter your n8n server URL (shown on the **MCP Access** page).
+   - Save the connection. If successful, n8n redirects you to authorize Lovable.
+1. Verify connectivity.
+   - Once connected, Lovable can query for workflows with MCP access enabled.
+   - **Example:** Asking Lovable to build a workflow UI that lists users and allows deleting them.
+
+#### Connecting Claude Desktop to n8n MCP server
+
+##### Using OAuth2
+
+1. Navigate to **Settings** > **Connectors** in Claude Desktop.
+1. Click on **Add custom connector**.
+1. Enter the following details:
+   - **Name:** n8n MCP
+   - **Remote MCP Server URL**: Your n8n base URL (shown on the **Instance-level MCP** page)
+1. Save the connector.
+1. When prompted, authorize Claude Desktop to access your n8n instance.
+
+##### Using Access Token
+
+Add the following entry to your `claude_desktop_config.json` file:
+
+```
+"mcpServers": {
+  "n8n-local": {
+    "type": "http",
+    "url": "https://<your-n8n-domain>/mcp-server/http",
+    "headers": {
+      "Authorization": "Bearer <YOUR_N8N_MCP_TOKEN>"
+    }
+  }
+}
+```
+
+Here, replace:
+
+- `<your-n8n-domain>`: Your n8n base URL (shown on the **Instance-level MCP** page)
+- `<YOUR_N8N_MCP_TOKEN>`: Your generated token
+
+### Connecting Claude Code to n8n MCP server
+
+Use the following CLI command:
+
+```
+claude mcp add --transport http n8n-mcp https://<your-n8n-domain>/mcp-server/http \
+  --header "Authorization: Bearer <YOUR_N8N_MCP_TOKEN>"
+```
+
+Alternatively, add the following entry to your `claude.json` file:
+
+```
+{
+    "mcpServers": {
+        "n8n-local": {
+            "type": "http",
+            "url": "https://<your-n8n-domain>/mcp-server/http",
+            "headers": {
+                "Authorization": "Bearer <YOUR_N8N_MCP_TOKEN>"
+            }
+        }
+    }
+}
+```
+
+Here, replace:
+
+- `<your-n8n-domain>`: Your n8n base URL (shown on the **Instance-level MCP** page)
+- `<YOUR_N8N_MCP_TOKEN>`: Your generated token
+
+### Connecting Codex CLI to n8n MCP server
+
+Add the following entry to your `~/.codex/config.toml` file:
+
+```
+[mcp_servers.n8n_mcp]
+url = "https://<your-n8n-domain>/mcp-server/http"
+http_headers = { "authorization" = "Bearer <YOUR_N8N_MCP_TOKEN>" }
+```
+
+Here, replace:
+
+- `<your-n8n-domain>`: Your n8n base URL (shown on the **Instance-level MCP** page)
+- `<YOUR_N8N_MCP_TOKEN>`: Your generated token
+
+### Connecting Google ADK agent to n8n MCP server
+
+Here's sample code to create an agent that connects to a remote n8n MCP server:
+
+```
+from google.adk.agents import Agent
+from google.adk.tools.mcp_tool import McpToolset
+from google.adk.tools.mcp_tool.mcp_session_manager import StreamableHTTPServerParams
+
+N8N_INSTANCE_URL = "https://localhost:5678"
+N8N_MCP_TOKEN = "YOUR_N8N_MCP_TOKEN"
+
+root_agent = Agent(
+    model="gemini-2.5-pro",
+    name="n8n_agent",
+    instruction="Help users manage and execute workflows in n8n",
+    tools=[
+        McpToolset(
+            connection_params=StreamableHTTPServerParams(
+                url=f"{N8N_INSTANCE_URL}/mcp-server/http",
+                headers={
+                    "Authorization": f"Bearer {N8N_MCP_TOKEN}",
+                },
+            ),
+        )
+    ],
+)
+```
+
+For more details, see [Connect ADK agent to n8n](https://google.github.io/adk-docs/tools/third-party/n8n/).
+
+## Troubleshooting
+
+If you encounter issues connecting MCP clients to your n8n instance, consider the following:
+
+- Ensure that your n8n instance is publicly accessible if you are using cloud-based MCP clients.
+- Verify that the MCP access is enabled in n8n settings.
+- Check that the workflows you want to access are marked as available in MCP.
+- Confirm that the authentication method (OAuth2 or Access Token) is correctly configured in your MCP client.
+- Review n8n server logs for any error messages related to MCP connections.
+
+# n8n MCP server tools reference
+
+This page describes all tools exposed by the instance-level MCP server.
+
+______________________________________________________________________
+
+## Workflow management
+
+### search_workflows
+
+Search for workflows with optional filters. Returns a preview of each workflow.
+
+#### Parameters
+
+| Name        | Type      | Required | Description                           |
+| ----------- | --------- | -------- | ------------------------------------- |
+| `query`     | `string`  | No       | Filter by name or description         |
+| `projectId` | `string`  | No       | Filter by project ID                  |
+| `limit`     | `integer` | No       | Limit the number of results (max 200) |
+
+#### Output
+
+| Field                   | Type       | Description                                              |
+| ----------------------- | ---------- | -------------------------------------------------------- |
+| `data`                  | `array`    | List of workflow previews                                |
+| `data[].id`             | `string`   | The unique identifier of the workflow                    |
+| `data[].name`           | \`string   | null\`                                                   |
+| `data[].description`    | \`string   | null\`                                                   |
+| `data[].active`         | \`boolean  | null\`                                                   |
+| `data[].createdAt`      | \`string   | null\`                                                   |
+| `data[].updatedAt`      | \`string   | null\`                                                   |
+| `data[].triggerCount`   | \`number   | null\`                                                   |
+| `data[].scopes`         | `string[]` | User permissions for this workflow                       |
+| `data[].canExecute`     | `boolean`  | Whether the user has permission to execute this workflow |
+| `data[].availableInMCP` | `boolean`  | Whether the workflow is visible to MCP tools             |
+| `count`                 | `integer`  | Total number of workflows that match the filters         |
+
+#### Notes
+
+- Maximum result limit is 200.
+- Includes user permission scopes for each workflow so MCP clients can get more info about what they can do with the workflow.
+- **IMPORTANT**: This tool is able to list all workflows a user has access to, regardless of their `Available in MCP` setting
+
+______________________________________________________________________
+
+### get_workflow_details
+
+Get detailed information about a specific workflow including trigger details.
+
+#### Parameters
+
+| Name         | Type     | Required | Description                        |
+| ------------ | -------- | -------- | ---------------------------------- |
+| `workflowId` | `string` | Yes      | The ID of the workflow to retrieve |
+
+#### Output
+
+| Field                      | Type       | Description                                                        |
+| -------------------------- | ---------- | ------------------------------------------------------------------ |
+| `workflow`                 | `object`   | Sanitized workflow data safe for MCP consumption                   |
+| `workflow.id`              | `string`   | Workflow ID                                                        |
+| `workflow.name`            | \`string   | null\`                                                             |
+| `workflow.active`          | `boolean`  | Whether the workflow is active                                     |
+| `workflow.isArchived`      | `boolean`  | Whether the workflow is archived                                   |
+| `workflow.versionId`       | `string`   | The current workflow version ID                                    |
+| `workflow.activeVersionId` | \`string   | null\`                                                             |
+| `workflow.triggerCount`    | `number`   | Number of triggers                                                 |
+| `workflow.createdAt`       | \`string   | null\`                                                             |
+| `workflow.updatedAt`       | \`string   | null\`                                                             |
+| `workflow.settings`        | \`object   | null\`                                                             |
+| `workflow.connections`     | `object`   | Workflow connections graph                                         |
+| `workflow.nodes`           | `array`    | List of nodes (credentials stripped)                               |
+| `workflow.activeVersion`   | \`object   | null\`                                                             |
+| `workflow.tags`            | `array`    | Tags with `id` and `name`                                          |
+| `workflow.meta`            | \`object   | null\`                                                             |
+| `workflow.parentFolderId`  | \`string   | null\`                                                             |
+| `workflow.description`     | `string`   | The description of the workflow                                    |
+| `workflow.scopes`          | `string[]` | User permissions for this workflow                                 |
+| `workflow.canExecute`      | `boolean`  | Whether the user has permission to execute this workflow           |
+| `triggerInfo`              | `string`   | Human-readable instructions describing how to trigger the workflow |
+
+#### Notes
+
+- Sensitive credential data is stripped from nodes before returning.
+- Includes active version details if the workflow is published.
+
+______________________________________________________________________
+
+### execute_workflow
+
+Execute a workflow by ID by mapping data from user prompt to trigger inputs. Returns execution ID and status. This will perform 'full' workflow execution, without mocking or skipping any nodes.
+
+#### Parameters
+
+| Name            | Type       | Required       | Default | Description                                                        |
+| --------------- | ---------- | -------------- | ------- | ------------------------------------------------------------------ |
+| `workflowId`    | `string`   | Yes            |         | The ID of the workflow to execute                                  |
+| `executionMode` | \`"manual" | "production"\` | No      | `"production"`                                                     |
+| `inputs`        | `object`   | No             |         | Inputs to provide to the workflow (discriminated union, see below) |
+
+**`inputs` variants (discriminated by `type`):**
+
+| Type      | Fields                                              | Description                            |
+| --------- | --------------------------------------------------- | -------------------------------------- |
+| `chat`    | `chatInput: string`                                 | Input for chat-based workflows         |
+| `form`    | `formData: Record<string, unknown>`                 | Input data for form-based workflows    |
+| `webhook` | `webhookData: { method?, query?, body?, headers? }` | Input data for webhook-based workflows |
+
+#### Output
+
+| Field         | Type     | Description                                                                                                                            |
+| ------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `executionId` | \`string | null\`                                                                                                                                 |
+| `status`      | `string` | The status of the execution. One of: `"success"`, `"error"`, `"running"`, `"waiting"`, `"canceled"`, `"crashed"`, `"new"`, `"unknown"` |
+| `error`       | `string` | Error message if the execution failed                                                                                                  |
+
+#### Notes
+
+- Only supports workflows with specific trigger node types: Webhook, Chat Trigger, Form Trigger, Manual Trigger, Schedule Trigger.
+- When `executionMode` is `"production"`, the workflow must have a published (active) version.
+- If there are multiple supported triggers in a workflow, MCP clients may only be able to use one (first one) of them to trigger the workflow when using workflow execution tools (not applicable to AI Workflow builder workflows).
+- Executing workflows with multi-step forms or any kind of human-in-the-loop interactions isn't supported.
+
+______________________________________________________________________
+
+### get_execution
+
+Available from n8n v2.12.0
+
+Get execution details by execution ID and workflow ID. By default returns metadata only.
+
+#### Parameters
+
+| Name           | Type       | Required | Description                                                                                               |
+| -------------- | ---------- | -------- | --------------------------------------------------------------------------------------------------------- |
+| `workflowId`   | `string`   | Yes      | The ID of the workflow the execution belongs to                                                           |
+| `executionId`  | `string`   | Yes      | The ID of the execution to retrieve                                                                       |
+| `includeData`  | `boolean`  | No       | Whether to include full execution result data. Defaults to false (metadata only).                         |
+| `nodeNames`    | `string[]` | No       | When `includeData` is true, return data only for these nodes. If omitted, data for all nodes is included. |
+| `truncateData` | `integer`  | No       | When `includeData` is true, limit the number of data items returned per node output.                      |
+
+#### Output
+
+| Field                      | Type      | Description                                                     |
+| -------------------------- | --------- | --------------------------------------------------------------- |
+| `execution`                | \`object  | null\`                                                          |
+| `execution.id`             | `string`  | Execution ID                                                    |
+| `execution.workflowId`     | `string`  | Workflow ID                                                     |
+| `execution.mode`           | `string`  | Execution mode                                                  |
+| `execution.status`         | `string`  | Execution status                                                |
+| `execution.startedAt`      | \`string  | null\`                                                          |
+| `execution.stoppedAt`      | \`string  | null\`                                                          |
+| `execution.retryOf`        | \`string  | null\`                                                          |
+| `execution.retrySuccessId` | \`string  | null\`                                                          |
+| `execution.waitTill`       | \`string  | null\`                                                          |
+| `data`                     | `unknown` | Execution result data (only present when `includeData` is true) |
+| `error`                    | `string`  | Error message if the request failed                             |
+
+#### Notes
+
+- Use lightweight metadata queries (default) when full execution data isn't needed.
+- Filtering by `nodeNames` and truncating via `truncateData` helps manage large result sets.
+
+______________________________________________________________________
+
+### test_workflow
+
+Available from n8n v2.15.0
+
+Test a workflow using pin data to bypass external services. Trigger nodes, nodes with credentials, and HTTP Request nodes are pinned (use simulated data). Other nodes (Set, If, Code, etc.) execute normally, including credential-free I/O nodes like Execute Command or file read/write nodes.
+
+#### Parameters
+
+| Name              | Type                    | Required | Description                                                                                    |
+| ----------------- | ----------------------- | -------- | ---------------------------------------------------------------------------------------------- |
+| `workflowId`      | `string`                | Yes      | The ID of the workflow to test                                                                 |
+| `pinData`         | `Record<string, array>` | Yes      | Pin data for all workflow nodes.                                                               |
+| `triggerNodeName` | `string`                | No       | Optional name of the trigger node to start execution from. Defaults to the first trigger node. |
+
+#### Output
+
+| Field         | Type     | Description                                                                                                                                 |
+| ------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `executionId` | \`string | null\`                                                                                                                                      |
+| `status`      | `string` | The status of the test execution. One of: `"success"`, `"error"`, `"running"`, `"waiting"`, `"canceled"`, `"crashed"`, `"new"`, `"unknown"` |
+| `error`       | `string` | Error message if the execution failed                                                                                                       |
+
+#### Notes
+
+- Can be used to test workflow logic without setting up credentials or hitting external services
+- This tool executes workflows synchronously (waits for execution to finish)
+- Has an enforced MCP execution timeout (5 minutes).
+
+______________________________________________________________________
+
+### prepare_test_pin_data
+
+Available from n8n v2.15.0
+
+Prepare test pin data for a workflow. Trigger nodes, nodes with credentials, and HTTP Request nodes need pin data. Logic nodes (Set, If, Code, etc.) and credential-free I/O nodes (Execute Command, file read/write) execute normally without pin data. Returns JSON Schemas describing the expected output shape for each node that needs pin data.
+
+#### Parameters
+
+| Name         | Type     | Required | Description                                          |
+| ------------ | -------- | -------- | ---------------------------------------------------- |
+| `workflowId` | `string` | Yes      | The ID of the workflow to generate test pin data for |
+
+#### Output
+
+| Field                               | Type                         | Description                                                                                                         |
+| ----------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `nodeSchemasToGenerate`             | `Record<string, JsonSchema>` | Nodes that need pin data. Keys are node names, values are JSON Schema objects describing the expected output shape. |
+| `nodesWithoutSchema`                | `string[]`                   | Node names that need pin data but have no output schema. Use empty defaults `[{"json": {}}]` for each.              |
+| `nodesSkipped`                      | `string[]`                   | Nodes that don't need pin data and will execute normally during the test.                                           |
+| `coverage`                          | `object`                     | Coverage statistics                                                                                                 |
+| `coverage.withSchemaFromExecution`  | `number`                     | Nodes with schemas inferred from last successful execution output                                                   |
+| `coverage.withSchemaFromDefinition` | `number`                     | Nodes with schemas from node type definitions                                                                       |
+| `coverage.withoutSchema`            | `number`                     | Nodes with no data or schema                                                                                        |
+| `coverage.skipped`                  | `number`                     | Nodes that will execute normally (no pin data needed)                                                               |
+| `coverage.total`                    | `number`                     | Total number of enabled nodes                                                                                       |
+
+#### Notes
+
+- Schemas should be used to generate realistic sample data for `test_workflow`.
+
+______________________________________________________________________
+
+### publish_workflow
+
+Available from n8n v2.12.0
+
+Publish (activate) a workflow to make it available for production execution. This creates an active version from the current draft.
+
+#### Parameters
+
+| Name         | Type     | Required | Description                                                                           |
+| ------------ | -------- | -------- | ------------------------------------------------------------------------------------- |
+| `workflowId` | `string` | Yes      | The ID of the workflow to publish                                                     |
+| `versionId`  | `string` | No       | Optional version ID to publish. If not provided, publishes the current draft version. |
+
+#### Output
+
+| Field             | Type      | Description                        |
+| ----------------- | --------- | ---------------------------------- |
+| `success`         | `boolean` | Whether publishing succeeded       |
+| `workflowId`      | `string`  | The workflow ID                    |
+| `activeVersionId` | \`string  | null\`                             |
+| `error`           | `string`  | Error message if publishing failed |
+
+______________________________________________________________________
+
+### unpublish_workflow
+
+Available from n8n v2.12.0
+
+Unpublish (deactivate) a workflow to stop it from being available for production execution.
+
+#### Parameters
+
+| Name         | Type     | Required | Description                         |
+| ------------ | -------- | -------- | ----------------------------------- |
+| `workflowId` | `string` | Yes      | The ID of the workflow to unpublish |
+
+#### Output
+
+| Field        | Type      | Description                          |
+| ------------ | --------- | ------------------------------------ |
+| `success`    | `boolean` | Whether unpublishing succeeded       |
+| `workflowId` | `string`  | The workflow ID                      |
+| `error`      | `string`  | Error message if unpublishing failed |
+
+______________________________________________________________________
+
+### search_projects
+
+Available from n8n v2.14.0
+
+Search for projects accessible to the current user.
+
+#### Parameters
+
+| Name    | Type         | Required | Description                                              |
+| ------- | ------------ | -------- | -------------------------------------------------------- |
+| `query` | `string`     | No       | Filter projects by name (case-insensitive partial match) |
+| `type`  | \`"personal" | "team"\` | No                                                       |
+| `limit` | `integer`    | No       | Limit the number of results (max 100)                    |
+
+#### Output
+
+| Field         | Type         | Description                          |
+| ------------- | ------------ | ------------------------------------ |
+| `data`        | `array`      | List of matching projects            |
+| `data[].id`   | `string`     | The unique identifier of the project |
+| `data[].name` | `string`     | The name of the project              |
+| `data[].type` | \`"personal" | "team"\`                             |
+| `count`       | `integer`    | Total number of matching projects    |
+
+#### Notes
+
+- Maximum result limit is 100.
+- This tool enables MCP clients to create workflows and data tables in a specific project
+
+______________________________________________________________________
+
+### search_folders
+
+Available from n8n v2.14.0
+
+Search for folders within a project.
+
+#### Parameters
+
+| Name        | Type      | Required | Description                                             |
+| ----------- | --------- | -------- | ------------------------------------------------------- |
+| `projectId` | `string`  | Yes      | The ID of the project to search folders in              |
+| `query`     | `string`  | No       | Filter folders by name (case-insensitive partial match) |
+| `limit`     | `integer` | No       | Limit the number of results (max 100)                   |
+
+#### Output
+
+| Field                   | Type      | Description                         |
+| ----------------------- | --------- | ----------------------------------- |
+| `data`                  | `array`   | List of matching folders            |
+| `data[].id`             | `string`  | The unique identifier of the folder |
+| `data[].name`           | `string`  | The name of the folder              |
+| `data[].parentFolderId` | \`string  | null\`                              |
+| `count`                 | `integer` | Total number of matching folders    |
+
+#### Notes
+
+- Maximum result limit is 100.
+- This tool enables MCP clients to create workflows in a specific folder
+
+______________________________________________________________________
+
+## Workflow builder
+
+### get_sdk_reference
+
+Available from n8n v2.12.0
+
+Get the n8n Workflow SDK reference documentation including patterns, expression syntax, and functions.
+
+#### Parameters
+
+| Name      | Type     | Required | Default | Description                                                                                                                                         |
+| --------- | -------- | -------- | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `section` | `string` | No       | `"all"` | Documentation section to retrieve. One of: `"patterns"`, `"expressions"`, `"functions"`, `"rules"`, `"import"`, `"guidelines"`, `"design"`, `"all"` |
+
+#### Output
+
+| Field       | Type     | Description                                                   |
+| ----------- | -------- | ------------------------------------------------------------- |
+| `reference` | `string` | SDK reference documentation content for the requested section |
+
+#### Notes
+
+- Should be called first before building any workflows.
+- Sections cover patterns, expression syntax, built-in functions, coding rules, import syntax, naming guidelines, and design guidance.
+
+______________________________________________________________________
+
+### search_nodes
+
+Available from n8n v2.12.0
+
+Search for n8n nodes by service name, trigger type, or utility function. Returns node IDs, discriminators (resource/operation/mode), and related nodes needed for `get_node_types` tool.
+
+#### Parameters
+
+| Name      | Type       | Required    | Description                                                                                                                                                                                            |
+| --------- | ---------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `queries` | `string[]` | Yes (min 1) | Search queries -- service names (for example `"gmail"`, `"slack"`), trigger types (for example `"schedule trigger"`, `"webhook"`), or utility nodes (for example `"set"`, `"if"`, `"merge"`, `"code"`) |
+
+#### Output
+
+| Field     | Type     | Description                                                              |
+| --------- | -------- | ------------------------------------------------------------------------ |
+| `results` | `string` | Search results with matching node IDs, discriminators, and related nodes |
+
+______________________________________________________________________
+
+### get_node_types
+
+Available from n8n v2.12.0
+
+Get TypeScript type definitions for n8n nodes. Returns exact parameter names and structures.
+
+#### Parameters
+
+| Name      | Type    | Required    | Description                                                                                                                                |
+| --------- | ------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `nodeIds` | `array` | Yes (min 1) | Array of node IDs. Each element can be a plain string (for example `"n8n-nodes-base.gmail"`) or an object with discriminators (see below). |
+
+**Node ID object format:**
+
+| Field       | Type     | Required | Description                                             |
+| ----------- | -------- | -------- | ------------------------------------------------------- |
+| `nodeId`    | `string` | Yes      | The node type ID (for example `"n8n-nodes-base.gmail"`) |
+| `version`   | `string` | No       | Specific version (for example `"2.1"`)                  |
+| `resource`  | `string` | No       | Resource discriminator (for example `"message"`)        |
+| `operation` | `string` | No       | Operation discriminator (for example `"send"`)          |
+| `mode`      | `string` | No       | Mode discriminator                                      |
+
+#### Output
+
+| Field         | Type     | Description                                         |
+| ------------- | -------- | --------------------------------------------------- |
+| `definitions` | `string` | TypeScript type definitions for the requested nodes |
+
+#### Notes
+
+- Critical for correct node configuration -- MCP clients should always call before writing workflow code.
+- Supports both simple string node IDs and objects with discriminators for multi-variant nodes.
+
+______________________________________________________________________
+
+### get_suggested_nodes
+
+Available from n8n v2.12.0
+
+Get curated node recommendations for workflow technique categories. Returns recommended nodes with pattern hints and configuration guidance. Use after analyzing what kind of workflow to build.
+
+#### Parameters
+
+| Name         | Type       | Required    | Description                                                                                                                                                                                                                                  |
+| ------------ | ---------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `categories` | `string[]` | Yes (min 1) | Workflow technique categories. Available values: `chatbot`, `notification`, `scheduling`, `data_transformation`, `data_persistence`, `data_extraction`, `document_processing`, `form_input`, `content_generation`, `triage`, `find_research` |
+
+#### Output
+
+| Field         | Type     | Description                                                                |
+| ------------- | -------- | -------------------------------------------------------------------------- |
+| `suggestions` | `string` | Curated node recommendations with pattern hints and configuration guidance |
+
+______________________________________________________________________
+
+### validate_workflow
+
+Available from n8n v2.12.0
+
+Validate n8n Workflow SDK code. Parses the code into a workflow and checks for errors. Returns the workflow JSON if valid, or detailed error messages to fix. Always validate before creating a workflow.
+
+#### Parameters
+
+| Name   | Type     | Required | Description                                                                                            |
+| ------ | -------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `code` | `string` | Yes      | Full TypeScript/JavaScript workflow code using the n8n Workflow SDK. Must include the workflow export. |
+
+#### Output
+
+| Field                      | Type       | Description                                      |
+| -------------------------- | ---------- | ------------------------------------------------ |
+| `valid`                    | `boolean`  | Whether the workflow code is valid               |
+| `nodeCount`                | `number`   | The number of nodes in the workflow (if valid)   |
+| `warnings`                 | `array`    | Validation warnings (if any)                     |
+| `warnings[].code`          | `string`   | The warning code identifying the type of warning |
+| `warnings[].message`       | `string`   | The warning message                              |
+| `warnings[].nodeName`      | `string`   | The node that triggered the warning              |
+| `warnings[].parameterPath` | `string`   | The parameter path that triggered the warning    |
+| `errors`                   | `string[]` | Validation errors (if invalid)                   |
+
+#### Notes
+
+- Must be called before `create_workflow_from_code` or `update_workflow`.
+- Warnings may be present even when the code is valid.
+
+______________________________________________________________________
+
+### create_workflow_from_code
+
+Available from n8n v2.12.0
+
+Create a workflow in n8n from validated SDK code. Parses the code into a workflow and saves it.
+
+#### Parameters
+
+| Name          | Type     | Required | Description                                                                                                            |
+| ------------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `code`        | `string` | Yes      | Full TypeScript/JavaScript workflow code using the n8n Workflow SDK. Must be validated first with `validate_workflow`. |
+| `name`        | `string` | No       | Optional workflow name (max 128 chars). If not provided, uses the name from the code.                                  |
+| `description` | `string` | No       | Short workflow description (max 255 chars, 1-2 sentences).                                                             |
+| `projectId`   | `string` | No       | Project ID to create the workflow in. Defaults to the user's personal project.                                         |
+| `folderId`    | `string` | No       | Folder ID to create the workflow in. Requires `projectId` to be set.                                                   |
+
+#### Output
+
+| Field                                      | Type     | Description                                                                                                |
+| ------------------------------------------ | -------- | ---------------------------------------------------------------------------------------------------------- |
+| `workflowId`                               | `string` | The ID of the created workflow                                                                             |
+| `name`                                     | `string` | The name of the created workflow                                                                           |
+| `nodeCount`                                | `number` | The number of nodes in the workflow                                                                        |
+| `url`                                      | `string` | The URL to open the workflow in n8n                                                                        |
+| `autoAssignedCredentials`                  | `array`  | List of credentials that were automatically assigned to nodes                                              |
+| `autoAssignedCredentials[].nodeName`       | `string` | The name of the node that had credentials auto-assigned                                                    |
+| `autoAssignedCredentials[].credentialName` | `string` | The name of the credential that was auto-assigned                                                          |
+| `note`                                     | `string` | Additional notes about the workflow creation (for example nodes skipped during credential auto-assignment) |
+
+#### Notes
+
+- Automatically assigns available credentials to nodes.
+- HTTP Request nodes are skipped during credential auto-assignment and must be configured manually.
+- Sets `availableInMCP` flag to true on the created workflow.
+- Marks the workflow with `aiBuilderAssisted` metadata.
+- Resolves webhook node IDs automatically.
+- `folderId` requires `projectId` to also be provided.
+
+______________________________________________________________________
+
+### update_workflow
+
+Available from n8n v2.12.0
+
+Update an existing workflow in n8n from validated SDK code. Parses the code into a workflow and saves the changes.
+
+#### Parameters
+
+| Name          | Type     | Required | Description                                                                                                            |
+| ------------- | -------- | -------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `workflowId`  | `string` | Yes      | The ID of the workflow to update                                                                                       |
+| `code`        | `string` | Yes      | Full TypeScript/JavaScript workflow code using the n8n Workflow SDK. Must be validated first with `validate_workflow`. |
+| `name`        | `string` | No       | Optional workflow name (max 128 chars). If not provided, uses the name from the code.                                  |
+| `description` | `string` | No       | Short workflow description (max 255 chars, 1-2 sentences).                                                             |
+
+#### Output
+
+| Field                                      | Type     | Description                                                                                              |
+| ------------------------------------------ | -------- | -------------------------------------------------------------------------------------------------------- |
+| `workflowId`                               | `string` | The ID of the updated workflow                                                                           |
+| `name`                                     | `string` | The name of the updated workflow                                                                         |
+| `nodeCount`                                | `number` | The number of nodes in the workflow                                                                      |
+| `url`                                      | `string` | The URL to open the workflow in n8n                                                                      |
+| `autoAssignedCredentials`                  | `array`  | List of credentials that were automatically assigned to nodes                                            |
+| `autoAssignedCredentials[].nodeName`       | `string` | The name of the node that had credentials auto-assigned                                                  |
+| `autoAssignedCredentials[].credentialName` | `string` | The name of the credential that was auto-assigned                                                        |
+| `note`                                     | `string` | Additional notes about the workflow update (for example nodes skipped during credential auto-assignment) |
+
+#### Notes
+
+- Preserves user-configured credentials from the existing workflow by matching nodes by name and type.
+- Marks the workflow with `aiBuilderAssisted` metadata.
+
+______________________________________________________________________
+
+### archive_workflow
+
+Available from n8n v2.12.0
+
+Archive a workflow in n8n by its ID.
+
+#### Parameters
+
+| Name         | Type     | Required | Description                       |
+| ------------ | -------- | -------- | --------------------------------- |
+| `workflowId` | `string` | Yes      | The ID of the workflow to archive |
+
+#### Output
+
+| Field        | Type      | Description                       |
+| ------------ | --------- | --------------------------------- |
+| `archived`   | `boolean` | Whether the workflow was archived |
+| `workflowId` | `string`  | The ID of the archived workflow   |
+| `name`       | `string`  | The name of the archived workflow |
+
+#### Notes
+
+- Idempotent -- skips already-archived workflows.
+
+______________________________________________________________________
+
+## Data tables
+
+### search_data_tables
+
+Available from n8n v2.16.0
+
+Search for data tables accessible to the current user. Use this to find a data table ID before modifying or adding data to it.
+
+#### Parameters
+
+| Name        | Type      | Required | Description                                                 |
+| ----------- | --------- | -------- | ----------------------------------------------------------- |
+| `query`     | `string`  | No       | Filter data tables by name (case-insensitive partial match) |
+| `projectId` | `string`  | No       | Filter by project ID                                        |
+| `limit`     | `integer` | No       | Limit the number of results (max 100)                       |
+
+#### Output
+
+| Field                    | Type      | Description                                                             |
+| ------------------------ | --------- | ----------------------------------------------------------------------- |
+| `data`                   | `array`   | List of data tables matching the query                                  |
+| `data[].id`              | `string`  | Unique identifier of the data table                                     |
+| `data[].name`            | `string`  | The name of the data table                                              |
+| `data[].projectId`       | `string`  | The project this data table belongs to                                  |
+| `data[].createdAt`       | `string`  | ISO timestamp when the data table was created                           |
+| `data[].updatedAt`       | `string`  | ISO timestamp when the data table was last updated                      |
+| `data[].columns`         | `array`   | The columns defined in this data table                                  |
+| `data[].columns[].id`    | `string`  | Column unique identifier                                                |
+| `data[].columns[].name`  | `string`  | Column name                                                             |
+| `data[].columns[].type`  | `string`  | Column data type. One of: `"string"`, `"number"`, `"boolean"`, `"date"` |
+| `data[].columns[].index` | `integer` | Column position in the table                                            |
+| `count`                  | `integer` | Total number of matching data tables                                    |
+
+#### Notes
+
+- Maximum result limit is 100.
+
+______________________________________________________________________
+
+### create_data_table
+
+Available from n8n v2.16.0
+
+Create a new data table with the specified columns.
+
+#### Parameters
+
+| Name             | Type     | Required    | Description                                                                                           |
+| ---------------- | -------- | ----------- | ----------------------------------------------------------------------------------------------------- |
+| `projectId`      | `string` | Yes         | The project ID where the data table will be created                                                   |
+| `name`           | `string` | Yes         | The name of the data table (min 1, max 128 chars, must be unique within the project)                  |
+| `columns`        | `array`  | Yes (min 1) | The columns to create in the data table                                                               |
+| `columns[].name` | `string` | Yes         | Column name. Must start with a letter, contain only letters, numbers, and underscores (max 63 chars). |
+| `columns[].type` | `string` | Yes         | The data type of the column. One of: `"string"`, `"number"`, `"boolean"`, `"date"`                    |
+
+#### Output
+
+| Field       | Type     | Description                                     |
+| ----------- | -------- | ----------------------------------------------- |
+| `id`        | `string` | The unique identifier of the created data table |
+| `name`      | `string` | The name of the created data table              |
+| `projectId` | `string` | The project ID of the created data table        |
+
+#### Notes
+
+- At least one column is required.
+- Table name must be unique within the project.
+- Column names must match the pattern: `^[a-zA-Z][a-zA-Z0-9_]*$` (max 63 chars).
+
+______________________________________________________________________
+
+### add_data_table_column
+
+Available from n8n v2.16.0
+
+Add a new column to an existing data table.
+
+#### Parameters
+
+| Name          | Type     | Required | Description                                                                                           |
+| ------------- | -------- | -------- | ----------------------------------------------------------------------------------------------------- |
+| `dataTableId` | `string` | Yes      | The ID of the data table to add a column to                                                           |
+| `projectId`   | `string` | Yes      | The project ID the data table belongs to                                                              |
+| `name`        | `string` | Yes      | Column name. Must start with a letter, contain only letters, numbers, and underscores (max 63 chars). |
+| `type`        | `string` | Yes      | The data type of the new column. One of: `"string"`, `"number"`, `"boolean"`, `"date"`                |
+
+#### Output
+
+| Field         | Type      | Description                     |
+| ------------- | --------- | ------------------------------- |
+| `success`     | `boolean` | Whether the operation succeeded |
+| `message`     | `string`  | Description of the result       |
+| `column`      | `object`  | The created column              |
+| `column.id`   | `string`  | Column unique identifier        |
+| `column.name` | `string`  | Column name                     |
+| `column.type` | `string`  | Column data type                |
+
+#### Notes
+
+- Column names must match the pattern: `^[a-zA-Z][a-zA-Z0-9_]*$` (max 63 chars).
+- Column type is immutable (trough MCP) after creation.
+
+______________________________________________________________________
+
+### rename_data_table_column
+
+Available from n8n v2.16.0
+
+Rename a column in a data table.
+
+#### Parameters
+
+| Name          | Type     | Required | Description                                           |
+| ------------- | -------- | -------- | ----------------------------------------------------- |
+| `dataTableId` | `string` | Yes      | The ID of the data table containing the column        |
+| `projectId`   | `string` | Yes      | The project ID the data table belongs to              |
+| `columnId`    | `string` | Yes      | The ID of the column to rename                        |
+| `name`        | `string` | Yes      | The new column name. Must follow column naming rules. |
+
+#### Output
+
+| Field         | Type      | Description                     |
+| ------------- | --------- | ------------------------------- |
+| `success`     | `boolean` | Whether the operation succeeded |
+| `message`     | `string`  | Description of the result       |
+| `column`      | `object`  | The renamed column              |
+| `column.id`   | `string`  | Column unique identifier        |
+| `column.name` | `string`  | New column name                 |
+| `column.type` | `string`  | Column data type                |
+
+#### Notes
+
+- New name must follow column naming rules: `^[a-zA-Z][a-zA-Z0-9_]*$` (max 63 chars).
+
+______________________________________________________________________
+
+### delete_data_table_column
+
+Available from n8n v2.16.0
+
+Delete a column from a data table. This permanently removes the column and all its data.
+
+#### Parameters
+
+| Name          | Type     | Required | Description                                    |
+| ------------- | -------- | -------- | ---------------------------------------------- |
+| `dataTableId` | `string` | Yes      | The ID of the data table containing the column |
+| `projectId`   | `string` | Yes      | The project ID the data table belongs to       |
+| `columnId`    | `string` | Yes      | The ID of the column to delete                 |
+
+#### Output
+
+| Field     | Type      | Description                     |
+| --------- | --------- | ------------------------------- |
+| `success` | `boolean` | Whether the operation succeeded |
+| `message` | `string`  | Description of the result       |
+
+#### Notes
+
+- Deleting a column through MCP can't be undone.
+
+______________________________________________________________________
+
+### rename_data_table
+
+Available from n8n v2.16.0
+
+Rename an existing data table.
+
+#### Parameters
+
+| Name          | Type     | Required | Description                                            |
+| ------------- | -------- | -------- | ------------------------------------------------------ |
+| `dataTableId` | `string` | Yes      | The ID of the data table to rename                     |
+| `projectId`   | `string` | Yes      | The project ID the data table belongs to               |
+| `name`        | `string` | Yes      | The new name for the data table (min 1, max 128 chars) |
+
+#### Output
+
+| Field     | Type      | Description                     |
+| --------- | --------- | ------------------------------- |
+| `success` | `boolean` | Whether the operation succeeded |
+| `message` | `string`  | Description of the result       |
+
+#### Notes
+
+- Name must be unique within the project.
+
+______________________________________________________________________
+
+### add_data_table_rows
+
+Available from n8n v2.16.0
+
+Insert rows into an existing data table. Each row is an object mapping column names to values.
+
+#### Parameters
+
+| Name          | Type     | Required              | Description                                                                                               |
+| ------------- | -------- | --------------------- | --------------------------------------------------------------------------------------------------------- |
+| `dataTableId` | `string` | Yes                   | The ID of the data table to insert rows into                                                              |
+| `projectId`   | `string` | Yes                   | The project ID the data table belongs to                                                                  |
+| `rows`        | `array`  | Yes (min 1, max 1000) | Array of row objects. Each object maps column names to values (`string`, `number`, `boolean`, or `null`). |
+
+#### Output
+
+| Field           | Type      | Description                            |
+| --------------- | --------- | -------------------------------------- |
+| `success`       | `boolean` | Whether the insert operation succeeded |
+| `insertedCount` | `integer` | Number of rows successfully inserted   |
+
+#### Notes
+
+- Maximum 1000 rows per call.
+- Row values must be `string`, `number`, `boolean`, or `null`.
+- Column names in row objects must match existing column names in the data table.
+
 # n8n public REST API
 
 Feature availability
@@ -3744,9 +5300,9 @@ There are two places in your workflows where you can use code:
 
 - **Expressions**
 
-  Use [expressions](../glossary/#expression-n8n) to transform [data](../data/) in your nodes. You can use JavaScript in expressions, as well as n8n's [Built-in methods and variables](builtin/overview/) and [Data transformation functions](builtin/data-transformation-functions/).
+  Use [expressions](../glossary/#expression-n8n) to transform [data](../data/) in your nodes. You can use JavaScript in expressions, as well as n8n's [Built-in methods and variables](builtin/overview/).
 
-  [Expressions](expressions/)
+  [Expressions](../data/expressions/)
 
 - **Code node**
 
@@ -3996,7 +5552,7 @@ Coding in n8n
 This page gives usage information about the Code node. For more guidance on coding in n8n, refer to the [Code](../) section. It includes:
 
 - Reference documentation on [Built-in methods and variables](../builtin/overview/)
-- Guidance on [Handling dates](../cookbook/luxon/) and [Querying JSON](../cookbook/jmespath/)
+- Guidance on [Handling dates](../../data/specific-data-types/luxon/) and [Querying JSON](../../data/specific-data-types/jmespath/)
 - A growing collection of examples in the [Cookbook](../cookbook/code-node/)
 
 Examples and templates
@@ -4082,10 +5638,10 @@ n8n added native Python support using task runners in version 1.111.0. This feat
 Main differences from Pyodide:
 
 - Native Python supports only `_items` in all-items mode and `_item` in per-item mode. It doesn't support other n8n built-in methods and variables.
-- Native Python supports importing native Python modules from the standard library and from third-parties, if the `n8nio/runners` image includes them and explicitly allowlists them. See [adding extra dependencies for task runners](../../hosting/configuration/task-runners/#adding-extra-dependencies) for more details.
+- On self-hosted, native Python supports importing native Python modules from the standard library and from third-parties, if the `n8nio/runners` image includes them and explicitly allowlists them. See [adding extra dependencies for task runners](../../hosting/configuration/task-runners/#adding-extra-dependencies) for more details.
 - Native Python denies insecure built-ins by default. See [task runners environment variables](../../hosting/configuration/environment-variables/task-runners/) for more details.
 - Unlike Pyodide, which accepts dot access notation, for example, `item.json.myNewField`, native Python only accepts bracket access notation, for example, `item["json"]["my_new_field"]`. There may be other minor syntax differences where Pyodide accepts constructs that aren't legal in native Python.
-- On n8n cloud, the Python option for the Code node doesn't allow users to import any third-party Python libraries. Self-hosting users can find setup instructions to include external libraries [here](https://docs.n8n.io/hosting/configuration/task-runners/#adding-extra-dependencies). In the long term, the n8n team is committed to allowing users to securely execute arbitrary Python code with any first- and third-party libraries using task runners.
+- On n8n cloud, the Python option for the Code node doesn't allow users to import any Python libraries — whether from the standard library or third-party packages. Self-hosting users can find setup instructions to include external libraries [here](https://docs.n8n.io/hosting/configuration/task-runners/#adding-extra-dependencies). In the long term, the n8n team is committed to allowing users to securely execute arbitrary Python code with any first- and third-party libraries using task runners.
 
 Upgrading to native Python is a breaking change, so you may need to adjust your Python scripts to use the native Python runner.
 
@@ -4126,89 +5682,6 @@ To use ChatGPT to generate code in the Code node:
 1. Select the **Ask AI** tab.
 1. Write your query.
 1. Select **Generate Code**. n8n sends your query to ChatGPT, then displays the result in the **Code** tab.
-
-# Expressions
-
-Expressions are a powerful feature implemented in all n8n nodes. They allow node parameters to be set dynamically based on data from:
-
-- Previous node executions
-- The workflow
-- Your n8n environment
-
-You can also execute JavaScript within an expression, making this a convenient and easy way to manipulate data into useful parameter values without writing extensive extra code.
-
-n8n created and uses a templating language called [Tournament](https://github.com/n8n-io/tournament), and extends it with [custom methods and variables](../builtin/overview/) and [data transformation functions](../builtin/data-transformation-functions/). These features make it easier to perform common tasks like getting data from other nodes or accessing workflow metadata.
-
-n8n additionally supports two libraries:
-
-- [Luxon](https://github.com/moment/luxon/), for working with dates and time.
-- [JMESPath](https://jmespath.org/), for querying JSON.
-
-Data in n8n
-
-When writing expressions, it's helpful to understand data structure and behavior in n8n. Refer to [Data](../../data/) for more information on working with data in your workflows.
-
-## Writing expressions
-
-To use an expression to set a parameter value:
-
-1. Hover over the parameter where you want to use an expression.
-1. Select **Expressions** in the **Fixed/Expression** toggle.
-1. Write your expression in the parameter, or select **Open expression editor** to open the expressions editor. If you use the expressions editor, you can browse the available data in the **Variable selector**. All expressions have the format `{{ your expression here }}`.
-
-### Example: Get data from webhook body
-
-Consider the following scenario: you have a webhook trigger that receives data through the webhook body. You want to extract some of that data for use in the workflow.
-
-Your webhook data looks similar to this:
-
-```
-[
-  {
-    "headers": {
-      "host": "n8n.instance.address",
-      ...
-    },
-    "params": {},
-    "query": {},
-    "body": {
-      "name": "Jim",
-      "age": 30,
-      "city": "New York"
-    }
-  }
-]
-```
-
-In the next node in the workflow, you want to get just the value of `city`. You can use the following expression:
-
-```
-{{$json.body.city}}
-```
-
-This expression:
-
-1. Accesses the incoming JSON-formatted data using n8n's custom `$json` variable.
-1. Finds the value of `city` (in this example, "New York"). Note that this example uses JMESPath syntax to query the JSON data. You can also write this expression as `{{$json['body']['city']}}`.
-
-### Example: Writing longer JavaScript
-
-You can do things like variable assignments or multiple statements in an expression, but you need to wrap your code using the syntax for an IIFE (Immediately Invoked Function Expression).
-
-The following code use the Luxon date and time library to find the time between two dates in months. We surround the code in both the handlebar brackets for an expression and the IIFE syntax.
-
-```
-{{(()=>{
-  let end = DateTime.fromISO('2017-03-13');
-  let start = DateTime.fromISO('2017-02-13');
-  let diffInMonths = end.diff(start, 'months');
-  return diffInMonths.toObject();
-})()}}
-```
-
-## Common issues
-
-For common errors or issues with expressions and suggested resolution steps, refer to [Common Issues](../cookbook/expressions/common-issues/).
 
 # Custom variables
 
@@ -4265,80 +5738,6 @@ When a project-scoped variable has the same key as a global variable, the projec
 
 Variables are read-only. You must use the UI to change the values. If you need to set and access custom data within your workflow, use [Workflow static data](../cookbook/builtin/get-workflow-static-data/).
 
-# Convenience methods
-
-n8n provides these methods to make it easier to perform common tasks in [expressions](../../../glossary/#expression-n8n).
-
-Python support
-
-You can use Python in the Code node. It isn't available in expressions.
-
-| Method                                                        | Description                                                                                                                                                                                                                                                                                                                                                                                 | Available in Code node? |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `$evaluateExpression(expression: string, itemIndex?: number)` | Evaluates a string as an expression. If you don't provide `itemIndex`, n8n uses the data from item 0 in the Code node.                                                                                                                                                                                                                                                                      |                         |
-| `$ifEmpty(value, defaultValue)`                               | The `$ifEmpty()` function takes two parameters, tests the first to check if it's empty, then returns either the parameter (if not empty) or the second parameter (if the first is empty). The first parameter is empty if it's: - `undefined` - `null` - An empty string `''` - An array where `value.length` returns `false` - An object where `Object.keys(value).length` returns `false` |                         |
-| `$if()`                                                       | The `$if()` function takes three parameters: a condition, the value to return if true, and the value to return if false.                                                                                                                                                                                                                                                                    |                         |
-| `$max()`                                                      | Returns the highest of the provided numbers.                                                                                                                                                                                                                                                                                                                                                |                         |
-| `$min()`                                                      | Returns the lowest of the provided numbers.                                                                                                                                                                                                                                                                                                                                                 |                         |
-
-| Method                                                        | Description                                                                                                                                                                                                                                                                                                                                                                                 |
-| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_evaluateExpression(expression: string, itemIndex?: number)` | Evaluates a string as an expression. If you don't provide `itemIndex`, n8n uses the data from item 0 in the Code node.                                                                                                                                                                                                                                                                      |
-| `_ifEmpty(value, defaultValue)`                               | The `_ifEmpty()` function takes two parameters, tests the first to check if it's empty, then returns either the parameter (if not empty) or the second parameter (if the first is empty). The first parameter is empty if it's: - `undefined` - `null` - An empty string `''` - An array where `value.length` returns `false` - An object where `Object.keys(value).length` returns `false` |
-
-# Current node input
-
-Methods for working with the input of the current node. Some methods and variables aren't available in the Code node.
-
-Python support
-
-You can use Python in the Code node. It isn't available in expressions.
-
-| Method                       | Description                                                                                                                                                                                    | Available in Code node?           |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| `$binary`                    | Shorthand for `$input.item.binary`. Incoming binary data from a node                                                                                                                           |                                   |
-| `$input.item`                | The input item of the current node that's being processed. Refer to [Item linking](../../../data/data-mapping/data-item-linking/) for more information on paired items and item linking.       |                                   |
-| `$input.all()`               | All input items in current node.                                                                                                                                                               |                                   |
-| `$input.first()`             | First input item in current node.                                                                                                                                                              |                                   |
-| `$input.last()`              | Last input item in current node.                                                                                                                                                               |                                   |
-| `$input.params`              | Object containing the query settings of the previous node. This includes data such as the operation it ran, result limits, and so on.                                                          |                                   |
-| `$json`                      | Shorthand for `$input.item.json`. Incoming JSON data from a node. Refer to [Data structure](../../../data/data-structure/) for information on item structure.                                  | (when running once for each item) |
-| `$input.context.noItemsLeft` | Boolean. Only available when working with the Loop Over Items node. Provides information about what's happening in the node. Use this to determine whether the node is still processing items. |                                   |
-
-| Method                       | Description                                                                                                                                                                                                                  |
-| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_input.item`                | The input item of the current node that's being processed. Refer to [Item linking](../../../data/data-mapping/data-item-linking/) for more information on paired items and item linking.                                     |
-| `_input.all()`               | All input items in current node.                                                                                                                                                                                             |
-| `_input.first()`             | First input item in current node.                                                                                                                                                                                            |
-| `_input.last()`              | Last input item in current node.                                                                                                                                                                                             |
-| `_input.params`              | Object containing the query settings of the previous node. This includes data such as the operation it ran, result limits, and so on.                                                                                        |
-| `_json`                      | Shorthand for `_input.item.json`. Incoming JSON data from a node. Refer to [Data structure](../../../data/data-structure/) for information on item structure. Available when you set **Mode** to **Run Once for Each Item**. |
-| `_input.context.noItemsLeft` | Boolean. Only available when working with the Loop Over Items node. Provides information about what's happening in the node. Use this to determine whether the node is still processing items.                               |
-
-# Built-in date and time methods
-
-Methods for working with date and time.
-
-Python support
-
-You can use Python in the Code node. It isn't available in expressions.
-
-| Method   | Description                                                                                                                                                      | Available in Code node? |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `$now`   | A Luxon object containing the current timestamp. Equivalent to `DateTime.now()`.                                                                                 |                         |
-| `$today` | A Luxon object containing the current timestamp, rounded down to the day. Equivalent to `DateTime.now().set({ hour: 0, minute: 0, second: 0, millisecond: 0 })`. |                         |
-
-| Method   | Description                                                                                                                                                      |
-| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `_now`   | A Luxon object containing the current timestamp. Equivalent to `DateTime.now()`.                                                                                 |
-| `_today` | A Luxon object containing the current timestamp, rounded down to the day. Equivalent to `DateTime.now().set({ hour: 0, minute: 0, second: 0, millisecond: 0 })`. |
-
-Don't mix native JavaScript and Luxon dates
-
-While you can use both native JavaScript dates and Luxon dates in n8n, they aren't directly interoperable. It's best to [convert JavaScript dates to Luxon](../../cookbook/luxon/#convert-javascript-dates-to-luxon) to avoid problems.
-
-n8n provides built-in convenience functions to support data transformation in expressions for dates. Refer to [Data transformation functions | Dates](../data-transformation-functions/dates/) for more information.
-
 # HTTP node variables
 
 Variables for working with HTTP node requests and responses when using pagination.
@@ -4359,7 +5758,7 @@ These variables are for use in expressions in the HTTP node. You can't use them 
 
 # JMESPath method
 
-This is an n8n-provided method for working with the [JMESPath](../../cookbook/jmespath/) library.
+This is an n8n-provided method for working with the [JMESPath](../../../data/specific-data-types/jmespath/) library.
 
 Python support
 
@@ -4452,34 +5851,6 @@ You can use Python in the Code node. It isn't available in expressions.
 | `_workflow.id`                 | The workflow ID.                                                                                                                                                                                                                                            |
 | `_workflow.name`               | The workflow name.                                                                                                                                                                                                                                          |
 
-# Output of other nodes
-
-Methods for working with the output of other nodes. Some methods and variables aren't available in the Code node.
-
-Python support
-
-You can use Python in the Code node. It isn't available in expressions.
-
-| Method                                                 | Description                                                                                                                                                                                            | Available in Code node? |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------- |
-| `$("<node-name>").all(branchIndex?, runIndex?)`        | Returns all items from a given node. If `branchIndex` isn't given it will default to the output that connects `node-name` with the node where you use the expression or code.                          |                         |
-| `$("<node-name>").first(branchIndex?, runIndex?)`      | The first item output by the given node. If `branchIndex` isn't given it will default to the output that connects `node-name` with the node where you use the expression or code.                      |                         |
-| `$("<node-name>").last(branchIndex?, runIndex?)`       | The last item output by the given node. If `branchIndex` isn't given it will default to the output that connects `node-name` with the node where you use the expression or code.                       |                         |
-| `$("<node-name>").item`                                | The linked item. This is the item in the specified node used to produce the current item. Refer to [Item linking](../../../data/data-mapping/data-item-linking/) for more information on item linking. |                         |
-| `$("<node-name>").params`                              | Object containing the query settings of the given node. This includes data such as the operation it ran, result limits, and so on.                                                                     |                         |
-| `$("<node-name>").context`                             | Boolean. Only available when working with the Loop Over Items node. Provides information about what's happening in the node. Use this to determine whether the node is still processing items.         |                         |
-| `$("<node-name>").itemMatching(currentNodeInputIndex)` | Use instead of `$("<node-name>").item` in the Code node if you need to trace back from an input item.                                                                                                  |                         |
-
-| Method                                                 | Description                                                                                                                                                                                                               | Available in Code node? |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| `_("<node-name>").all(branchIndex?, runIndex?)`        | Returns all items from a given node. If `branchIndex` isn't given it will default to the output that connects`node-name` with the node where you use the expression or code.                                              |                         |
-| `_("<node-name>").first(branchIndex?, runIndex?)`      | The first item output by the given node. If `branchIndex` isn't given it will default to the output that connects`node-name` with the node where you use the expression or code.                                          |                         |
-| `_("<node-name>").last(branchIndex?, runIndex?)`       | The last item output by the given node. If `branchIndex` isn't given it will default to the output that connects`node-name` with the node where you use the expression or code.                                           |                         |
-| `_("<node-name>").item`                                | The linked item. This is the item in the specified node used to produce the current item. Refer to [Item linking](../../../data/data-mapping/data-item-linking/) for more information on item linking.                    |                         |
-| `_("<node-name>").params`                              | Object containing the query settings of the given node. This includes data such as the operation it ran, result limits, and so on.                                                                                        |                         |
-| `_("<node-name>").context`                             | Boolean. Only available when working with the Loop Over Items node. Provides information about what's happening in the node. Use this to determine whether the node is still processing items.                            |                         |
-| `_("<node-name>").itemMatching(currentNodeInputIndex)` | Use instead of `_("<node-name>").item` in the Code node if you need to trace back from an input item. Refer to [Retrieve linked items from earlier in the workflow](../../cookbook/builtin/itemmatching/) for an example. |                         |
-
 # Built-in methods and variables
 
 n8n provides built-in methods and variables for working with data and accessing n8n data. This section provides a reference of available methods and variables for use in [expressions](../../../glossary/#expression-n8n), with a short description.
@@ -4492,1418 +5863,10 @@ All data transformation functions are only available in the expressions editor.
 
 The [Cookbook](../../) contains examples for some common tasks, including some [Code node only](../../cookbook/code-node/) functions.
 
-- [Current node input](/code/builtin/current-node-input/)
-- [Output of other nodes](/code/builtin/output-other-nodes/)
-- [Date and time](/code/builtin/date-time/)
 - [JMESPath](/code/builtin/jmespath/)
 - [HTTP node](/code/builtin/http-node-variables/)
 - [LangChain Code node](/code/builtin/langchain-methods/)
 - [n8n metadata](/code/builtin/n8n-metadata/)
-- [Convenience methods](/code/builtin/convenience/)
-- [Data transformation functions](/code/builtin/data-transformation-functions/)
-
-# Data transformation functions
-
-Data transformation functions are helper functions to make data transformation easier in [expressions](../../../glossary/#expression-n8n).
-
-JavaScript in expressions
-
-You can use any JavaScript in expressions. Refer to [Expressions](../../expressions/) for more information.
-
-For a list of available functions, refer to the page for your data type:
-
-- [Arrays](arrays/)
-- [Dates](dates/)
-- [Numbers](numbers/)
-- [Objects](objects/)
-- [Strings](strings/)
-
-## Usage
-
-Data transformation functions are available in the expressions editor.
-
-The syntax is:
-
-```
-{{ dataItem.function() }}
-```
-
-For example, to check if a string is an email:
-
-```
-{{ "example@example.com".isEmail() }}
-
-// Returns true
-```
-
-# Arrays
-
-A reference document listing built-in convenience functions to support data transformation in [expressions](../../../../glossary/#expression-n8n) for arrays.
-
-JavaScript in expressions
-
-You can use any JavaScript in expressions. Refer to [Expressions](../../../expressions/) for more information.
-
-### average(): Number
-
-Returns the value of elements in an array
-
-______________________________________________________________________
-
-### chunk(size: Number): Array
-
-Splits arrays into chunks with a length of size
-
-#### Function parameters
-
-sizeRequiredNumber
-
-The size of each chunk.
-
-______________________________________________________________________
-
-### compact(): Array
-
-Removes empty values from the array.
-
-______________________________________________________________________
-
-### difference(arr: Array): Array
-
-Compares two arrays. Returns all elements in the base array that aren't present in arr.
-
-#### Function parameters
-
-arrRequiredArray
-
-The array to compare to the base array.
-
-______________________________________________________________________
-
-### intersection(arr: Array): Array
-
-Compares two arrays. Returns all elements in the base array that are present in arr.
-
-#### Function parameters
-
-arrRequiredArray
-
-The array to compare to the base array.
-
-______________________________________________________________________
-
-### first(): Array item
-
-Returns the first element of the array.
-
-______________________________________________________________________
-
-### isEmpty(): Boolean
-
-Checks if the array doesn't have any elements.
-
-______________________________________________________________________
-
-### isNotEmpty(): Boolean
-
-Checks if the array has elements.
-
-______________________________________________________________________
-
-### last(): Array item
-
-Returns the last element of the array.
-
-______________________________________________________________________
-
-### max(): Number
-
-Returns the highest value in an array.
-
-______________________________________________________________________
-
-### merge(arr: Array): Array
-
-Merges two Object-arrays into one array by merging the key-value pairs of each element.
-
-#### Function parameters
-
-arrRequiredArray
-
-The array to merge into the base array.
-
-______________________________________________________________________
-
-### min(): Number
-
-Gets the minimum value from a number-only array.
-
-______________________________________________________________________
-
-### pluck(fieldName?: String): Array
-
-Returns an array of Objects where keys equal the given field names.
-
-#### Function parameters
-
-fieldNameOptionalString
-
-The key(s) you want to retrieve. You can enter as many keys as you want, as comma-separated strings.
-
-______________________________________________________________________
-
-### randomItem(): Array item
-
-Returns a random element from an array.
-
-______________________________________________________________________
-
-### removeDuplicates(key?: String): Array
-
-Removes duplicates from an array.
-
-#### Function parameters
-
-keyOptionalString
-
-A key, or comma-separated list of keys, to check for duplicates.
-
-______________________________________________________________________
-
-### renameKeys(from: String, to: String): Array
-
-Renames all matching keys in the array. You can rename more than one key by entering a series of comma separated strings, in the pattern oldKeyName, newKeyName.
-
-#### Function parameters
-
-fromRequiredString
-
-The key you want to rename.
-
-toRequiredString
-
-The new name.
-
-______________________________________________________________________
-
-### smartJoin(keyField: String, nameField: String): Array
-
-Operates on an array of objects where each object contains key-value pairs. Creates a new object containing key-value pairs, where the key is the value of the first pair, and the value is the value of the second pair. Removes non-matching and empty values and trims any whitespace before joining.
-
-#### Function parameters
-
-keyFieldRequiredString
-
-The key to join.
-
-nameFieldRequiredString
-
-The value to join.
-
-#### Example
-
-##### Basic usage
-
-```
-// Input
-{{ [{"type":"fruit", "name":"apple"},{"type":"vegetable", "name":"carrot"} ].smartJoin("type","name") }}
-// Output
-[Object: {"fruit":"apple","vegetable":"carrot"}]
-```
-
-______________________________________________________________________
-
-### sum(): Number
-
-Returns the total sum all the values in an array of parsable numbers.
-
-______________________________________________________________________
-
-### toJsonString(): String
-
-Convert an array to a JSON string. Equivalent of `JSON.stringify`.
-
-______________________________________________________________________
-
-### union(arr: Array): Array
-
-Concatenates two arrays and then removes duplicate.
-
-#### Function parameters
-
-arrRequiredArray
-
-The array to compare to the base array.
-
-______________________________________________________________________
-
-### unique(key?: String): Array
-
-Remove duplicates from an array.
-
-#### Function parameters
-
-keyOptionalString
-
-A key, or comma-separated list of keys, to check for duplicates.
-
-______________________________________________________________________
-
-# Booleans
-
-A reference document listing built-in convenience functions to support data transformation in [expressions](../../../../glossary/#expression-n8n) for arrays.
-
-JavaScript in expressions
-
-You can use any JavaScript in expressions. Refer to [Expressions](../../../expressions/) for more information.
-
-### toInt(): Number
-
-Convert a boolean to a number. `false` converts to `0`, `true` converts to `1`.
-
-______________________________________________________________________
-
-# Dates
-
-A reference document listing built-in convenience functions to support data transformation in [expressions](../../../../glossary/#expression-n8n) for dates.
-
-JavaScript in expressions
-
-You can use any JavaScript in expressions. Refer to [Expressions](../../../expressions/) for more information.
-
-### beginningOf(unit?: DurationUnit): Date
-
-Transforms a Date to the start of the given time period. Returns either a JavaScript Date or Luxon Date, depending on input.
-
-#### Function parameters
-
-unitOptionalString enum
-
-A valid string specifying the time unit.
-
-Default: `week`
-
-One of: `second`, `minute`, `hour`, `day`, `week`, `month`, `year`
-
-______________________________________________________________________
-
-### endOfMonth(): Date
-
-Transforms a Date to the end of the month.
-
-______________________________________________________________________
-
-### extract(datePart?: DurationUnit): Number
-
-Extracts the part defined in datePart from a Date. Returns either a JavaScript Date or Luxon Date, depending on input.
-
-#### Function parameters
-
-datePartOptionalString enum
-
-A valid string specifying the time unit.
-
-Default: `week`
-
-One of: `second`, `minute`, `hour`, `day`, `week`, `month`, `year`
-
-______________________________________________________________________
-
-### format(fmt: TimeFormat): String
-
-Formats a Date in the given structure
-
-#### Function parameters
-
-fmtRequiredString enum
-
-A valid string specifying the time format. Refer to [Luxon | Table of tokens](https://moment.github.io/luxon/#/formatting?id=table-of-tokens) for formats.
-
-______________________________________________________________________
-
-### isBetween(date1: Date | DateTime, date2: Date | DateTime): Boolean
-
-Checks if a Date is between two given dates.
-
-#### Function parameters
-
-date1RequiredDate or DateTime
-
-The first date in the range.
-
-date2RequiredDate or DateTime
-
-The last date in the range.
-
-______________________________________________________________________
-
-### isDst(): Boolean
-
-Checks if a Date is within Daylight Savings Time.
-
-______________________________________________________________________
-
-### isInLast(n?: Number, unit?: DurationUnit): Boolean
-
-Checks if a Date is within a given time period.
-
-#### Function parameters
-
-nOptionalNumber
-
-The number of units. For example, to check if the date is in the last nine weeks, enter 9.
-
-Default: `0`
-
-unitOptionalString enum
-
-A valid string specifying the time unit.
-
-Default: `minutes`
-
-One of: `second`, `minute`, `hour`, `day`, `week`, `month`, `year`
-
-______________________________________________________________________
-
-### isWeekend(): Boolean
-
-Checks if the Date falls on a Saturday or Sunday.
-
-______________________________________________________________________
-
-### minus(n: Number, unit?: DurationUnit): Date
-
-Subtracts a given time period from a Date. Returns either a JavaScript Date or Luxon Date, depending on input.
-
-#### Function parameters
-
-nRequiredNumber
-
-The number of units. For example, to subtract nine seconds, enter 9 here.
-
-unitOptionalString enum
-
-A valid string specifying the time unit.
-
-Default: `milliseconds`
-
-One of: `second`, `minute`, `hour`, `day`, `week`, `month`, `year`
-
-______________________________________________________________________
-
-### plus(n: Number, unit?: DurationUnit): Date
-
-Adds a given time period to a Date. Returns either a JavaScript Date or Luxon Date, depending on input.
-
-#### Function parameters
-
-nRequiredNumber
-
-The number of units. For example, to add nine seconds, enter 9 here.
-
-unitOptionalString enum
-
-A valid string specifying the time unit.
-
-Default: `milliseconds`
-
-One of: `second`, `minute`, `hour`, `day`, `week`, `month`, `year`
-
-______________________________________________________________________
-
-### toDateTime(): Date
-
-Converts a JavaScript date to a [Luxon date object](https://docs.n8n.io/code/cookbook/luxon/).
-
-______________________________________________________________________
-
-# Numbers
-
-A reference document listing built-in convenience functions to support data transformation in [expressions](../../../../glossary/#expression-n8n) for numbers.
-
-JavaScript in expressions
-
-You can use any JavaScript in expressions. Refer to [Expressions](../../../expressions/) for more information.
-
-### ceil(): Number
-
-Rounds up a number to a whole number.
-
-______________________________________________________________________
-
-### floor(): Number
-
-Rounds down a number to a whole number.
-
-______________________________________________________________________
-
-### format(locales?: LanguageCode, options?: FormatOptions): String
-
-This is a wrapper around [Intl.NumberFormat()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat). Returns a formatted string of a number based on the given LanguageCode and FormatOptions. When no arguments are given, transforms the number in a like format 1.234.
-
-#### Function parameters
-
-localesOptionalString
-
-An IETF BCP 47 language tag.
-
-Default: `en-US`
-
-optionsOptionalObject
-
-Configure options for number formatting. Refer to [MDN | Intl.NumberFormat()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat) for more information.
-
-______________________________________________________________________
-
-### isEven(): Boolean
-
-Returns true if the number is even. Only works on whole numbers.
-
-______________________________________________________________________
-
-### isOdd(): Boolean
-
-Returns true if the number is odd. Only works on whole numbers.
-
-______________________________________________________________________
-
-### round(decimalPlaces?: Number): Number
-
-Returns the value of a number rounded to the nearest whole number, unless a decimal place is specified.
-
-#### Function parameters
-
-decimalPlacesOptionalNumber
-
-How many decimal places to round to.
-
-Default: `0`
-
-______________________________________________________________________
-
-### toBoolean(): Boolean
-
-Converts a number to a boolean. `0` converts to `false`. All other values convert to `true`.
-
-______________________________________________________________________
-
-### toDateTime(format?: String): Date
-
-Converts a number to a [Luxon date object](https://docs.n8n.io/code/cookbook/luxon/).
-
-#### Function parameters
-
-formatOptionalString enum
-
-Can be `ms` (milliseconds), `s` (seconds), or `excel` (Excel 1900). Defaults to milliseconds.
-
-______________________________________________________________________
-
-# Objects
-
-A reference document listing built-in convenience functions to support data transformation in expressions for objects.
-
-JavaScript in expressions
-
-You can use any JavaScript in expressions. Refer to [Expressions](../../../expressions/) for more information.
-
-### isEmpty(): Boolean
-
-Checks if the Object has no key-value pairs.
-
-______________________________________________________________________
-
-### merge(object: Object): Object
-
-Merges two Objects into a single Object using the first as the base Object. If a key exists in both Objects, the key in the base Object takes precedence.
-
-#### Function parameters
-
-objectRequiredObject
-
-The Object to merge with the base Object.
-
-______________________________________________________________________
-
-### hasField(fieldName: String): Boolean
-
-Checks if the Object has a given field. Only top-level keys are supported.
-
-#### Function parameters
-
-fieldNameRequiredString
-
-The field to search for.
-
-______________________________________________________________________
-
-### removeField(key: String): Object
-
-Removes a given field from the Object
-
-#### Function parameters
-
-keyRequiredString
-
-The field key of the field to remove.
-
-______________________________________________________________________
-
-### removeFieldsContaining(value: String): Object
-
-Removes fields with a given value from the Object.
-
-#### Function parameters
-
-valueRequiredString
-
-The field value of the field to remove.
-
-______________________________________________________________________
-
-### keepFieldsContaining(value: String): Object
-
-Removes fields that do not match the given value from the Object.
-
-#### Function parameters
-
-valueRequiredString
-
-The field value of the field to keep.
-
-______________________________________________________________________
-
-### compact(): Object
-
-Removes empty values from an Object.
-
-______________________________________________________________________
-
-### toJsonString(): String
-
-Convert an object to a JSON string. Equivalent of `JSON.stringify`.
-
-______________________________________________________________________
-
-### urlEncode(): String
-
-Transforms an Object into a URL parameter list. Only top-level keys are supported.
-
-______________________________________________________________________
-
-# Strings
-
-A reference document listing built-in convenience functions to support data transformation in [expressions](../../../../glossary/#expression-n8n) for strings.
-
-JavaScript in expressions
-
-You can use any JavaScript in expressions. Refer to [Expressions](../../../expressions/) for more information.
-
-### base64Encode(): A base64 encoded string.
-
-Encode a string as base64.
-
-______________________________________________________________________
-
-### base64Decode(): A plain string.
-
-Convert a base64 encoded string to a normal string.
-
-______________________________________________________________________
-
-### extractDomain(): String
-
-Extracts a domain from a string containing a valid URL. Returns undefined if none is found.
-
-______________________________________________________________________
-
-### extractEmail(): String
-
-Extracts an email from a string. Returns undefined if none is found.
-
-______________________________________________________________________
-
-### extractUrl(): String
-
-Extracts a URL from a string. Returns undefined if none is found.
-
-______________________________________________________________________
-
-### extractUrlPath(): String
-
-Extract the path but not the root domain from a URL. For example, `"https://example.com/orders/1/details".extractUrlPath()` returns `"/orders/1/details/"`.
-
-______________________________________________________________________
-
-### hash(algo?: Algorithm): String
-
-Returns a string hashed with the given algorithm.
-
-#### Function parameters
-
-algoOptionalString enum
-
-Which hashing algorithm to use.
-
-Default: `md5`
-
-One of: `md5`, `base64`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `sha3`, `ripemd160`
-
-______________________________________________________________________
-
-### isDomain(): Boolean
-
-Checks if a string is a domain.
-
-______________________________________________________________________
-
-### isEmail(): Boolean
-
-Checks if a string is an email.
-
-______________________________________________________________________
-
-### isEmpty(): Boolean
-
-Checks if a string is empty.
-
-______________________________________________________________________
-
-### isNotEmpty(): Boolean
-
-Checks if a string has content.
-
-______________________________________________________________________
-
-### isNumeric(): Boolean
-
-Checks if a string only contains digits.
-
-______________________________________________________________________
-
-### isUrl(): Boolean
-
-Checks if a string is a valid URL.
-
-______________________________________________________________________
-
-### parseJson(): Object
-
-Equivalent of `JSON.parse()`. Parses a string as a JSON object.
-
-______________________________________________________________________
-
-### quote(mark?: String): String
-
-Returns a string wrapped in the quotation marks. Default quotation is `"`.
-
-#### Function parameters
-
-markOptionalString
-
-Which quote mark style to use.
-
-Default: `"`
-
-______________________________________________________________________
-
-### removeMarkdown(): String
-
-Removes Markdown formatting from a string.
-
-______________________________________________________________________
-
-### replaceSpecialChars(): String
-
-Replaces non-ASCII characters in a string with an ASCII representation.
-
-______________________________________________________________________
-
-### removeTags(): String
-
-Remove tags, such as HTML or XML, from a string.
-
-______________________________________________________________________
-
-### toBoolean(): Boolean
-
-Convert a string to a boolean. `"false"`, `"0"`, `""`, and `"no"` convert to `false`.
-
-______________________________________________________________________
-
-### toDateTime(): Date
-
-Converts a string to a [Luxon date object](https://docs.n8n.io/code/cookbook/luxon/).
-
-______________________________________________________________________
-
-### toDecimalNumber(): Number
-
-See [toFloat](#string-toFloat)
-
-______________________________________________________________________
-
-### toFloat(): Number
-
-Converts a string to a decimal number.
-
-______________________________________________________________________
-
-### toInt(): Number
-
-Converts a string to an integer.
-
-______________________________________________________________________
-
-### toSentenceCase(): String
-
-Formats a string to sentence case.
-
-______________________________________________________________________
-
-### toSnakeCase(): String
-
-Formats a string to snake case.
-
-______________________________________________________________________
-
-### toTitleCase(): String
-
-Formats a string to title case. Will not change already uppercase letters to prevent losing information from acronyms and trademarks such as iPhone or FAANG.
-
-______________________________________________________________________
-
-### toWholeNumber(): Number
-
-Converts a string to a whole number.
-
-______________________________________________________________________
-
-### urlDecode(entireString?: Boolean): String
-
-Decodes a URL-encoded string. It decodes any percent-encoded characters in the input string, and replaces them with their original characters.
-
-#### Function parameters
-
-entireStringOptionalBoolean
-
-Whether to decode characters that are part of the URI syntax (true) or not (false).
-
-______________________________________________________________________
-
-### urlEncode(entireString?: Boolean): String
-
-Encodes a string to be used/included in a URL.
-
-#### Function parameters
-
-entireStringOptionalBoolean
-
-Whether to encode characters that are part of the URI syntax (true) or not (false).
-
-______________________________________________________________________
-
-# Query JSON with JMESPath
-
-[JMESPath](https://jmespath.org/) is a query language for JSON that you can use to extract and transform elements from a JSON document. For full details of how to use JMESPath, refer to the [JMESPath documentation](https://jmespath.org/tutorial.html).
-
-## The `jmespath()` method
-
-n8n provides a custom method, `jmespath()`. Use this method to perform a search on a JSON object using the JMESPath query language.
-
-The basic syntax is:
-
-```
-$jmespath(object, searchString)
-```
-
-```
-_jmespath(object, searchString)
-```
-
-To help understand what the method does, here is the equivalent longer JavaScript:
-
-```
-var jmespath = require('jmespath');
-jmespath.search(object, searchString);
-```
-
-Expressions must be single-line
-
-The longer code example doesn't work in Expressions, as they must be single-line.
-
-`object` is a JSON object, such as the output of a previous node. `searchString` is an expression written in the JMESPath query language. The [JMESPath Specification](https://jmespath.org/specification.html#jmespath-specification) provides a list of supported expressions, while their [Tutorial](https://jmespath.org/tutorial.html) and [Examples](https://jmespath.org/examples.html) provide interactive examples.
-
-Search parameter order
-
-The examples in the [JMESPath Specification](https://jmespath.org/specification.html#jmespath-specification) follow the pattern `search(searchString, object)`. The [JMESPath JavaScript library](https://github.com/jmespath/jmespath.js/), which n8n uses, supports `search(object, searchString)` instead. This means that when using examples from the JMESPath documentation, you may need to change the order of the search function parameters.
-
-## Common tasks
-
-This section provides examples for some common operations. More examples, and detailed guidance, are available in [JMESPath's own documentation](https://jmespath.org/tutorial.html).
-
-When trying out these examples, you need to set the Code node **Mode** to **Run Once for Each Item**.
-
-### Apply a JMESPath expression to a collection of elements with projections
-
-From the [JMESPath projections documentation](https://jmespath.org/tutorial.html#projections):
-
-> Projections are one of the key features of JMESPath. Use it to apply an expression to a collection of elements. JMESPath supports five kinds of projections:
->
-> - List Projections
-> - Slice Projections
-> - Object Projections
-> - Flatten Projections
-> - Filter Projections
-
-The following example shows basic usage of list, slice, and object projections. Refer to the [JMESPath projections documentation](https://jmespath.org/tutorial.html#projections) for detailed explanations of each projection type, and more examples.
-
-Given this JSON from a webhook node:
-
-```
-[
-  {
-    "headers": {
-      "host": "n8n.instance.address",
-      ...
-    },
-    "params": {},
-    "query": {},
-    "body": {
-      "people": [
-        {
-          "first": "James",
-          "last": "Green"
-        },
-        {
-          "first": "Jacob",
-          "last": "Jones"
-        },
-        {
-          "first": "Jayden",
-          "last": "Smith"
-        }
-      ],
-      "dogs": {
-        "Fido": {
-          "color": "brown",
-          "age": 7
-        },
-        "Spot": {
-          "color": "black and white",
-          "age": 5
-        }
-      }
-    }
-  }
-]
-```
-
-Retrieve a [list](https://jmespath.org/tutorial.html#list-and-slice-projections) of all the people's first names:
-
-```
-{{$jmespath($json.body.people, "[*].first" )}}
-// Returns ["James", "Jacob", "Jayden"]
-```
-
-```
-let firstNames = $jmespath($json.body.people, "[*].first" )
-return {firstNames};
-/* Returns:
-[
-	{
-		"firstNames": [
-			"James",
-			"Jacob",
-			"Jayden"
-		]
-	}
-]
-*/
-```
-
-```
-firstNames = _jmespath(_json.body.people, "[*].first" )
-return {"firstNames":firstNames}
-"""
-Returns:
-[
- 	{
-		"firstNames": [
-			"James",
-			"Jacob",
-			"Jayden"
-		]
-	}
-]
-"""
-```
-
-Get a [slice](https://jmespath.org/tutorial.html#list-and-slice-projections) of the first names:
-
-```
-{{$jmespath($json.body.people, "[:2].first")}}
-// Returns ["James", "Jacob"]
-```
-
-```
-let firstTwoNames = $jmespath($json.body.people, "[:2].first");
-return {firstTwoNames};
-/* Returns:
-[
-	{
-		"firstNames": [
-			"James",
-			"Jacob",
-			"Jayden"
-		]
-	}
-]
-*/
-```
-
-```
-firstTwoNames = _jmespath(_json.body.people, "[:2].first" )
-return {"firstTwoNames":firstTwoNames}
-"""
-Returns:
-[
-	{
-		"firstTwoNames": [
-		"James",
-		"Jacob"
-		]
-	}
-]
-"""
-```
-
-Get a list of the dogs' ages using [object projections](https://jmespath.org/tutorial.html#object-projections):
-
-```
-{{$jmespath($json.body.dogs, "*.age")}}
-// Returns [7,5]
-```
-
-```
-let dogsAges = $jmespath($json.body.dogs, "*.age");
-return {dogsAges};
-/* Returns:
-[
-	{
-		"dogsAges": [
-			7,
-			5
-		]
-	}
-]
-*/
-```
-
-```
-dogsAges = _jmespath(_json.body.dogs, "*.age")
-return {"dogsAges": dogsAges}
-"""
-Returns:
-[
-	{
-		"dogsAges": [
-			7,
-			5
-		]
-	}
-]
-"""
-```
-
-### Select multiple elements and create a new list or object
-
-Use [Multiselect](https://jmespath.org/tutorial.html#multiselect) to select elements from a JSON object and combine them into a new list or object.
-
-Given this JSON from a webhook node:
-
-```
-[
-  {
-    "headers": {
-      "host": "n8n.instance.address",
-      ...
-    },
-    "params": {},
-    "query": {},
-    "body": {
-      "people": [
-        {
-          "first": "James",
-          "last": "Green"
-        },
-        {
-          "first": "Jacob",
-          "last": "Jones"
-        },
-        {
-          "first": "Jayden",
-          "last": "Smith"
-        }
-      ],
-      "dogs": {
-        "Fido": {
-          "color": "brown",
-          "age": 7
-        },
-        "Spot": {
-          "color": "black and white",
-          "age": 5
-        }
-      }
-    }
-  }
-]
-```
-
-Use multiselect list to get the first and last names and create new lists containing both names:
-
-```
-{{$jmespath($json.body.people, "[].[first, last]")}}
-// Returns [["James","Green"],["Jacob","Jones"],["Jayden","Smith"]]
-```
-
-```
-let newList = $jmespath($json.body.people, "[].[first, last]");
-return {newList};
-/* Returns:
-[
-	{
-		"newList": [
-			[
-				"James",
-				"Green"
-			],
-			[
-				"Jacob",
-				"Jones"
-			],
-			[
-				"Jayden",
-				"Smith"
-			]
-		]
-	}
-]
-*/
-```
-
-```
-newList = _jmespath(_json.body.people, "[].[first, last]")
-return {"newList":newList}
-"""
-Returns:
-[
-	{
-		"newList": [
-			[
-				"James",
-				"Green"
-			],
-			[
-				"Jacob",
-				"Jones"
-			],
-			[
-				"Jayden",
-				"Smith"
-			]
-		]
-	}
-]
-"""
-```
-
-### An alternative to arrow functions in expressions
-
-For example, generate some input data by returning the below code from the Code node:
-
-```
-return[
-  {
-    "json": {      
-      "num_categories": "0",
-      "num_products": "45",
-      "category_id": 5529735,
-      "parent_id": 1407340,
-      "pos_enabled": 1,
-      "pos_favorite": 0,
-      "name": "HP",
-      "description": "",
-      "image": ""
-    }
-  },
-  {
-    "json": {
-      "num_categories": "0",
-      "num_products": "86",
-      "category_id": 5529740,
-      "parent_id": 1407340,
-      "pos_enabled": 1,
-      "pos_favorite": 0,
-      "name": "Lenovo",
-      "description": "",
-      "image": ""
-    }
-  }  
-]
-```
-
-You could do a search like "find the item with the name Lenovo and tell me their category ID."
-
-```
-{{ $jmespath($("Code").all(), "[?json.name=='Lenovo'].json.category_id") }}
-```
-
-# Date and time with Luxon
-
-[Luxon](https://github.com/moment/luxon/) is a JavaScript library that makes it easier to work with date and time. For full details of how to use Luxon, refer to [Luxon's documentation](https://moment.github.io/luxon/#/?id=luxon).
-
-n8n passes dates between nodes as strings, so you need to parse them. Luxon makes this easier.
-
-Python support
-
-Luxon is a JavaScript library. The two convenience [variables](#get-the-current-datetime-or-date) created by n8n are available when using Python in the Code node, but their functionality is limited:
-
-- You can't perform Luxon operations on these variables. For example, there is no Python equivalent for `$today.minus(...)`.
-- The generic Luxon functionality, such as [Convert date string to Luxon](#convert-date-string-to-luxon), isn't available for Python users.
-
-## Date and time behavior in n8n
-
-Be aware of the following:
-
-- In a workflow, n8n converts dates and times to strings between nodes. Keep this in mind when doing arithmetic on dates and times from other nodes.
-- Using Luxon's `DateTime()` is the recommended approach in n8n. Using vanilla JavaScript's `Date()` doesn't work with some n8n features. For example, it doesn't respect the [Workflow-specific Time Zone](https://docs.n8n.io/workflows/settings/#timezone).
-- With vanilla JavaScript, you can convert a string to a date with `new Date('2019-06-23')`. In Luxon, you must use a function explicitly stating the format, such as `DateTime.fromISO('2019-06-23')` or `DateTime.fromFormat("23-06-2019", "dd-MM-yyyy")`.
-
-## Setting the timezone in n8n
-
-Luxon uses the n8n timezone. This value is either:
-
-- Default: `America/New York`
-- A custom timezone for your n8n instance, set using the `GENERIC_TIMEZONE` environment variable.
-- A custom timezone for an individual workflow, configured in workflow settings.
-
-## Common tasks
-
-This section provides examples for some common operations. More examples, and detailed guidance, are available in [Luxon's own documentation](https://moment.github.io/luxon/#/?id=luxon).
-
-### Get the current datetime or date
-
-Use the [`$now` and `$today` Luxon objects](../../builtin/date-time/) to get the current time or day:
-
-- `now`: a Luxon object containing the current timestamp. Equivalent to `DateTime.now()`.
-- `today`: a Luxon object containing the current timestamp, rounded down to the day. Equivalent to `DateTime.now().set({ hour: 0, minute: 0, second: 0, millisecond: 0 })`.
-
-Note that these variables can return different time formats when cast as a string:
-
-```
-{{$now}}
-// n8n displays the ISO formatted timestamp
-// For example 2022-03-09T14:02:37.065+00:00
-{{"Today's date is " + $now}}
-// n8n displays "Today's date is <unix timestamp>"
-// For example "Today's date is 1646834498755"
-```
-
-```
-$now
-// n8n displays <ISO formatted timestamp>
-// For example 2022-03-09T14:00:25.058+00:00
-let rightNow = "Today's date is " + $now
-// n8n displays "Today's date is <unix timestamp>"
-// For example "Today's date is 1646834498755"
-```
-
-```
-_now
-# n8n displays <ISO formatted timestamp>
-# For example 2022-03-09T14:00:25.058+00:00
-rightNow = "Today's date is " + str(_now)
-# n8n displays "Today's date is <unix timestamp>"
-# For example "Today's date is 1646834498755"
-```
-
-n8n provides built-in convenience functions to support data transformation in expressions for dates. Refer to [Data transformation functions | Dates](../../builtin/data-transformation-functions/dates/) for more information.
-
-### Convert JavaScript dates to Luxon
-
-To convert a native JavaScript date to a Luxon date:
-
-- In expressions, use the [`.toDateTime()` method](../../builtin/data-transformation-functions/dates/#date-toDateTime). For example, `{{ (new Date()).ToDateTime() }}`.
-- In the Code node, use `DateTime.fromJSDate()`. For example, `let luxondate = DateTime.fromJSDate(new Date())`.
-
-### Convert date string to Luxon
-
-You can convert date strings and other date formats to a Luxon DateTime object. You can convert from standard formats and from arbitrary strings.
-
-A difference between Luxon DateTime and JavaScript Date
-
-With vanilla JavaScript, you can convert a string to a date with `new Date('2019-06-23')`. In Luxon, you must use a function explicitly stating the format, such as `DateTime.fromISO('2019-06-23')` or `DateTime.fromFormat("23-06-2019", "dd-MM-yyyy")`.
-
-#### If you have a date in a supported standard technical format:
-
-Most dates use `fromISO()`. This creates a Luxon DateTime from an ISO 8601 string. For example:
-
-```
-{{DateTime.fromISO('2019-06-23T00:00:00.00')}}
-```
-
-```
-let luxonDateTime = DateTime.fromISO('2019-06-23T00:00:00.00')
-```
-
-Luxon's API documentation has more information on [fromISO](https://moment.github.io/luxon/api-docs/index.html#datetimefromiso).
-
-Luxon provides functions to handle conversions for a range of formats. Refer to Luxon's guide to [Parsing technical formats](https://moment.github.io/luxon/#/parsing?id=parsing-technical-formats) for details.
-
-#### If you have a date as a string that doesn't use a standard format:
-
-Use Luxon's [Ad-hoc parsing](https://moment.github.io/luxon/#/parsing?id=ad-hoc-parsing). To do this, use the `fromFormat()` function, providing the string and a set of [tokens](https://moment.github.io/luxon/#/parsing?id=table-of-tokens) that describe the format.
-
-For example, you have n8n's founding date, 23rd June 2019, formatted as `23-06-2019`. You want to turn this into a Luxon object:
-
-```
-{{DateTime.fromFormat("23-06-2019", "dd-MM-yyyy")}}
-```
-
-```
-let newFormat = DateTime.fromFormat("23-06-2019", "dd-MM-yyyy")
-```
-
-When using ad-hoc parsing, note Luxon's warning about [Limitations](https://moment.github.io/luxon/#/parsing?id=limitations). If you see unexpected results, try their [Debugging](https://moment.github.io/luxon/#/parsing?id=debugging) guide.
-
-### Get n days from today
-
-Get a number of days before or after today.
-
-For example, you want to set a field to always show the date seven days before the current date.
-
-In the expressions editor, enter:
-
-```
-{{$today.minus({days: 7})}}
-```
-
-On the 23rd June 2019, this returns `[Object: "2019-06-16T00:00:00.000+00:00"]`.
-
-This example uses n8n's custom variable `$today` for convenience. It's the equivalent of `DateTime.now().set({ hour: 0, minute: 0, second: 0, millisecond: 0 }).minus({days: 7})`.
-
-For example, you want a variable containing the date seven days before the current date.
-
-In the code editor, enter:
-
-```
-let sevenDaysAgo = $today.minus({days: 7})
-```
-
-On the 23rd June 2019, this returns `[Object: "2019-06-16T00:00:00.000+00:00"]`.
-
-This example uses n8n's custom variable `$today` for convenience. It's the equivalent of `DateTime.now().set({ hour: 0, minute: 0, second: 0, millisecond: 0 }).minus({days: 7})`.
-
-For more detailed information and examples, refer to:
-
-- Luxon's [guide to math](https://moment.github.io/luxon/#/math)
-- Their API documentation on [DateTime plus](https://moment.github.io/luxon/api-docs/index.html#datetimeplus) and [DateTime minus](https://moment.github.io/luxon/api-docs/index.html#datetimeminus)
-
-### Create human-readable dates
-
-In [Get n days from today](#get-n-days-from-today), the example gets the date seven days before the current date, and returns it as `[Object: "yyyy-mm-dd-T00:00:00.000+00:00"]` (for expressions) or `yyyy-mm-dd-T00:00:00.000+00:00` (in the Code node). To make this more readable, you can use Luxon's formatting functions.
-
-For example, you want the field containing the date to be formatted as DD/MM/YYYY, so that on the 23rd June 2019, it returns `23/06/2019`.
-
-This expression gets the date seven days before today, and converts it to the DD/MM/YYYY format.
-
-```
-{{$today.minus({days: 7}).toLocaleString()}}
-```
-
-```
-let readableSevenDaysAgo = $today.minus({days: 7}).toLocaleString()
-```
-
-You can alter the format. For example:
-
-```
-{{$today.minus({days: 7}).toLocaleString({month: 'long', day: 'numeric', year: 'numeric'})}}
-```
-
-On 23rd June 2019, this returns "16 June 2019".
-
-```
-let readableSevenDaysAgo = $today.minus({days: 7}).toLocaleString({month: 'long', day: 'numeric', year: 'numeric'})
-```
-
-On 23rd June 2019, this returns "16 June 2019".
-
-Refer to Luxon's guide on [toLocaleString (strings for humans)](https://moment.github.io/luxon/#/formatting?id=tolocalestring-strings-for-humans) for more information.
-
-### Get the time between two dates
-
-To get the time between two dates, use Luxon's diffs feature. This subtracts one date from another and returns a duration.
-
-For example, get the number of months between two dates:
-
-```
-{{DateTime.fromISO('2019-06-23').diff(DateTime.fromISO('2019-05-23'), 'months').toObject()}}
-```
-
-This returns `[Object: {"months":1}]`.
-
-```
-let monthsBetweenDates = DateTime.fromISO('2019-06-23').diff(DateTime.fromISO('2019-05-23'), 'months').toObject()
-```
-
-This returns `{"months":1}`.
-
-Refer to Luxon's [Diffs](https://moment.github.io/luxon/#/math?id=diffs) for more information.
-
-### A longer example: How many days to Christmas?
-
-This example brings together several Luxon features, uses JMESPath, and does some basic string manipulation.
-
-The scenario: you want a countdown to 25th December. Every day, it should tell you the number of days remaining to Christmas. You don't want to update it for next year - it needs to seamlessly work for every year.
-
-```
-{{"There are " + $today.diff(DateTime.fromISO($today.year + '-12-25'), 'days').toObject().days.toString().substring(1) + " days to Christmas!"}}
-```
-
-This outputs `"There are <number of days> days to Christmas!"`. For example, on 9th March, it outputs "There are 291 days to Christmas!".
-
-A detailed explanation of what the expression does:
-
-- `{{`: indicates the start of the expression.
-- `"There are "`: a string.
-- `+`: used to join two strings.
-- `$today.diff()`: This is similar to the example in [Get the time between two dates](#get-the-time-between-two-dates), but it uses n8n's custom `$today` variable.
-- `DateTime.fromISO($today.year + '-12-25'), 'days'`: this part gets the current year using `$today.year`, turns it into an ISO string along with the month and date, and then takes the whole ISO string and converts it to a Luxon DateTime data structure. It also tells Luxon that you want the duration in days.
-- `toObject()` turns the result of diff() into a more usable object. At this point, the expression returns `[Object: {"days":-<number-of-days>}]`. For example, on 9th March, `[Object: {"days":-291}]`.
-- `.days` uses JMESPath syntax to retrieve just the number of days from the object. For more information on using JMESPath with n8n, refer to our [JMESpath](../jmespath/) documentation. This gives you the number of days to Christmas, as a negative number.
-- `.toString().substring(1)` turns the number into a string and removes the `-`.
-- `+ " days to Christmas!"`: another string, with a `+` to join it to the previous string.
-- `}}`: indicates the end of the expression.
-
-```
-let daysToChristmas = "There are " + $today.diff(DateTime.fromISO($today.year + '-12-25'), 'days').toObject().days.toString().substring(1) + " days to Christmas!";
-```
-
-This outputs `"There are <number of days> days to Christmas!"`. For example, on 9th March, it outputs "There are 291 days to Christmas!".
-
-A detailed explanation of what the code does:
-
-- `"There are "`: a string.
-- `+`: used to join two strings.
-- `$today.diff()`: This is similar to the example in [Get the time between two dates](#get-the-time-between-two-dates), but it uses n8n's custom `$today` variable.
-- `DateTime.fromISO($today.year + '-12-25'), 'days'`: this part gets the current year using `$today.year`, turns it into an ISO string along with the month and date, and then takes the whole ISO string and converts it to a Luxon DateTime data structure. It also tells Luxon that you want the duration in days.
-- `toObject()` turns the result of diff() into a more usable object. At this point, the expression returns `[Object: {"days":-<number-of-days>}]`. For example, on 9th March, `[Object: {"days":-291}]`.
-- `.days` uses JMESPath syntax to retrieve just the number of days from the object. For more information on using JMESPath with n8n, refer to our [JMESpath](../jmespath/) documentation. This gives you the number of days to Christmas, as a negative number.
-- `.toString().substring(1)` turns the number into a string and removes the `-`.
-- `+ " days to Christmas!"`: another string, with a `+` to join it to the previous string.
 
 # Examples using n8n's built-in methods and variables
 
@@ -5911,14 +5874,13 @@ n8n provides built-in methods and variables for working with data and accessing 
 
 - [execution](/code/cookbook/builtin/execution/)
 - [getWorkflowStaticData](/code/cookbook/builtin/get-workflow-static-data/)
-- [Retrieve linked items from earlier in the workflow](/code/cookbook/builtin/itemmatching/)
 - [(node-name).all](/code/cookbook/builtin/all/)
 - [vars](/code/cookbook/builtin/vars/)
 
 ## Related resources
 
 - [Built-in methods and variables reference](../../builtin/overview/)
-- [Expressions](../../expressions/)
+- [Expressions](../../../data/expressions/)
 - [Code node](../../code-node/)
 
 # `("<node-name>").all(branchIndex?: number, runIndex?: number)`
@@ -6112,86 +6074,6 @@ delete nodeStaticData.lastExecution
 
 [View template details](https://n8n.io/workflows/2538-demo-workflow-how-to-use-workflowstaticdata/)
 
-# Retrieve linked items from earlier in the workflow
-
-Every item in a node's input data links back to the items used in previous nodes to generate it. This is useful if you need to retrieve linked items from further back than the immediate previous node.
-
-To access the linked items from earlier in the workflow, use `("<node-name>").itemMatching(currentNodeinputIndex)`.
-
-For example, consider a workflow that does the following:
-
-1. The Customer Datastore node generates example data:
-
-   ```
-   [
-   	{
-   		"id": "23423532",
-   		"name": "Jay Gatsby",
-   		"email": "gatsby@west-egg.com",
-   		"notes": "Keeps asking about a green light??",
-   		"country": "US",
-   		"created": "1925-04-10"
-   	},
-   	{
-   		"id": "23423533",
-   		"name": "José Arcadio Buendía",
-   		"email": "jab@macondo.co",
-   		"notes": "Lots of people named after him. Very confusing",
-   		"country": "CO",
-   		"created": "1967-05-05"
-   	},
-   	...
-   ]
-   ```
-
-1. The Edit Fields node simplifies this data:
-
-   ```
-   [
-   	{
-   		"name": "Jay Gatsby"
-   	},
-   	{
-   		"name": "José Arcadio Buendía"
-   	},
-       ...
-   ]
-   ```
-
-1. The Code node restore the email address to the correct person:
-
-   ```
-   [
-   	{
-   		"name": "Jay Gatsby",
-   		"restoreEmail": "gatsby@west-egg.com"
-   	},
-   	{
-   		"name": "José Arcadio Buendía",
-   		"restoreEmail": "jab@macondo.co"
-   	},
-   	...
-   ]
-   ```
-
-The Code node does this using the following code:
-
-```
-for(let i=0; i<$input.all().length; i++) {
-	$input.all()[i].json.restoreEmail = $('Customer Datastore (n8n training)').itemMatching(i).json.email;
-}
-return $input.all();
-```
-
-```
-for i,item in enumerate(_input.all()):
-	_input.all()[i].json.restoreEmail = _('Customer Datastore (n8n training)').itemMatching(i).json.email
-
-return _input.all();
-```
-
-You can view and download the example workflow from [n8n website | itemMatchin usage example](https://n8n.io/workflows/1966-itemmatching-usage-example/) .
-
 # `vars`
 
 Feature availability
@@ -6375,93 +6257,6 @@ The output will be similar to the following.
 ]
 ```
 
-# Expressions cookbook
-
-This section contains examples and recipes for tasks you can do with [expressions](../../../glossary/#expression-n8n).
-
-Python support
-
-You can use Python in the Code node. It isn't available in expressions.
-
-- [Check incoming data](/code/cookbook/expressions/check-incoming-data/)
-- [Common issues](/code/cookbook/expressions/common-issues/)
-
-## Related resources
-
-- [Built-in methods and variables reference](../../builtin/overview/)
-- [Expressions](../../expressions/)
-
-# Check incoming data
-
-At times, you may want to check the incoming data. If the incoming data doesn't match a condition, you may want to return a different value. For example, you want to check if a variable from the previous node is empty and return a string if it's empty. Use the following code snippet to return `not found` if the variable is empty.
-
-```
-{{$json["variable_name"]? $json["variable_name"] :"not found"}}
-```
-
-The above expression uses the ternary operator. You can learn more about the ternary operator [here](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Conditional_Operator).
-
-As an alternative, you can use the [nullish coalescing operator (??)](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Nullish_coalescing) or the [logical or operator (||)](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Logical_OR):
-
-```
-{{ $x ?? "default value" }}
-{{ $x || "default value" }}
-```
-
-In either of the above two cases, the value of `$x` will be used if it's set to a non-null, non-false value. The string `default value` is the fallback value.
-
-# Expressions common issues
-
-Here are some common errors and issues related to [expressions](../../../expressions/) and steps to resolve or troubleshoot them.
-
-## The 'JSON Output' in item 0 contains invalid JSON
-
-This error occurs when you use JSON mode but don't provide a valid JSON object. Depending on the problem with the JSON object, the error sometimes display as `The 'JSON Output' in item 0 does not contain a valid JSON object`.
-
-To resolve this, make sure that the code you provide is valid JSON:
-
-- Check the JSON with a [JSON validator](https://jsonlint.com/).
-- Check that your JSON object doesn't reference undefined input data. This may occur if the incoming data doesn't always include the same fields.
-
-## Can't get data for expression
-
-This error occurs when n8n can't retrieve the data referenced by an expression. Often, this happens when the preceding node hasn't been run yet.
-
-Another variation of this may appear as `Referenced node is unexecuted`. In that case, the full text of this error will tell you the exact node that isn't executing in this format:
-
-> An expression references the node '<node-name>', but it hasn’t been executed yet. Either change the expression, or re-wire your workflow to make sure that node executes first.
-
-To begin troubleshooting, test the workflow up to the named node.
-
-For nodes that use JavaScript or other custom code, you can check if a previous node has executed before trying to use its value by checking the following:
-
-```
-$("<node-name>").isExecuted
-```
-
-As an example, this JSON references the parameters of the input data. This error will display if you test this step without connecting it to another node:
-
-```
-{
-  "my_field_1": {{ $input.params }}
-}
-```
-
-## Invalid syntax
-
-This error occurs when you use an expression that has a syntax error.
-
-For example, the expression in this JSON includes a trailing period, which results in an invalid syntax error:
-
-```
-{
-  "my_field_1": "value",
-  "my_field_2": {{ $('If').item.json. }}
-}
-```
-
-To resolve this error, check your [expression syntax](../../../expressions/) to make sure they follow the expected format.
-
 # Examples using n8n's HTTP Request node
 
 The HTTP Request node is one of the most versatile nodes in n8n. Use this node to make HTTP requests to query data from any app or service with a REST API.
@@ -6474,7 +6269,7 @@ Refer to [HTTP Request](../../../integrations/builtin/core-nodes/n8n-nodes-base.
 
 - [HTTP Request](../../../integrations/builtin/core-nodes/n8n-nodes-base.httprequest/)
 - [Built-in methods and variables reference](../../builtin/overview/)
-- [Expressions](../../expressions/)
+- [Expressions](../../../data/expressions/)
 
 # Pagination in the HTTP Request node
 
@@ -6719,7 +6514,7 @@ You can find all available nodes in the **nodes panel** on the right side of the
 
 - Click the **+** icon in the top right corner of the canvas.
 - Click the **+** icon on the right side of an existing node on the canvas (the node to which you want to add another one).
-- Click the `Tab` key on your keyboard.
+- Press the `N` key on your keyboard.
 
 *Nodes panel*
 
@@ -6770,7 +6565,7 @@ The finished workflow will look like this:
 
 ## 1. Add a Manual Trigger node
 
-Open the nodes panel (reminder: you can open this by selecting the **+** icon in the top right corner of the [canvas](../../../glossary/#canvas-n8n) or selecting `Tab` on your keyboard).
+Open the nodes panel (reminder: you can open this by selecting the **+** icon in the top right corner of the [canvas](../../../glossary/#canvas-n8n) or pressing `N` on your keyboard).
 
 Then:
 
@@ -7828,7 +7623,7 @@ When you execute the **Code node**, the result should look like this:
 
 ## Referencing node data with the Code node
 
-Just like you can use [expressions](../../../code/expressions/) to reference data from other nodes, you can also use some [methods and variables](../../../code/builtin/overview/) in the **Code node**.
+Just like you can use [expressions](../../../data/expressions/) to reference data from other nodes, you can also use some [methods and variables](../../../code/builtin/overview/) in the **Code node**.
 
 Please make sure you read these pages before continuing to the next exercise.
 
@@ -7861,7 +7656,7 @@ The two most common operations for data transformation are:
 
 There are several ways to transform data for the purposes mentioned above:
 
-- Use n8n's [data transformation nodes](../../../data/#data-transformation-nodes). Use these nodes to modify the structure of incoming data that contain lists (arrays) without needing to use JavaScript code in the **Code node**:
+- Use n8n's [data transformation nodes](../../../data/expressions/#other-data-transformation-nodes). Use these nodes to modify the structure of incoming data that contain lists (arrays) without needing to use JavaScript code in the **Code node**:
   - Use the [**Split Out node**](../../../integrations/builtin/core-nodes/n8n-nodes-base.splitout/) to separate a single data item containing a list into multiple items.
   - Use the [**Aggregate node**](../../../integrations/builtin/core-nodes/n8n-nodes-base.aggregate/) to take separate items, or portions of them, and group them together into individual items.
 - Use the **Code node** to write JavaScript functions to modify the data structure of incoming data using the **Run Once for All Items** mode:
@@ -9077,7 +8872,9 @@ Next, you will build these three workflows with step-by-step instructions.
 
 Nathan's company stores its customer data in Airtable. This data contains information about the customers' ID, country, email, and join date, but lacks data about their respective region and subregion. You need to fill in these last two fields in order to create the reports for regional sales.
 
-To accomplish this task, you first need to make a copy of this table in your Airtable account:
+To accomplish this task, you first need to make a copy of this table in your Airtable account.
+
+[Click here to access.](https://airtable.com/embed/shrNX9tjPkVLABbNz?backgroundColor=orange&viewControls=on)
 
 When setting up your Airtable, ensure that the `customerSince` column is configured as a Date type field with the **Include time** option enabled. Without this setting, you may encounter errors in step 4 when updating the table.
 
@@ -9779,7 +9576,7 @@ The example workflows use Sticky Notes to guide you:
 
 Feature availability
 
-Available on all Cloud plans, and Enterprise self-hosted plans.
+Available on all Cloud plans, and Business and Enterprise self-hosted plans.
 
 You can share a credential directly with other users to use in their own workflows. Or share a credential in a [project](../../glossary/#project-n8n) for all members of that project to use. Any users using a shared credential won't be able to view or edit the credential details.
 
@@ -9812,98 +9609,161 @@ To unshare a credential:
 1. Select **trash icon** on the user or project you want to remove from the list of shared users and projects.
 1. Select **Save** to apply the changes.
 
-# Data
+# Overview
 
-Data is the information that n8n nodes receive and process. For basic usage of n8n you don't need to understand data structures and manipulation. However, it becomes important if you want to:
+In n8n, data flows through your workflow from node to node. Each node receives data, processes it, and passes the results to the next node. Understanding how data moves and transforms in your workflows is essential for building effective workflows.
 
-- Create your own node
-- Write custom [expressions](../glossary/#expression-n8n)
-- Use the Function or Function Item node
+## How data works in n8n
 
-This section covers:
+**Data flows through nodes**: When you connect nodes, data automatically passes from one to the next. Each node processes the incoming data and outputs results based on its configuration.
 
-- [Data structure](data-structure/)
-- [Data flow within nodes](data-flow-nodes/)
+**View data at every stage**: You can inspect data at any point in your workflow:
+
+- **Node details view**: Double-click any node to see its input and output data. Choose between **Schema**, **Table** and **JSON** views. Schema view shows a simplified structure from the first item only, Table and JSON display the full dataset.
+- **Execution logs**: Review past workflow runs to see the data that passed through each node.
+
+**Reference previous data**: Use [data mapping](data-mapping/) to reference data from earlier nodes in your workflow. You can:
+
+- Select values from previous nodes using the UI
+- Write [expressions](expressions/) to dynamically access and combine data
+- Reference specific nodes by name to get their output
+
+**Transform data**: n8n provides multiple ways to modify data:
+
+- Use dedicated transformation nodes (Aggregate, Split Out, Sort, and more)
+- Write [expressions](expressions-for-transformation/) directly in node parameters
+- Use the [Code node](expressions/#code-node) for custom JavaScript or Python logic
+- Apply the [AI Transform node](expressions/#ai-transform-node) for AI-assisted transformations
+
+**Understand the data structure**: n8n uses a [consistent data structure](data-structure/) across all nodes, making it predictable how data flows and transforms throughout your workflows.
+
+## In this section
+
+- [How n8n structures data](data-structure/)
 - [Transforming data](transforming-data/)
-- [Process data using code](code/)
-- [Pinning](data-pinning/) and [editing](data-editing/) data during workflow development.
-- [Data mapping](data-mapping/) and [Item linking](data-mapping/data-item-linking/): how data items link to each other.
+- [Processing data using code](expressions/#code-node)
+- [Pinning, mocking, and editing data](data-pinning/) during workflow development
+- [Referencing data](data-mapping/) and [item linking](data-mapping/data-item-linking/): how data items link to each other
 
-## Related resources
+# Filtering data
 
-### Data transformation nodes
+Filtering in n8n can mean different things depending on what you want to accomplish. This guide covers both visual filtering in the UI and data filtering during workflow execution.
 
-n8n provides a collection of nodes to transform data:
+## Filter data visually in the UI
 
-- [Aggregate](../integrations/builtin/core-nodes/n8n-nodes-base.aggregate/): take separate items, or portions of them, and group them together into individual items.
-- [Limit](../integrations/builtin/core-nodes/n8n-nodes-base.aggregate/): remove items beyond a defined maximum number.
-- [Remove Duplicates](../integrations/builtin/core-nodes/n8n-nodes-base.removeduplicates/): identify and delete items that are identical across all fields or a subset of fields.
-- [Sort](../integrations/builtin/core-nodes/n8n-nodes-base.sort/): organize lists of in a desired ordering, or generate a random selection.
-- [Split Out](../integrations/builtin/core-nodes/n8n-nodes-base.splitout/): separate a single data item containing a list into multiple items.
-- [Summarize](../integrations/builtin/core-nodes/n8n-nodes-base.summarize/): aggregate items together, in a manner similar to Excel pivot tables.
+Feature availability
 
-# Binary data
+Available on Community, Cloud Pro, and Enterprise plans.
 
-Binary data is any file-type data, such as image files or documents.
+Search and filter data in the node **INPUT** and **OUTPUT** panels. Use this to check your node's data and find specific items.
 
-This page collects resources relating to binary data in n8n.
+To search:
 
-## Working with binary data in your workflows
+1. In a node, select **Search** in the **INPUT** or **OUTPUT** panel.
+1. Enter your search term.
 
-You can process binary data in n8n workflows. n8n provides nodes to help you work with binary data. You can also use code.
+n8n filters as you type, displaying the objects or rows containing the term.
 
-### Nodes
+Filtering is purely visual: n8n doesn't change or delete data. The filter resets when you close and reopen the node.
 
-There are three key nodes dedicated to handling binary data files:
+## Filter data during workflow execution
 
-- [Read/Write Files from Disk](../../integrations/builtin/core-nodes/n8n-nodes-base.readwritefile/) to read and write files from/to the machine where n8n is running.
-- [Convert to File](../../integrations/builtin/core-nodes/n8n-nodes-base.converttofile/) to take input data and output it as a file.
-- [Extract From File](../../integrations/builtin/core-nodes/n8n-nodes-base.extractfromfile/) to get data from a binary format and convert it to JSON.
+To actually remove or filter data in your workflow, use these approaches:
 
-There are separate nodes for working with XML and HTML data:
+### Filter out items
 
-- [HTML](../../integrations/builtin/core-nodes/n8n-nodes-base.html/)
-- [XML](../../integrations/builtin/core-nodes/n8n-nodes-base.xml/)
+To remove entire items from your workflow based on conditions, use the [Filter node](../../integrations/builtin/core-nodes/n8n-nodes-base.filter/). This node evaluates conditions and only passes through items that meet your criteria.
 
-And nodes for performing common tasks:
+### Filter out fields
 
-- [Compression](../../integrations/builtin/core-nodes/n8n-nodes-base.compression/)
-- [Edit Image](../../integrations/builtin/core-nodes/n8n-nodes-base.editimage/)
-- [FTP](../../integrations/builtin/core-nodes/n8n-nodes-base.ftp/)
+To remove specific fields from an item or object while keeping the item itself, use the [Edit Fields (Set) node](../../integrations/builtin/core-nodes/n8n-nodes-base.set/). Configure it to remove the fields you don't need.
 
-You can trigger a workflow based on changes to a local file using the [Local File trigger](../../integrations/builtin/core-nodes/n8n-nodes-base.localfiletrigger/).
+### Filter array elements
 
-To split or concatenate binary data items, use the [data transformation nodes](../#data-transformation-nodes).
+To filter elements within an array inside an item, use the `.filter()` method in an expression or Code node. For example:
 
-### Code
+```
+{{ $json.myArray.filter(item => item.value > 10) }}
+```
 
-You can use the [Code node](../../code/code-node/) to manipulate binary data in your workflows. For example, [Get the binary data buffer](../../code/cookbook/code-node/get-binary-data-buffer/): get the binary data available in your workflow.
+This removes array elements that don't match your condition while preserving the item structure.
 
-## Configure binary data mode when self-hosting
+### Filter out duplicate items from previous executions
 
-You can configure how your self-hosted n8n instance handles binary data using the [Binary data environment variables](../../hosting/configuration/environment-variables/binary-data/). This includes tasks such as setting the storage path and choosing how to store binary data.
+To remove items that have been seen in previous executions of a workflow, use the [Remove Duplicates](../../integrations/builtin/core-nodes/n8n-nodes-base.removeduplicates/) node. Use this when an event fires multiple times but you only want to process the first occurrence.
 
-Your configuration affects how well n8n scales: [Scaling | Binary data filesystem mode](../../hosting/scaling/binary-data/).
+# Pinning and mocking data
 
-Reading and writing binary files can have security implications. If you want to disable reading and writing binary data, use the `NODES_EXCLUDE` environment variable. Refer to [Environment variables | Nodes](../../hosting/configuration/environment-variables/nodes/) for more information.
+When developing workflows, you might want to test your logic without repeatedly calling external systems or working with live data. n8n provides two related features to help with this:
 
-# Processing data with code
+- **Data mocking**: Create or simulate test data without connecting to real data sources
+- **Data pinning**: Save test data (mocked or real) and reuse it in future workflow executions instead of fetching fresh data
 
-## Function
+Both approaches save time and resources during development, help you work with consistent datasets, and protect live systems from repeated test calls.
 
-A function is a block of code designed to perform a certain task. In n8n, you can write custom JavaScript or Python code snippets to add, remove, and update the data you receive from a node.
+For development only
 
-The [Code](../../integrations/builtin/core-nodes/n8n-nodes-base.code/) node gives you access to the incoming data and you can manipulate it. With this node you can create any function you want using JavaScript code.
+Data pinning and mocking are features to help test workflows during development. Data pinning isn't available for production workflow executions.
 
-# Data editing
+## Data mocking approaches
 
-n8n allows you to edit [pinned data](../data-pinning/). This means you can check different scenarios without setting up each scenario and sending the relevant data from your external system. It makes it easier to test edge cases.
+Create test data to work with during development. You can create mock data in several ways:
+
+### Generate custom data using the Code or Edit Fields nodes
+
+You can create a custom dataset in your workflow using either the [Code node](../../integrations/builtin/core-nodes/n8n-nodes-base.code/) or the [Edit Fields (Set) node](../../integrations/builtin/core-nodes/n8n-nodes-base.set/).
+
+In the Code node, you can create any data set you want, and return it as the node output. In the Edit Fields node, select **Add fields** to add your custom data.
+
+The Edit Fields node is a good choice for small tests. To create more complex datasets, use the Code node.
+
+**Use this approach when**: You need complete control over your test data structure and values, or when you want to test edge cases with specific data patterns.
+
+### Output a sample data set from the Customer Datastore node
+
+The Customer Datastore node provides a fake dataset to work with. Add and execute the node to explore the data.
+
+**Use this approach when**: You need some test data when exploring n8n, and you don't have a real use-case to work with.
+
+Once you've created or obtained test data you want to reuse across multiple workflow executions, use [Data pinning](#data-pinning) to save it for consistent testing.
+
+## Data pinning
+
+You can 'pin' data during workflow development. Data pinning means saving the output data of a node and using the saved data instead of fetching fresh data in future workflow executions.
+
+You can use this when working with data from external sources to avoid having to repeat requests to the external system. This can save time and resources:
+
+- If your workflow relies on an external system to trigger it, such as a webhook call, being able to pin data means you don't need to use the external system every time you test the workflow.
+- If the external resource has data or usage limits, pinning data during tests avoids consuming your resource limits.
+- You can fetch and pin the data you want to test, then have confidence that the data is consistent in all your workflow tests.
+- You can mock test data (using the approaches above), then pin it for reuse across executions.
+
+You can only pin data for nodes that have a single main output ("error" outputs don't count for this purpose).
+
+### Pin data
+
+To pin data in a node:
+
+1. Run the node to load data.
+1. In the **OUTPUT** view, select **Pin data** . When data pinning is active, the button is disabled and a "This data is pinned" banner is displayed in the **OUTPUT** view.
+
+Nodes that output binary data
+
+You can't pin data if the output data includes binary data.
+
+### Unpin data
+
+When data pinning is active, a banner appears at the top of the node's output panel indicating that n8n has pinned the data. To unpin data and fetch fresh data on the next execution, select the **Unpin** link in the banner.
+
+### Edit pinned data
+
+n8n allows you to edit pinned data. This means you can check different scenarios without setting up each scenario and sending the relevant data from your external system. It makes it easier to test edge cases.
 
 For development only
 
 Data editing isn't available for production workflow executions. It's a feature to help test workflows during development.
 
-## Edit output data
+#### Edit output data
 
 To edit output data:
 
@@ -9913,7 +9773,7 @@ To edit output data:
 1. Edit your data.
 1. Select **Save**. n8n saves your data changes and pins your data.
 
-## Use data from previous executions
+#### Use data from previous executions
 
 You can copy data from nodes in previous workflow executions:
 
@@ -9929,7 +9789,7 @@ You can copy data from nodes in previous workflow executions:
    1. Hover over the JSON. n8n displays the **Copy** button.
    1. Select **Copy** .
    1. You can choose what to copy:
-      - **Copy Item Path** and **Copy Parameter Path** gives you expressions that access parts of the JSON.
+      - **Copy Item Path** and **Copy Parameter Path** give you expressions that access parts of the JSON.
       - **Copy Value**: copies the entire selected JSON.
 1. Return to the workflow you're working on:
    1. Open the left menu.
@@ -9943,111 +9803,22 @@ You can copy data from nodes in previous workflow executions:
 1. Paste in the data from the previous execution.
 1. Select **Save**. n8n saves your data changes and pins your data.
 
-# Data filtering
+### Combine mocking with pinning
 
-Feature availability
+For the most realistic testing experience, you can combine mocking and pinning approaches:
 
-Available on Cloud Pro and Enterprise plans.
+1. Create test data using one of the mocking approaches (Code node, Edit Fields node, or Customer Datastore)
+1. Edit the test data to create specific test scenarios or edge cases
+1. Pin the edited data for reuse across multiple workflow executions
+1. Continue developing with this edited, pinned dataset
 
-Search and filter data in the node **INPUT** and **OUTPUT** panels. Use this to check your node's data.
+This approach gives you complete control over your test data while ensuring consistent testing across multiple runs.
 
-To search:
+# How n8n structures data
 
-1. In a node, select **Search** in the **INPUT** or **OUTPUT** panel.
-1. Enter your search term.
+Understanding how n8n structures and passes data between nodes is fundamental to building workflows. This guide covers both the data structure format and how data flows through your workflow.
 
-n8n filters as you type your search, displaying the objects or rows containing the term.
-
-Filtering is purely visual: n8n doesn't change or delete data. The filter resets when you close and reopen the node.
-
-# Data flow within nodes
-
-Nodes can process multiple items.
-
-For example, if you set the Trello node to `Create-Card`, and create an expression that sets `Name` using a property called `name-input-value` from the incoming data, the node creates a card for each item, always choosing the `name-input-value` of the current item.
-
-For example, this input will create two cards. One named `test1` the other one named `test2`:
-
-```
-[
-	{
-		name-input-value: "test1"
-	},
-	{
-		name-input-value: "test2"
-	}
-]
-```
-
-# Data mocking
-
-Data mocking is simulating or faking data. It's useful when developing a workflow. By mocking data, you can:
-
-- Avoid making repeated calls to your data source. This saves time and costs.
-- Work with a small, predictable dataset during initial development.
-- Avoid the risk of overwriting live data: in the early stages of building your workflow, you don't need to connect your real data source.
-
-## Mocking with real data using data pinning
-
-Using [data pinning](../data-pinning/), you load real data into your workflow, then pin it in the output panel of a node. Using this approach you have realistic data, with only one call to your data source. You can [edit pinned data](../data-editing/).
-
-Use this approach when you need to configure your workflow to handle the exact data structure and parameters provided by your data source.
-
-To pin data in a node:
-
-1. Run the node to load data.
-1. In the **OUTPUT** view, select **Pin data** . When data pinning is active, the button is disabled and a "This data is pinned" banner is displayed in the **OUTPUT** view.
-
-Nodes that output binary data
-
-You can't pin data if the output data includes binary data.
-
-## Generate custom data using the Code or Edit Fields nodes
-
-You can create a custom dataset in your workflow using either the [Code node](../../integrations/builtin/core-nodes/n8n-nodes-base.code/) or the [Edit Fields (Set) node](../../integrations/builtin/core-nodes/n8n-nodes-base.set/).
-
-In the Code node, you can create any data set you want, and return it as the node output. In the Edit Fields node, select **Add fields** to add your custom data.
-
-The Edit Fields node is a good choice for small tests. To create more complex datasets, use the Code node.
-
-## Output a sample data set from the Customer Datastore node
-
-The Customer Datastore node provides a fake dataset to work with. Add and execute the node to explore the data.
-
-Use this approach if you need some test data when exploring n8n, and you don't have a real use-case to work with.
-
-# Data pinning
-
-You can 'pin' data during workflow development. Data pinning means saving the output data of a node, and using the saved data instead of fetching fresh data in future workflow executions.
-
-You can use this when working with data from external sources to avoid having to repeat requests to the external system. This can save time and resources:
-
-- If your workflow relies on an external system to trigger it, such as a webhook call, being able to pin data means you don't need to use the external system every time you test the workflow.
-- If the external resource has data or usage limits, pinning data during tests avoids consuming your resource limits.
-- You can fetch and pin the data you want to test, then have confidence that the data is consistent in all your workflow tests.
-
-You can only pin data for nodes that have a single main output ("error" outputs don't count for this purpose).
-
-For development only
-
-Data pinning isn't available for production workflow executions. It's a feature to help test workflows during development.
-
-## Pin data
-
-To pin data in a node:
-
-1. Run the node to load data.
-1. In the **OUTPUT** view, select **Pin data** . When data pinning is active, the button is disabled and a "This data is pinned" banner is displayed in the **OUTPUT** view.
-
-Nodes that output binary data
-
-You can't pin data if the output data includes binary data.
-
-## Unpin data
-
-When data pinning is active, a banner appears at the top of the node's output panel indicating that n8n has pinned the data. To unpin data and fetch fresh data on the next execution, select the **Unpin** link in the banner.
-
-# Data structure
+## Data structure
 
 In n8n, all data passed between nodes is an array of objects. It has the following structure:
 
@@ -10082,9 +9853,11 @@ Skipping the `json` key and array syntax
 
 From 0.166.0 on, when using the Function node or Code node, n8n automatically adds the `json` key if it's missing. It also automatically wraps your items in an array (`[]`) if needed. This is only the case when using the Function or Code nodes. When building your own nodes, you must still make sure the node returns data with the `json` key.
 
-## Data item processing
+## How data flows within nodes
 
-Nodes can process multiple items.
+When you connect nodes in a workflow, data automatically passes from one node to the next.
+
+Nodes process multiple items automatically. When a node receives an array of data items, it processes each item individually and performs the configured operation for each one.
 
 For example, if you set the Trello node to `Create-Card`, and create an expression that sets `Name` using a property called `name-input-value` from the incoming data, the node creates a card for each item, always choosing the `name-input-value` of the current item.
 
@@ -10093,228 +9866,17 @@ For example, this input will create two cards. One named `test1` the other one n
 ```
 [
 	{
-		name-input-value: "test1"
+		"name-input-value": "test1"
 	},
 	{
-		name-input-value: "test2"
+		"name-input-value": "test2"
 	}
 ]
 ```
 
-# Data tables
+## Understand what you're mapping with drag and drop
 
-## Overview
-
-Data tables integrate data storage within your n8n environment. Using data tables, you can save, manage, and interact with data directly inside your workflows without relying on external database systems for scenarios such as:
-
-- Persisting data across workflows in the same project
-- Storing markers to prevent duplicate runs or control workflow triggers
-- Reusing prompts or messages across workflows
-- Storing evaluation data for AI workflows
-- Storing data generated from workflow executions
-- Combining data from different sources to enrich your datasets
-- Creating lookup tables as quick reference points within workflows
-
-## How to use data tables
-
-There are two parts to working with data tables: creating them and interacting with them in workflows.
-
-### Step 1: Creating a data table
-
-1. In your n8n project, select the **Data tables** tab.
-1. Click the split button located in the top right corner and select **Create Data table**.
-1. Enter a descriptive name for your table.
-
-In the table view that appears, you can:
-
-- Add and reorder columns to organize your data
-- Add, delete, and update rows
-- Edit existing data
-
-### Step 2: Interacting with Data tables in workflows
-
-Interact with data tables in your workflow using the **Data table** node, which allows you to retrieve, update, and manipulate the data stored in a Data table.
-
-See [Data table node](../../integrations/builtin/core-nodes/n8n-nodes-base.datatable/).
-
-## Considerations and limitations of data tables
-
-- Data tables are suitable for light to moderate data storage. By default, the total storage used by all data tables in an instance is limited to 50MB. In self-hosted environments, you can increase this default size limit using the environment variable `N8N_DATA_TABLES_MAX_SIZE_BYTES`.
-- When your data tables approach 80% of your storage limit, a warning will alert you. A final warning appears when you reach the storage limit. Exceeding this limit will disable manual additions to tables and cause workflow execution errors during attempts to insert or update data.
-- By default, data tables created within a project are accessible to all team members in that project.
-- Tables created in a **Personal** space are only accessible by their creator.
-
-## Data tables versus variables
-
-| Feature                    | Data tables | Variables |
-| -------------------------- | ----------- | --------- |
-| Unified tabular view       | ✓           | ✗         |
-| Row-column relationships   | ✓           | ✗         |
-| Cross-project access       | ✗           | ✓         |
-| Individual value display   | ✗           | ✓         |
-| Optimized for short values | ✗           | ✓         |
-| Structured data            | ✓           | ✗         |
-| Scoped to projects         | ✓           | ✗         |
-| Use values as expressions  | ✗           | ✓         |
-
-## Exporting and importing data
-
-To transfer data between n8n and external tools, use workflows that:
-
-1. Retrieve data from a data table.
-1. Export it using an API or file export.
-1. Import data into another system or data table accordingly.
-
-# Schema Preview
-
-Schema Preview exposes expected schema data from the previous node in the Node Editor without the user having to provide credentials or execute the node. This makes it possible to construct workflows without having to provide credentials in advance. The preview doesn't include mock data, but it does expose the expected fields, making it possible to select and incorporate them into the input of subsequent nodes.
-
-## Using the preview
-
-1. There must be a node with Schema Preview available in your workflow.
-1. When clicking on the details of the next node in the sequence, the Schema Preview data will show up in the Node Editor where schema data would typically be exposed.
-1. Use data from the Schema Preview just as you would other schemas - drag and drop fields as input into your node parameters and settings.
-
-# Transforming data
-
-n8n uses a predefined [data structure](../data-structure/) that allows all nodes to process incoming data correctly.
-
-Your incoming data may have a different data structure, in which case you will need to transform it to allow each item to be processed individually.
-
-For example, the image below shows the output of an [HTTP Request](../../integrations/builtin/core-nodes/n8n-nodes-base.httprequest/) node that returns data incompatible with n8n's data structure. The node returns the data and displays that only one item was returned.
-
-To transform this kind of structure into the n8n data structure you can use the data transformation nodes:
-
-- [Aggregate](../../integrations/builtin/core-nodes/n8n-nodes-base.aggregate/): take separate items, or portions of them, and group them together into individual items.
-- [Limit](../../integrations/builtin/core-nodes/n8n-nodes-base.limit/): remove items beyond a defined maximum number.
-- [Remove Duplicates](../../integrations/builtin/core-nodes/n8n-nodes-base.removeduplicates/): identify and delete items that are identical across all fields or a subset of fields.
-- [Sort](../../integrations/builtin/core-nodes/n8n-nodes-base.sort/): organize lists of in a desired ordering, or generate a random selection.
-- [Split Out](../../integrations/builtin/core-nodes/n8n-nodes-base.splitout/): separate a single data item containing a list into multiple items.
-- [Summarize](../../integrations/builtin/core-nodes/n8n-nodes-base.summarize/): aggregate items together, in a manner similar to Excel pivot tables.
-
-# Data mapping
-
-Data mapping means referencing data from previous nodes.
-
-This section contains guidance on:
-
-- Mapping data in most scenarios: [Data mapping in the UI](data-mapping-ui/) and [Data mapping in expression](data-mapping-expressions/)
-- How to handle [item linking](data-item-linking/) when using the Code node or building your own nodes.
-
-# Mapping in the expressions editor
-
-These examples show how to access linked items in the expressions editor. Refer to [expressions](../../../code/expressions/) for more information on expressions, including built in variables and methods.
-
-For information on errors with mapping and linking items, refer to [Item linking errors](../data-item-linking/item-linking-errors/).
-
-## Access the linked item in a previous node's output
-
-When you use this, n8n works back up the item linking chain, to find the parent item in the given node.
-
-```
-// Returns the linked item
-{{$("<node-name>").item}}
-```
-
-As a longer example, consider a scenario where a node earlier in the workflow has the following output data:
-
-```
-[
-  {
-    "id": "23423532",
-    "name": "Jay Gatsby",
-  },
-  {
-    "id": "23423533",
-    "name": "José Arcadio Buendía",
-  },
-  {
-    "id": "23423534",
-    "name": "Max Sendak",
-  },
-  {
-    "id": "23423535",
-    "name": "Zaphod Beeblebrox",
-  },
-  {
-    "id": "23423536",
-    "name": "Edmund Pevensie",
-  }
-]
-```
-
-To extract the name, use the following expression:
-
-```
-{{$("<node-name>").item.json.name}}
-```
-
-### Access the linked item in the current node's input
-
-In this case, the item linking is within the node: find the input item that the node links to an output item.
-
-```
-// Returns the linked item
-{{$input.item}}
-```
-
-As a longer example, consider a scenario where the current node has the following input data:
-
-```
-[
-  {
-    "id": "23423532",
-    "name": "Jay Gatsby",
-  },
-  {
-    "id": "23423533",
-    "name": "José Arcadio Buendía",
-  },
-  {
-    "id": "23423534",
-    "name": "Max Sendak",
-  },
-  {
-    "id": "23423535",
-    "name": "Zaphod Beeblebrox",
-  },
-  {
-    "id": "23423536",
-    "name": "Edmund Pevensie",
-  }
-]
-```
-
-To extract the name, you'd normally use drag-and-drop [Data mapping](../), but you could also write the following expression:
-
-```
-{{$input.item.json.name}}
-```
-
-# Mapping in the UI
-
-Data mapping means referencing data from previous nodes. It doesn't include changing (transforming) data, just referencing it.
-
-You can map data in the following ways:
-
-- Using the expressions editor.
-- By dragging and dropping data from the **INPUT** into parameters. This generates the expression for you.
-
-For information on errors with mapping and linking items, refer to [Item linking errors](../data-item-linking/item-linking-errors/).
-
-## How to drag and drop data
-
-1. Run your workflow to load data.
-1. Open the node where you need to map data.
-1. You can map in table, JSON, and schema view:
-   - In table view: click and hold a table heading to map top level data, or a field in the table to map nested data.
-   - In JSON view: click and hold a key.
-   - In schema view: click and hold a key.
-1. Drag the item into the field where you want to use the data.
-
-### Understand what you're mapping with drag and drop
-
-Data mapping maps the key path, and loads the key's value into the field. For example, given the following data:
+Data mapping maps the field path, and loads the field's value. For example, given the following data:
 
 ```
 [
@@ -10327,7 +9889,7 @@ Data mapping maps the key path, and loads the key's value into the field. For ex
 
 You can map `fruit` by dragging and dropping **fruit** from the **INPUT** into the field where you want to use its value. This creates an expression, `{{ $json.fruit }}`. When the node iterates over input items, the value of the field becomes the value of `fruit` for each item.
 
-### Understand nested data
+## Understand nested data
 
 Given the following data:
 
@@ -10352,26 +9914,494 @@ Given the following data:
 
 n8n displays it in table form like this:
 
-# Data item linking
+# Data tables
 
-An item is a single piece of data. Nodes receive one or more items, operate on them, and output new items. Each item links back to previous items.
+## Overview
 
-You need to understand this behavior if you're:
+Data tables integrate data storage within your n8n environment. Using data tables, you can save, manage, and interact with data directly in your workflows without relying on external database systems for scenarios such as:
 
-- Building a programmatic-style node that implements complex behaviors with its input and output data.
-- Using the Code node or expressions editor to access data from earlier items in the workflow.
+- Persisting data across workflows in the same project
+- Storing markers to prevent duplicate runs or control workflow triggers
+- Reusing prompts or messages across workflows
+- Storing evaluation data for AI workflows
+- Storing data generated from workflow executions
+- Combining data from different sources to enrich your datasets
+- Creating lookup tables as quick reference points within workflows
+
+## Working with data tables
+
+You can create, filter, and manage data tables and their data in three ways: using the **Data Table node**, the **DataTable API endpoint** , or the **Data tables tab**.
+
+### Data Table node
+
+Use data tables inside workflows to store and manage data, enabling automated creation, retrieval, updates, and deletions as your workflow runs.
+
+See the [Data Table node](../../integrations/builtin/core-nodes/n8n-nodes-base.datatable/) for full documentation.
+
+### DataTable API endpoint
+
+Work with data tables programmatically using the `/datatables` endpoint in the n8n API.
+
+See the [API reference](https://docs.n8n.io/api/api-reference/#tag/datatable) for full documentation.
+
+### Data table tab
+
+View and work with data tables directly in the UI through a visual interface. This lets you browse and edit data, and manage tables without building a workflow.
+
+1. In your n8n project, select the **Data tables** tab.
+
+1. Click the split button located in the top right corner and select **Create Data table**.
+
+1. Enter a descriptive name for your table.
+
+1. Select how to create the table:
+
+   - **From scratch**: Create a new table by manually defining columns and adding rows using the visual interface.
+   - **Import CSV**: Upload a CSV file to automatically create the table structure and populate it with data from the file.
+
+   In the table view that appears, you can:
+
+   - Rename or delete the data table or its columns
+   - Add and reorder columns to organize your data
+   - Add, delete, and update rows
+   - Edit existing data
+
+## Exporting and importing data
+
+From the **Data tables** tab, you can:
+
+- Import CSV data directly into a data table, as described in the [previous section](#data-table-tab)
+- Download a CSV of your data table. Click the three dot menu in the top left and select **Download CSV**.
+
+## Considerations and limitations of data tables
+
+- Data tables are suitable for light to moderate data storage. By default, the total storage used by all data tables in an instance is limited to 50MB. In self-hosted environments, you can increase this default size limit using the environment variable `N8N_DATA_TABLES_MAX_SIZE_BYTES`.
+- When your data tables approach 80% of your storage limit, n8n displays a warning. A final warning appears when you reach the storage limit. Exceeding this limit will disable manual additions to tables and cause workflow execution errors during attempts to insert or update data.
+- By default, data tables created within a project are accessible to all team members in that project.
+- Tables created in a **Personal** space are only accessible by their creator.
+- Direct programmatic access to data tables from a Code node isn't supported. You can't access data table values via built-in methods or variables.
+
+## Data tables versus variables
+
+| Feature                    | Data tables | Variables |
+| -------------------------- | ----------- | --------- |
+| Unified tabular view       | ✓           | ✗         |
+| Row-column relationships   | ✓           | ✗         |
+| Cross-project access       | ✗           | ✓         |
+| Individual value display   | ✗           | ✓         |
+| Optimized for short values | ✗           | ✓         |
+| Structured data            | ✓           | ✗         |
+| Scoped to projects         | ✓           | ✗         |
+| Use values as expressions  | ✗           | ✓         |
+
+# Expressions for data transformation
+
+You can use expression transformation functions anywhere expressions are supported in n8n.
+
+However, if your main goal is to transform data using expressions without performing any other operations, use the **Edit Fields (Set)** node. This node is designed specifically for data transformation, providing a clean interface to:
+
+- Add new fields with expression-based values
+- Modify existing field values using transformation functions
+- Remove or rename fields
+
+This keeps your workflow organized by separating data transformation from business logic, making it easier to understand and maintain.
+
+**Best practice**: Instead of adding complex expressions to multiple parameters across different nodes, use Edit Fields to prepare your data first, then pass the transformed data to subsequent nodes.
+
+See [Expression reference](../expression-reference/) for more information and examples.
+
+### Example: Get data from webhook body
+
+Consider the following scenario: you have a webhook trigger that receives data through the webhook body. You want to extract some of that data for use in the workflow.
+
+Your webhook data looks similar to this:
+
+```
+[
+  {
+    "headers": {
+      "host": "n8n.instance.address",
+      ...
+    },
+    "params": {},
+    "query": {},
+    "body": {
+      "name": "Jim",
+      "age": 30,
+      "city": "New York"
+    }
+  }
+]
+```
+
+In the next node in the workflow, you want to get just the value of `city`. You can use the following expression:
+
+```
+{{$json.body.city}}
+```
+
+This expression:
+
+1. Accesses the incoming JSON-formatted data using n8n's custom `$json` variable.
+1. Finds the value of `city` (in this example, "New York"). Note that this example uses JMESPath syntax to query the JSON data. You can also write this expression as `{{$json['body']['city']}}`.
+
+### Using expressions in credentials
+
+You can also use expressions in credential fields. When you reference data using expressions (for example, `{{$json.body.city}}` or `{{ $('Webhook').item.json.headers.authorization }}`), n8n evaluates the expression within the context of the current workflow execution.
+
+This means that:
+
+- Expressions in credentials can access data available in the current execution context, including data from previous nodes.
+- Each workflow execution has its own data context.
+- Expressions are evaluated per execution, so different executions don't share data.
+
+For example, if a webhook node receives an access token and you reference it in a credential field using an expression, the value is resolved using the execution data of that specific workflow run.
+
+## Example: Writing longer JavaScript as expressions
+
+You can do things like variable assignments or multiple statements in an expression, but you need to wrap your code using the syntax for an Immediately Invoked Function Expression (IIFE).
+
+The following code use the Luxon date and time library to find the time between two dates in months. We surround the code in both the handlebar brackets for an expression and the IIFE syntax.
+
+```
+{{(()=>{
+  let end = DateTime.fromISO('2017-03-13');
+  let start = DateTime.fromISO('2017-02-13');
+  let diffInMonths = end.diff(start, 'months');
+  return diffInMonths.toObject();
+})()}}
+```
+
+## Common issues
+
+Here are some common errors and issues related to [expressions](../expressions/) and steps to resolve or troubleshoot them.
+
+### The 'JSON Output' in item 0 contains invalid JSON
+
+This error occurs when you use JSON mode but don't provide a valid JSON object. Depending on the problem with the JSON object, the error sometimes displays as `The 'JSON Output' in item 0 does not contain a valid JSON object`.
+
+To resolve this, make sure that the code you provide is valid JSON:
+
+- Check the JSON with a [JSON validator](https://jsonlint.com/).
+- Check that your JSON object doesn't reference undefined input data. This may occur if the incoming data doesn't always include the same fields.
+
+### Can't get data for expression
+
+This error occurs when n8n can't retrieve the data referenced by an expression. Often, this happens when the preceding node hasn't been run yet.
+
+Another variation of this may appear as `Referenced node is unexecuted`. In that case, the full text of this error will tell you the exact node that isn't executing in this format:
+
+> An expression references the node '<node-name>', but it hasn't been executed yet. Either change the expression, or re-wire your workflow to make sure that node executes first.
+
+To begin troubleshooting, test the workflow up to the named node.
+
+For nodes that use JavaScript or other custom code, you can check if a previous node has executed before trying to use its value by checking the following:
+
+```
+$("<node-name>").isExecuted
+```
+
+As an example, this JSON references the parameters of the input data. This error will display if you test this step without connecting it to another node:
+
+```
+{
+  "my_field_1": {{ $input.params }}
+}
+```
+
+### Invalid syntax
+
+This error occurs when you use an expression that has a syntax error.
+
+For example, the expression in this JSON includes a trailing period, which results in an invalid syntax error:
+
+```
+{
+  "my_field_1": "value",
+  "my_field_2": {{ $('If').item.json. }}
+}
+```
+
+To resolve this error, check your [expression syntax](../expressions/) to make sure it follows the expected format.
+
+# Expressions versus data nodes
+
+n8n provides multiple ways to work with and transform data. Understanding when to use each approach helps you build efficient workflows.
+
+| Approach                        | Use when you need to...                                  | Examples                                                     | Available on          |
+| ------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------ | --------------------- |
+| Expressions                     | Set a single parameter value using existing data         | Pull `{{$json.city}}`, format dates, simple math             | Cloud and Self-hosted |
+| Code node                       | Write full JavaScript/Python for complex transformations | Restructure data, loop through items, use external libraries | Cloud and Self-hosted |
+| AI Transform node               | Generate transformation code from natural language       | `Group by user and sum totals`, `categorize by sentiment`    | Cloud only            |
+| Other data transformation nodes | Perform common operations with a visual interface        | Aggregate items, split arrays, sort data, remove duplicates  | Cloud and Self-hosted |
+
+### Expressions
+
+Expressions are small pieces of JavaScript-like code you put directly into node parameters using n8n's `{{ ... }}` syntax. They can dynamically set parameter values by using data from previous nodes, workflow metadata, or environment variables.
+
+Use expressions when you can
+
+Expressions have the advantage of providing an immediate preview of the computed values, so use expressions where you can.
+
+**When to use expressions:**
+
+- To pull a value from previous node data. For example, `{{$json.body.city}}`.
+- To perform light transformations or calculations directly in a field.
+- To avoid adding extra nodes and to keep logic close to the parameter that you are setting.
+
+### Code node
+
+The [Code node](../../integrations/builtin/core-nodes/n8n-nodes-base.code/) is a dedicated node where you write JavaScript or Python that runs as a workflow step. It gives you access to incoming data from previous nodes, which you can manipulate by adding, removing, or updating items. You can create any custom function you need and use n8n's built‑in methods and variables through `$` syntax.
+
+**When to use the Code node:**
+
+- You need more complex logic or data transformation than an expression can provide, such as restructuring arrays and objects, aggregating or splitting items, and custom algorithms.
+- You want to transform many items at once.
+- You want to use promises, `console.log`, or, in the case of self‑hosted setups, external npm modules.
+
+### AI Transform node
+
+This node generates code snippets based on a short natural‑language prompt. It's context‑aware and understands your workflow's nodes and data types. The generated code is read‑only in the node; you can copy it into a Code node to edit.
+
+**When to use the AI Transform node:**
+
+- You know what transformation you want but don't want to hand‑write the code.
+- You want AI to draft the transformation logic and then run it directly in the node, or copy into a Code node for further customization.
+
+### Other data transformation nodes
+
+n8n provides a collection of nodes to transform data:
+
+- [Aggregate](../../integrations/builtin/core-nodes/n8n-nodes-base.aggregate/): take separate items, or portions of them, and group them together into individual items.
+- [Limit](../../integrations/builtin/core-nodes/n8n-nodes-base.limit/): remove items beyond a defined maximum number.
+- [Remove Duplicates](../../integrations/builtin/core-nodes/n8n-nodes-base.removeduplicates/): identify and delete items that are identical across all fields or a subset of fields.
+- [Sort](../../integrations/builtin/core-nodes/n8n-nodes-base.sort/): organize lists in a desired ordering, or generate a random selection.
+- [Split Out](../../integrations/builtin/core-nodes/n8n-nodes-base.splitout/): separate a single data item containing a list into multiple items.
+- [Summarize](../../integrations/builtin/core-nodes/n8n-nodes-base.summarize/): aggregate items together, in a manner similar to Excel pivot tables.
+
+**When to use data transformation nodes:**
+
+- The operation you need matches a specific transformation node's purpose.
+- You want a no-code solution with a guided UI.
+- You prefer visual workflow building over writing expressions or code.
+
+# Approaches for transforming data
+
+Data transformation in n8n involves modifying, restructuring, or enriching data as it moves through your workflow. This includes changing data formats, filtering or aggregating values, adding computed fields, and converting data structures to work with different nodes.
+
+n8n uses a predefined [data structure](../data-structure/) that allows all nodes to process incoming data correctly. When your data doesn't match this structure, or when you need to modify it for your use case, you'll need to transform it.
+
+n8n provides several approaches for data transformation:
+
+- [Expressions](../expressions/#expressions) allow you to transform data directly in node parameters using n8n's expression syntax (`{{ }}`)
+- The [Code node](../expressions/#code-node) lets you write custom JavaScript or Python for complex transformations.
+- The [AI Transform node](../expressions/#ai-transform-node) generates transformation code from natural language prompts.
+- Advanced transformation techniques: For sophisticated data manipulation, n8n supports:
+- **Ternary operators**: Conditional logic directly in expressions (`condition ? valueIfTrue : valueIfFalse`)
+- **Chained functions**: Combine multiple transformation functions
+- **Complex expressions**: Use JavaScript methods and operators within expression syntax
+- Specialized transformation nodes for common structural transformations:
+- [Aggregate](../../integrations/builtin/core-nodes/n8n-nodes-base.aggregate/): group separate items together
+- [Limit](../../integrations/builtin/core-nodes/n8n-nodes-base.limit/): restrict the number of items
+- [Remove Duplicates](../../integrations/builtin/core-nodes/n8n-nodes-base.removeduplicates/): eliminate identical items
+- [Sort](../../integrations/builtin/core-nodes/n8n-nodes-base.sort/): order items or randomize
+- [Split Out](../../integrations/builtin/core-nodes/n8n-nodes-base.splitout/): separate lists into individual items
+- [Summarize](../../integrations/builtin/core-nodes/n8n-nodes-base.summarize/): aggregate data like Excel pivot tables
+
+For a comparison of these approaches, see [Expressions versus data nodes](../expressions/).
+
+# Referencing data
+
+Referencing data, or data mapping, means accessing information from previous nodes in your workflow. This allows you to use output from earlier steps as input for later nodes, creating dynamic workflows that pass data through multiple operations.
+
+When you reference data, you're not changing it. You're pointing to values that already exist so you can use them in node parameters, expressions, or custom code.
+
+If you want to change the data you're referencing, see [Transforming data](../transforming-data/).
+
+## How to reference data
+
+The main way to reference data is using [expressions](../expressions/#expressions). You can create expressions by typing them in a parameter's field or dragging and dropping fields from the Input panel in the UI. Expressions will automatically figure out the correct item to use using [item linking](data-item-linking/).
+
+# Referencing data in the UI
+
+Data mapping means referencing data from previous nodes. It doesn't include changing (transforming) data, just referencing it.
+
+When you need data from a particular node in your workflow, you can [reference nodes by name](../referencing-other-nodes/). This is useful when your workflow has multiple branches or when you need to access data from several steps back.
+
+You can map data in the following ways:
+
+- Using the expressions editor.
+- By dragging and dropping data from the **INPUT** pane into node parameters. This generates the expression for you.
+
+For information on errors with mapping and linking items, refer to [Item linking errors](../data-item-linking/item-linking-errors/).
+
+See [Common ways of referencing](../referencing-other-nodes/#common-ways-of-referencing).
+
+# Accessing linked items in the Code node
+
+Every item in a node's input data links back to the items used in previous nodes to generate it. This is useful if you need to retrieve linked items from further back than the immediate previous node.
+
+To access the linked items from earlier in the workflow, use `("<node-name>").itemMatching(currentNodeinputIndex)`.
+
+For example, consider a workflow that does the following:
+
+1. The Customer Datastore node generates example data:
+
+   ```
+   [
+   	{
+   		"id": "23423532",
+   		"name": "Jay Gatsby",
+   		"email": "gatsby@west-egg.com",
+   		"notes": "Keeps asking about a green light??",
+   		"country": "US",
+   		"created": "1925-04-10"
+   	},
+   	{
+   		"id": "23423533",
+   		"name": "José Arcadio Buendía",
+   		"email": "jab@macondo.co",
+   		"notes": "Lots of people named after him. Very confusing",
+   		"country": "CO",
+   		"created": "1967-05-05"
+   	},
+   	...
+   ]
+   ```
+
+1. The Edit Fields node simplifies this data:
+
+   ```
+   [
+   	{
+   		"name": "Jay Gatsby"
+   	},
+   	{
+   		"name": "José Arcadio Buendía"
+   	},
+       ...
+   ]
+   ```
+
+1. The Code node restores the email address to the correct person:
+
+   ```
+   [
+   	{
+   		"name": "Jay Gatsby",
+   		"restoreEmail": "gatsby@west-egg.com"
+   	},
+   	{
+   		"name": "José Arcadio Buendía",
+   		"restoreEmail": "jab@macondo.co"
+   	},
+   	...
+   ]
+   ```
+
+The Code node does this using the following code:
+
+```
+for(let i=0; i<$input.all().length; i++) {
+	$input.all()[i].json.restoreEmail = $('Customer Datastore (n8n training)').itemMatching(i).json.email;
+}
+return $input.all();
+```
+
+```
+for i,item in enumerate(_input.all()):
+	_input.all()[i].json.restoreEmail = _('Customer Datastore (n8n training)').itemMatching(i).json.email
+
+return _input.all();
+```
+
+You can view and download the example workflow from [n8n website | itemMatching usage example](https://n8n.io/workflows/1966-itemmatching-usage-example/).
+
+# Referencing previous nodes
+
+When working with data in n8n, you'll often need to reference information from the current node or from previous nodes in your workflow.
+
+## Common ways of referencing
+
+The most frequently used methods for accessing data are:
+
+- **`$json`**: Access JSON data from the current input item
+- **`$('<node-name>').item.json`**: Access JSON data from a [linked item](../data-item-linking/) in a previous node
+
+## Other referencing methods
+
+These methods work in both expressions and the Code node:
+
+| Method                     | Description                                    |
+| -------------------------- | ---------------------------------------------- |
+| `$binary`                  | Access binary data from the current input item |
+| `$input.item`              | The input item currently being processed       |
+| `$('<node-name>').first()` | Get the first item from a specified node       |
+| `$('<node-name>').last()`  | Get the last item from a specified node        |
+| `$('<node-name>').all()`   | Get all items from a specified node            |
+
+## Current node input
+
+Methods for working with the input of the current node. Some methods and variables aren't available in the Code node.
+
+Python support
+
+You can use Python in the Code node. It isn't available in expressions.
+
+| Method                       | Description                                                                                                                                                                                    | Available in Code node?           |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| `$binary`                    | Shorthand for `$input.item.binary`. Incoming binary data from a node                                                                                                                           |                                   |
+| `$input.item`                | The input item of the current node that's being processed. Refer to [Item linking](../data-item-linking/) for more information on paired items and item linking.                               |                                   |
+| `$input.all()`               | All input items in current node.                                                                                                                                                               |                                   |
+| `$input.first()`             | First input item in current node.                                                                                                                                                              |                                   |
+| `$input.last()`              | Last input item in current node.                                                                                                                                                               |                                   |
+| `$input.params`              | Object containing the query settings of the previous node. This includes data such as the operation it ran, result limits, and so on.                                                          |                                   |
+| `$json`                      | Shorthand for `$input.item.json`. Incoming JSON data from a node. Refer to [Data structure](../../data-structure/) for information on item structure.                                          | (when running once for each item) |
+| `$input.context.noItemsLeft` | Boolean. Only available when working with the Loop Over Items node. Provides information about what's happening in the node. Use this to determine whether the node is still processing items. |                                   |
+
+| Method                       | Description                                                                                                                                                                                                          |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `_input.item`                | The input item of the current node that's being processed. Refer to [Item linking](../data-item-linking/) for more information on paired items and item linking.                                                     |
+| `_input.all()`               | All input items in current node.                                                                                                                                                                                     |
+| `_input.first()`             | First input item in current node.                                                                                                                                                                                    |
+| `_input.last()`              | Last input item in current node.                                                                                                                                                                                     |
+| `_input.params`              | Object containing the query settings of the previous node. This includes data such as the operation it ran, result limits, and so on.                                                                                |
+| `_json`                      | Shorthand for `_input.item.json`. Incoming JSON data from a node. Refer to [Data structure](../../data-structure/) for information on item structure. Available when you set **Mode** to **Run Once for Each Item**. |
+| `_input.context.noItemsLeft` | Boolean. Only available when working with the Loop Over Items node. Provides information about what's happening in the node. Use this to determine whether the node is still processing items.                       |
+
+## Output of other nodes
+
+Methods for working with the output of other nodes. Some methods and variables aren't available in the Code node.
+
+| Method                                                 | Description                                                                                                                                                                                    | Available in Code node? |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
+| `$("<node-name>").all(branchIndex?, runIndex?)`        | Returns all items from a given node. If `branchIndex` isn't given it will default to the output that connects `node-name` with the node where you use the expression or code.                  |                         |
+| `$("<node-name>").first(branchIndex?, runIndex?)`      | The first item output by the given node. If `branchIndex` isn't given it will default to the output that connects `node-name` with the node where you use the expression or code.              |                         |
+| `$("<node-name>").last(branchIndex?, runIndex?)`       | The last item output by the given node. If `branchIndex` isn't given it will default to the output that connects `node-name` with the node where you use the expression or code.               |                         |
+| `$("<node-name>").item`                                | The linked item. This is the item in the specified node used to produce the current item. Refer to [Item linking](../data-item-linking/) for more information on item linking.                 |                         |
+| `$("<node-name>").params`                              | Object containing the query settings of the given node. This includes data such as the operation it ran, result limits, and so on.                                                             |                         |
+| `$("<node-name>").context`                             | Boolean. Only available when working with the Loop Over Items node. Provides information about what's happening in the node. Use this to determine whether the node is still processing items. |                         |
+| `$("<node-name>").itemMatching(currentNodeInputIndex)` | Use instead of `$("<node-name>").item` in the Code node if you need to trace back from an input item.                                                                                          |                         |
+
+# Linking data items
+
+An item is a single piece of data. Nodes receive one or more items, operate on them, and output new items. Each item links back to the items in the previous nodes that generated it.
+
+Usually this just works. You need to understand this behavior in detail if you're:
+
 - Using the Code node for complex behaviors with input and output data.
+- Building a programmatic-style node.
 
 This section provides:
 
 - A conceptual overview of [Item linking concepts](item-linking-concepts/).
 - Information on [Item linking for node creators](item-linking-node-building/).
-- Support for end users who need to [Work with the data path](item-linking-code-node/) to retrieve item data from previous nodes, and link items when using the Code node.
-- Guidance on troubleshooting [Errors](item-linking-errors/).
+- Support for end users who need to [work with the data path](item-linking-code-node/) to retrieve item data from previous nodes and link items when using the Code node.
+- Guidance on troubleshooting [errors](item-linking-errors/).
 
-# Item linking in the Code node
+# Preserving linking in the Code node
 
-Use n8n's item linking to access data from items that precede the current item. It also has implications when using the Code node. Most nodes link every output item to an input item. This creates a chain of items that you can work back along to access previous items. For a deeper conceptual overview of this topic, refer to [Item linking concepts](../item-linking-concepts/). This document focuses on practical usage examples.
+When referencing a previous node you need to know which item to use. This is solved by item linking. Most nodes automatically link every output item to an input item, creating a chain of items that you can work back along to access previous items. For a deeper conceptual overview of this topic, refer to [Item linking concepts](../item-linking-concepts/). This document focuses on practical usage examples.
 
 When using the Code node, there are some scenarios where you need to manually supply item linking information if you want to be able to use `$("<node-name>").item` later in the workflow. All these scenarios only apply if you have more than one incoming item. n8n automatically handles item linking for single items.
 
@@ -10468,14 +10498,14 @@ return newItems;
 
 Each new item now links to the item used to create it.
 
-# Item linking concepts
+# How items link through workflows
 
 Each output item created by a node includes metadata that links them to the input item (or items) that the node used to generate them. This creates a chain of items that you can work back along to access previous items. This can be complicated to understand, especially if the node splits or merges data. You need to understand item linking when building your own programmatic nodes, or in some scenarios using the Code node.
 
 This document provides a conceptual overview of this feature. For usage details, refer to:
 
 - [Item linking for node creators](../item-linking-node-building/), for details on how to handle item linking when building a node.
-- [Item linking in the Code node](../item-linking-code-node/), to learn how to handle item linking in the Code node.
+- [Preserving linking in the Code node](../item-linking-code-node/), to learn how to handle item linking in the Code node.
 - [Item linking errors](../item-linking-errors/), to understand the errors you may encounter in the editor UI.
 
 ## n8n's automatic item linking
@@ -10498,8 +10528,7 @@ In this example, it's possible for n8n to link an item in one node back several 
 The methods for accessing linked items are different depending on whether you're using the UI, expressions, or the code node. Explore the following resources:
 
 - [Mapping in the UI](../../data-mapping-ui/)
-- [Mapping in the expressions editor](../../data-mapping-expressions/)
-- [Item linking in the Code node](../item-linking-code-node/)
+- [Preserving linking in the Code node](../item-linking-code-node/)
 - [Item linking errors](../item-linking-errors/)
 
 # Item linking errors
@@ -10519,7 +10548,7 @@ When using `.item`, n8n displays an error when:
 
 To solve these errors, you can either avoid using `.item`, or fix the root cause.
 
-You can avoid `.item` by using `.first()`, `.last()` or `.all()[index]` instead. They require you to know the position of the item that you’re targeting within the target node's output items. Refer to [Built in methods and variables | Output of other nodes](../../../../code/builtin/output-other-nodes/) for more detail on these methods.
+You can avoid `.item` by using `.first()`, `.last()` or `.all()[index]` instead. They require you to know the position of the item that you're targeting within the target node's output items. Refer to [Referencing previous nodes](../../referencing-other-nodes/) for more detail on these methods.
 
 The fix for the root cause depends on the exact error.
 
@@ -10531,7 +10560,7 @@ If you see this error message:
 
 There's a node in the chain that doesn't return pairing information. The solution here depends on the type of the previous node:
 
-- Code nodes: make sure you return which input items the node used to produce each output item. Refer to [Item linking in the code node](../item-linking-code-node/) for more information.
+- Code nodes: make sure you return which input items the node used to produce each output item. Refer to [Preserving linking in the Code node](../item-linking-code-node/) for more information.
 - Custom or community nodes: the node creator needs to update the node to return which input items it uses to produce each output item. Refer to [Item linking for node creators](../item-linking-node-building/) for more information.
 
 ### Fix for 'Multiple matching items for expression'
@@ -10544,7 +10573,7 @@ Sometimes n8n uses multiple items to create a single item. Examples include the 
 
 When you use `.item` and there are multiple possible matches, n8n doesn't know which one to use. To solve this you can either:
 
-- Use `.first()`, `.last()` or `.all()[index]` instead. Refer to [Built in methods and variables | Output of other nodes](../../../../code/builtin/output-other-nodes/) for more detail on these methods.
+- Use `.first()`, `.last()` or `.all()[index]` instead. Refer to [Referencing previous nodes](../../referencing-other-nodes/) for more detail on these methods.
 - Reference a different node that contains the same information, but doesn't have multiple matching items.
 
 # Item linking for node creators
@@ -10584,1226 +10613,5761 @@ newItem = {
 };
 ```
 
-# n8n Embed
+# Expression Reference
 
-n8n Embed is part of n8n's paid offering. Using Embed, you can white label n8n, or incorporate it in your software as part of your commercial product.
+These are some commonly used expressions. A more exhaustive list appears below.
 
-For more information about when to use Embed, as well as costs and licensing processes, refer to [Embed](https://n8n.io/embed/) on the n8n website.
+| Category                       | Expression                        | Description                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------ | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Access current input item data | `$json`                           | JSON data of the current item                                                                                                                                                                                                                                                                                                                                                     |
+|                                | `$json.fieldName`                 | Field of the current item                                                                                                                                                                                                                                                                                                                                                         |
+|                                | `$binary`                         | Binary data of current item                                                                                                                                                                                                                                                                                                                                                       |
+| Access previous node data      | `$("NodeName").first()`           | First item in a node                                                                                                                                                                                                                                                                                                                                                              |
+|                                | `$("NodeName").item`              | Linked item of a node. See [Item linking](../data-mapping/data-item-linking/) for more information.                                                                                                                                                                                                                                                                               |
+|                                | `$("NodeName").all()`             | All items of a node                                                                                                                                                                                                                                                                                                                                                               |
+|                                | `$("NodeName").last()`            | Last item of a node                                                                                                                                                                                                                                                                                                                                                               |
+| Date/Time                      | `$now`                            | Current date and time                                                                                                                                                                                                                                                                                                                                                             |
+|                                | `$today`                          | Today's date                                                                                                                                                                                                                                                                                                                                                                      |
+|                                | `$now.toFormat("yyyy-MM-dd")`     | Format current date as a string                                                                                                                                                                                                                                                                                                                                                   |
+| Conditionals                   | `$if(condition, "true", "false")` | Helper function that returns a value when a condition is true or false                                                                                                                                                                                                                                                                                                            |
+|                                | `condition ? true : false`        | Ternary operator: returns one value if a condition is true, another if false                                                                                                                                                                                                                                                                                                      |
+|                                | `$ifEmpty(value, defaultValue)`   | Helper function takes two parameters and tests the first to check if it's empty, then returns either the parameter (if not empty) or the second parameter (if the first is empty). The first parameter is empty if it's `undefined`, `null`, an empty string `''`, an array where `value.length` returns `false` , or an object where `Object.keys(value).length` returns `false` |
+| String Methods                 | `text.toUpperCase()`              | Convert to uppercase                                                                                                                                                                                                                                                                                                                                                              |
+|                                | `text.toLowerCase()`              | Convert to lowercase                                                                                                                                                                                                                                                                                                                                                              |
+|                                | `text.includes("foo")`            | Check if text contains search term                                                                                                                                                                                                                                                                                                                                                |
+|                                | `text.extractEmail()`             | Extract email from text                                                                                                                                                                                                                                                                                                                                                           |
+| Array Methods                  | `array.length`                    | Get array length                                                                                                                                                                                                                                                                                                                                                                  |
+|                                | `array.join(", ")`                | Join array elements using a comma a separator                                                                                                                                                                                                                                                                                                                                     |
+|                                | `array.filter(x => x <= 20)`      | Filter items of array based on the filtering condition                                                                                                                                                                                                                                                                                                                            |
+|                                | `array.map(x => x.id)`            | Transform items of an array                                                                                                                                                                                                                                                                                                                                                       |
 
-## Support
+Browse the tables below to find methods by the data type on which they act. Click a method name to read detailed documentation for it.
 
-The [community forum](https://community.n8n.io/) can help with various issues. If you are a current Embed customer, you can also contact n8n support, using the email provided when you bought the license.
+## Array
 
-## Russia and Belarus
+- [*`Array`*.**`append(elem1, elem2?, ..., elemN?)`**](array/#arrayappend)
 
-n8n Embed isn't available in Russia and Belarus. Refer to n8n's blog post [Update on n8n cloud accounts in Russia and Belarus](https://blog.n8n.io/update-on-n8n-cloud-accounts-in-russia-and-belarus/) for more information.
+  Adds new elements to the end of the array. Similar to `push()`, but returns the modified array. Consider using spread syntax instead (see examples).
 
-# Configuration
+- [*`Array`*.**`average()`**](array/#arrayaverage)
 
-Feature availability
+  Returns the average of the numbers in the array. Throws an error if there are any non-numbers.
 
-Embed requires an embed license. For more information about when to use Embed, as well as costs and licensing processes, refer to [Embed](https://n8n.io/embed/) on the n8n website.
+- [*`Array`*.**`chunk(length)`**](array/#arraychunk)
 
-## Authentication
+  Splits the array into an array of sub-arrays, each with the given length
 
-You can secure n8n by setting up [User management](../../user-management/), n8n's built-in authentication feature.
+- [*`Array`*.**`compact()`**](array/#arraycompact)
 
-n8n supports [LDAP](../../user-management/ldap/) and [SAML](../../user-management/saml/).
+  Removes any empty values from the array. `null`, `""` and `undefined` count as empty.
 
-### Credential overwrites
+- [*`Array`*.**`concat(array2, array3?, ... arrayN?)`**](array/#arrayconcat)
 
-To offer OAuth login to users, it's possible to overwrite [credentials](../../glossary/#credential-n8n) on a global basis. This credential data isn't visible to users but the backend uses it automatically.
+  Joins one or more arrays onto the end of the base array
 
-In the Editor UI, n8n hides all overwritten fields by default. This means that users are able to authenticate using OAuth by pressing the "connect" button on the credentials.
+- [*`Array`*.**`difference(otherArray)`**](array/#arraydifference)
 
-n8n offers two ways to apply credential overwrites: using Environment Variable and using the REST API.
+  Compares two arrays. Returns all elements in the base array that aren't present in `otherArray`.
 
-#### Using environment variables
+- [*`Array`*.**`filter(function(element, index?, array?), thisValue?)`**](array/#arrayfilter)
 
-You can set credential overwrites using environment variable by setting the `CREDENTIALS_OVERWRITE_DATA` to `{ CREDENTIAL_NAME: { PARAMETER: VALUE }}`.
+  Returns an array with only the elements satisfying a condition. The condition is a function that returns `true` or `false`.
 
-Warning
+- [*`Array`*.**`find(function(element, index?, array?), thisValue?)`**](array/#arrayfind)
 
-Even though this is possible, it isn't recommended. Environment variables aren't protected in n8n, so the data can leak to users.
+  Returns the first element from the array that satisfies the provided condition. The condition is a function that returns `true` or `false`. Returns `undefined` if no matches are found.
 
-#### Using REST APIs
+If you need all matching elements, use `filter()`.
 
-The recommended way is to load the data using a custom REST endpoint. Set the `CREDENTIALS_OVERWRITE_ENDPOINT` to a path under which this endpoint should be made available. You can set `CREDENTIALS_OVERWRITE_ENDPOINT_AUTH_TOKEN` to require a token for accessing the endpoint. When this token is configured, the endpoint is only accessible if the token is included in the `Authorization` header as a `Bearer` token.
+- [*`Array`*.**`first()`**](array/#arrayfirst)
 
-Note
+  Returns the first element of the array
 
-The endpoint can be called just once for security reasons, unless `CREDENTIALS_OVERWRITE_ENDPOINT_AUTH_TOKEN` is set.
+- [*`Array`*.**`includes(element, start?)`**](array/#arrayincludes)
 
-For example:
+  Returns `true` if the array contains the specified element
 
-1. Activate the endpoint by setting the environment variable in the environment n8n runs under:
+- [*`Array`*.**`indexOf(element, start?)`**](array/#arrayindexof)
 
-   ```
-   export CREDENTIALS_OVERWRITE_ENDPOINT=send-credentials
-   ```
+  Returns the position of the first matching element in the array, or -1 if the element isn’t found. Positions start at 0.
 
-1. A JSON file with the credentials to overwrite is then needed. For example, a `oauth-credentials.json` file to overwrite credentials for Asana and GitHub could look like this:
+- [*`Array`*.**`intersection(otherArray)`**](array/#arrayintersection)
 
-   ```
-   {
-       "asanaOAuth2Api": {
-           "clientId": "<id>",
-           "clientSecret": "<secret>"
-       },
-       "githubOAuth2Api": {
-           "clientId": "<id>",
-           "clientSecret": "<secret>"
-       }
-   }
-   ```
+  Compares two arrays. Returns all elements in the base array that are also present in the other array.
 
-1. Then apply it to the instance by sending it using curl:
+- [*`Array`*.**`isEmpty()`**](array/#arrayisempty)
 
-   ```
-   curl -H "Content-Type: application/json" --data @oauth-credentials.json http://localhost:5678/send-credentials
-   ```
+  Returns `true` if the array has no elements or is `null`
 
-Note
+- [*`Array`*.**`isNotEmpty()`**](array/#arrayisnotempty)
 
-There are cases when credentials are based on others. For example, the `googleSheetsOAuth2Api` extends the `googleOAuth2Api`. In this case, you can set parameters on the parent credentials (`googleOAuth2Api`) for all child-credentials (`googleSheetsOAuth2Api`) to use.
+  Returns `true` if the array has at least one element
 
-In case `CREDENTIALS_OVERWRITE_ENDPOINT_AUTH_TOKEN` is set to `secure-token`, the curl command will be:
+- [*`Array`*.**`join(separator?)`**](array/#arrayjoin)
 
-````
-```sh
-curl -H "Content-Type: application/json" -H "Authorization: Bearer secure-token" --data @oauth-credentials.json http://localhost:5678/send-credentials
-````
+  Merges all elements of the array into a single string, with an optional separator between each element.
+
+The opposite of `split()`.
+
+- [*`Array`*.**`last()`**](array/#arraylast)
+
+  Returns the last element of the array
+
+- [*`Array`*.**`length`**](array/#arraylength)
+
+  The number of elements in the array
+
+- [*`Array`*.**`map(function(element, index?, array?), thisValue?)`**](array/#arraymap)
+
+  Creates a new array by applying a function to each element of the original array
+
+- [*`Array`*.**`max()`**](array/#arraymax)
+
+  Returns the largest number in the array. Throws an error if there are any non-numbers.
+
+- [*`Array`*.**`min()`**](array/#arraymin)
+
+  Returns the smallest number in the array. Throws an error if there are any non-numbers.
+
+- [*`Array`*.**`pluck(fieldName1?, fieldName2?, …)`**](array/#arraypluck)
+
+  Returns an array containing the values of the given field(s) in each Object of the array. Ignores any array elements that aren’t Objects or don’t have a key matching the field name(s) provided.
+
+- [*`Array`*.**`randomItem()`**](array/#arrayrandomitem)
+
+  Returns a randomly-chosen element from the array
+
+- [*`Array`*.**`reduce(function(prevResult, currentElem, currentIndex?, array?), initResult)`**](array/#arrayreduce)
+
+  Reduces an array to a single value by applying a function to each element. The function combines the current element with the result of reducing the previous elements, producing a new result.
+
+- [*`Array`*.**`removeDuplicates(keys?)`**](array/#arrayremoveduplicates)
+
+  Removes any re-occurring elements from the array
+
+- [*`Array`*.**`renameKeys(from, to)`**](array/#arrayrenamekeys)
+
+  Changes all matching keys (field names) of any Objects in the array. Rename more than one key by adding extra arguments, i.e. `from1, to1, from2, to2, ...`.
+
+- [*`Array`*.**`reverse()`**](array/#arrayreverse)
+
+  Reverses the order of the elements in the array
+
+- [*`Array`*.**`slice(start, end)`**](array/#arrayslice)
+
+  Returns a portion of the array, from the `start` index up to (but not including) the `end` index. Indexes start at 0.
+
+- [*`Array`*.**`smartJoin(keyField, nameField)`**](array/#arraysmartjoin)
+
+  Creates a single Object from an array of Objects. Each Object in the array provides one field for the returned Object. Each Object in the array must contain a field with the key name and a field with the value.
+
+- [*`Array`*.**`sort(compareFunction(a, b)?)`**](array/#arraysort)
+
+  Reorders the elements of the array. For sorting strings alphabetically, no parameter is required. For sorting numbers or Objects, see examples.
+
+- [*`Array`*.**`sum()`**](array/#arraysum)
+
+  Returns the total of all the numbers in the array. Throws an error if there are any non-numbers.
+
+- [*`Array`*.**`toJsonString()`**](array/#arraytojsonstring)
+
+  Converts the array to a JSON string. The same as JavaScript’s `JSON.stringify()`.
+
+- [*`Array`*.**`toSpliced(start, deleteCount, elem1, ....., elemN)`**](array/#arraytospliced)
+
+  Adds and/or removes array elements at a given position.
+
+See also `slice()` and `append()`.
+
+- [*`Array`*.**`toString()`**](array/#arraytostring)
+
+  Converts the array to a string, with values separated by commas. To use a different separator, use `join()` instead.
+
+- [*`Array`*.**`union(otherArray)`**](array/#arrayunion)
+
+  Concatenates two arrays and then removes any duplicates
+
+- [*`Array`*.**`unique()`**](array/#arrayunique)
+
+  Removes any duplicate elements from the array
+
+## BinaryFile
+
+- [`binaryFile`.**`directory`**](binaryfile/#binaryfiledirectory)
+
+  The path to the directory that the file is stored in. Useful for distinguishing between files with the same name in different directories. Not set if n8n is configured to store files in its database.
+
+- [`binaryFile`.**`fileExtension`**](binaryfile/#binaryfilefileextension)
+
+  The suffix attached to the filename (e.g. `txt`)
+
+- [`binaryFile`.**`fileName`**](binaryfile/#binaryfilefilename)
+
+  The name of the file, including extension
+
+- [`binaryFile`.**`fileSize`**](binaryfile/#binaryfilefilesize)
+
+  A string representing the size of the file
+
+- [`binaryFile`.**`fileType`**](binaryfile/#binaryfilefiletype)
+
+  A string representing the type of the file, e.g. `image`. Corresponds to the first part of the MIME type.
+
+- [`binaryFile`.**`id`**](binaryfile/#binaryfileid)
+
+  The unique ID of the file. Used to identify the file when it is stored on disk or in a storage service such as S3.
+
+- [`binaryFile`.**`mimeType`**](binaryfile/#binaryfilemimetype)
+
+  A string representing the format of the file’s contents, e.g. `image/jpeg`
+
+## Boolean
+
+- [*`Boolean`*.**`isEmpty()`**](boolean/#booleanisempty)
+
+  Returns `false` for all booleans. Returns `true` for `null`.
+
+- [*`Boolean`*.**`toNumber()`**](boolean/#booleantonumber)
+
+  Converts `true` to 1 and `false` to 0
+
+- [*`Boolean`*.**`toString()`**](boolean/#booleantostring)
+
+  Converts `true` to the string ‘true’ and `false` to the string ‘false’
+
+## CustomData
+
+- [`$execution.customData`.**`get(key)`**](customdata/#executioncustomdataget)
+
+  Returns the custom execution data stored under the given key. [More info](/workflows/executions/custom-executions-data/)
+
+- [`$execution.customData`.**`getAll()`**](customdata/#executioncustomdatagetall)
+
+  Returns all the key-value pairs of custom data that have been set in the current execution. [More info](/workflows/executions/custom-executions-data/)
+
+- [`$execution.customData`.**`set(key, value)`**](customdata/#executioncustomdataset)
+
+  Stores custom execution data under the key specified. Use this to easily filter executions by this data. [More info](/workflows/executions/custom-executions-data/)
+
+- [`$execution.customData`.**`setAll(obj)`**](customdata/#executioncustomdatasetall)
+
+  Sets multiple key-value pairs of custom data for the execution. Use this to easily filter executions by this data. [More info](/workflows/executions/custom-executions-data/)
+
+## Date
+
+- [*`Date`*.**`toDateTime()`**](date/#datetodatetime)
+
+  Converts a JavaScript Date to a Luxon DateTime. The DateTime contains the same information, but is easier to manipulate.
+
+## DateTime
+
+- [*`DateTime`*.**`day`**](datetime/#datetimeday)
+
+  The day of the month (1-31)
+
+- [*`DateTime`*.**`diffTo(otherDateTime, unit)`**](datetime/#datetimediffto)
+
+  Returns the difference between two DateTimes, in the given unit(s)
+
+- [*`DateTime`*.**`diffToNow(unit)`**](datetime/#datetimedifftonow)
+
+  Returns the difference between the current moment and the DateTime, in the given unit(s). For a textual representation, use `toRelative()` instead.
+
+- [*`DateTime`*.**`endOf(unit, opts)`**](datetime/#datetimeendof)
+
+  Rounds the DateTime up to the end of one of its units, e.g. the end of the month
+
+- [*`DateTime`*.**`equals(other)`**](datetime/#datetimeequals)
+
+  Returns `true` if the two DateTimes represent exactly the same moment and are in the same time zone. For a less strict comparison, use `hasSame()`.
+
+- [*`DateTime`*.**`extract(unit?)`**](datetime/#datetimeextract)
+
+  Extracts a part of the date or time, e.g. the month, as a number. To extract textual names instead, see `format()`.
+
+- [*`DateTime`*.**`format(fmt)`**](datetime/#datetimeformat)
+
+  Converts the DateTime to a string, using the format specified. [Formatting guide](https://moment.github.io/luxon/#/formatting?id=table-of-tokens). For common formats, `toLocaleString()` may be easier.
+
+- [*`DateTime`*.**`hasSame(otherDateTime, unit)`**](datetime/#datetimehassame)
+
+  Returns `true` if the two DateTimes are the same, down to the unit specified. Time zones are ignored (only local times are compared), so use `toUTC()` first if needed.
+
+- [*`DateTime`*.**`hour`**](datetime/#datetimehour)
+
+  The hour of the day (0-23)
+
+- [*`DateTime`*.**`isBetween(date1, date2)`**](datetime/#datetimeisbetween)
+
+  Returns `true` if the DateTime lies between the two moments specified
+
+- [*`DateTime`*.**`isInDST`**](datetime/#datetimeisindst)
+
+  Whether the DateTime is in daylight saving time
+
+- [*`DateTime`*.**`locale`**](datetime/#datetimelocale)
+
+  The locale of a DateTime, such 'en-GB'. The locale is used when formatting the DateTime.
+
+- [*`DateTime`*.**`millisecond`**](datetime/#datetimemillisecond)
+
+  The millisecond of the second (0-999)
+
+- [*`DateTime`*.**`minus(n, unit?)`**](datetime/#datetimeminus)
+
+  Subtracts a given period of time from the DateTime
+
+- [*`DateTime`*.**`minute`**](datetime/#datetimeminute)
+
+  The minute of the hour (0-59)
+
+- [*`DateTime`*.**`month`**](datetime/#datetimemonth)
+
+  The month (1-12)
+
+- [*`DateTime`*.**`monthLong`**](datetime/#datetimemonthlong)
+
+  The textual long month name, e.g. 'October'. Defaults to the system's locale if no locale has been specified.
+
+- [*`DateTime`*.**`monthShort`**](datetime/#datetimemonthshort)
+
+  The textual abbreviated month name, e.g. 'Oct'. Defaults to the system's locale if no locale has been specified.
+
+- [*`DateTime`*.**`plus(n, unit?)`**](datetime/#datetimeplus)
+
+  Adds a given period of time to the DateTime
+
+- [*`DateTime`*.**`quarter`**](datetime/#datetimequarter)
+
+  The quarter of the year (1-4)
+
+- [*`DateTime`*.**`second`**](datetime/#datetimesecond)
+
+  The second of the minute (0-59)
+
+- [*`DateTime`*.**`set(values)`**](datetime/#datetimeset)
+
+  Assigns new values to specified units of the DateTime. To round a DateTime, see also `startOf()` and `endOf()`.
+
+- [*`DateTime`*.**`setLocale(locale)`**](datetime/#datetimesetlocale)
+
+  Sets the locale, which determines the language and formatting for the DateTime. Useful when generating a textual representation of the DateTime, e.g. with `format()` or `toLocaleString()`.
+
+- [*`DateTime`*.**`setZone(zone, opts)`**](datetime/#datetimesetzone)
+
+  Converts the DateTime to the given time zone. The DateTime still represents the same moment unless specified in the options. See also `toLocal()` and `toUTC()`.
+
+- [*`DateTime`*.**`startOf(unit, opts)`**](datetime/#datetimestartof)
+
+  Rounds the DateTime down to the beginning of one of its units, e.g. the start of the month
+
+- [*`DateTime`*.**`toISO(opts)`**](datetime/#datetimetoiso)
+
+  Returns an ISO 8601-compliant string representation of the DateTime
+
+- [*`DateTime`*.**`toLocal()`**](datetime/#datetimetolocal)
+
+  Converts a DateTime to the workflow’s local time zone. The DateTime still represents the same moment unless specified in the parameters. The workflow’s time zone can be set in the workflow settings.
+
+- [*`DateTime`*.**`toLocaleString(formatOpts)`**](datetime/#datetimetolocalestring)
+
+  Returns a localised string representing the DateTime, i.e. in the language and format corresponding to its locale. Defaults to the system's locale if none specified.
+
+- [*`DateTime`*.**`toMillis()`**](datetime/#datetimetomillis)
+
+  Returns a Unix timestamp in milliseconds (the number elapsed since 1st Jan 1970)
+
+- [*`DateTime`*.**`toRelative(options)`**](datetime/#datetimetorelative)
+
+  Returns a textual representation of the time relative to now, e.g. ‘in two days’. Rounds down by default.
+
+- [*`DateTime`*.**`toSeconds()`**](datetime/#datetimetoseconds)
+
+  Returns a Unix timestamp in seconds (the number elapsed since 1st Jan 1970)
+
+- [*`DateTime`*.**`toString()`**](datetime/#datetimetostring)
+
+  Returns a string representation of the DateTime. Similar to `toISO()`. For more formatting options, see `format()` or `toLocaleString()`.
+
+- [*`DateTime`*.**`toUTC(offset, opts)`**](datetime/#datetimetoutc)
+
+  Converts a DateTime to the UTC time zone. The DateTime still represents the same moment unless specified in the parameters. Use `setZone()` to convert to other zones.
+
+- [*`DateTime`*.**`weekday`**](datetime/#datetimeweekday)
+
+  The day of the week. 1 is Monday and 7 is Sunday.
+
+- [*`DateTime`*.**`weekdayLong`**](datetime/#datetimeweekdaylong)
+
+  The textual long weekday name, e.g. 'Wednesday'. Defaults to the system's locale if no locale has been specified.
+
+- [*`DateTime`*.**`weekdayShort`**](datetime/#datetimeweekdayshort)
+
+  The textual abbreviated weekday name, e.g. 'Wed'. Defaults to the system's locale if no locale has been specified.
+
+- [*`DateTime`*.**`weekNumber`**](datetime/#datetimeweeknumber)
+
+  The week number of the year (1-52ish)
+
+- [*`DateTime`*.**`year`**](datetime/#datetimeyear)
+
+  The year
+
+- [*`DateTime`*.**`zone`**](datetime/#datetimezone)
+
+  The time zone associated with the DateTime
+
+## ExecData
+
+- [`$exec`.**`customData`**](execdata/#execcustomdata)
+
+  Set and get custom execution data (e.g. to filter executions by). You can also do this with the ‘Execution Data’ node. [More info](/workflows/executions/custom-executions-data/)
+
+- [`$exec`.**`id`**](execdata/#execid)
+
+  The ID of the current workflow execution
+
+- [`$exec`.**`mode`**](execdata/#execmode)
+
+  Can be one of 3 values: either `test` (meaning the execution was triggered by clicking a button in n8n) or `production` (meaning the execution was triggered automatically). When running workflow tests, `evaluation` is used.
+
+- [`$exec`.**`resumeFormUrl`**](execdata/#execresumeformurl)
+
+  The URL to access a form generated by the [’Wait’ node](/integrations/builtin/core-nodes/n8n-nodes-base.wait/).
+
+- [`$exec`.**`resumeUrl`**](execdata/#execresumeurl)
+
+  The webhook URL to call to resume a workflow waiting at a [’Wait’ node](/integrations/builtin/core-nodes/n8n-nodes-base.wait/).
+
+## HTTPResponse
+
+- [`$response`.**`body`**](httpresponse/#responsebody)
+
+  The body of the response object from the last HTTP call. Only available in the ‘HTTP Request’ node
+
+- [`$response`.**`headers`**](httpresponse/#responseheaders)
+
+  The headers returned by the last HTTP call. Only available in the ‘HTTP Request’ node.
+
+- [`$response`.**`statusCode`**](httpresponse/#responsestatuscode)
+
+  The HTTP status code returned by the last HTTP call. Only available in the ‘HTTP Request’ node.
+
+- [`$response`.**`statusMessage`**](httpresponse/#responsestatusmessage)
+
+  An optional message regarding the request status. Only available in the ‘HTTP Request’ node.
+
+## Item
+
+- [`$item`.**`binary`**](item/#itembinary)
+
+  Returns any binary data the item contains
+
+- [`$item`.**`json`**](item/#itemjson)
+
+  Returns the JSON data the item contains. [More info](/data/data-structure/)
+
+## NodeInputData
+
+- [`$input`.**`all(branchIndex?, runIndex?)`**](nodeinputdata/#inputall)
+
+  Returns an array of the current node’s input items
+
+- [`$input`.**`first(branchIndex?, runIndex?)`**](nodeinputdata/#inputfirst)
+
+  Returns the current node’s first input item
+
+- [`$input`.**`item`**](nodeinputdata/#inputitem)
+
+  Returns the input item currently being processed
+
+- [`$input`.**`last(branchIndex?, runIndex?)`**](nodeinputdata/#inputlast)
+
+  Returns the current node’s last input item
+
+- [`$input`.**`params`**](nodeinputdata/#inputparams)
+
+  The configuration settings of the current node. These are the parameters you fill out within the node when configuring it (e.g. its operation).
+
+## NodeOutputData
+
+- [`$()`.**`all(branchIndex?, runIndex?)`**](nodeoutputdata/#all)
+
+  Returns an array of the node’s output items
+
+- [`$()`.**`first(branchIndex?, runIndex?)`**](nodeoutputdata/#first)
+
+  Returns the first item output by the node
+
+- [`$()`.**`isExecuted`**](nodeoutputdata/#isexecuted)
+
+  Is `true` if the node has executed, `false` otherwise
+
+- [`$()`.**`item`**](nodeoutputdata/#item)
+
+  Returns the matching item, i.e. the one used to produce the current item in the current node. [More info](/data/data-mapping/data-item-linking/)
+
+- [`$()`.**`itemMatching(currentItemIndex?)`**](nodeoutputdata/#itemmatching)
+
+  Returns the matching item, i.e. the one used to produce the item in the current node at the specified index. [More info](/data/data-mapping/data-item-linking/)
+
+- [`$()`.**`last(branchIndex?, runIndex?)`**](nodeoutputdata/#last)
+
+  Returns the last item output by the node
+
+- [`$()`.**`params`**](nodeoutputdata/#params)
+
+  The configuration settings of the given node. These are the parameters you fill out within the node’s UI (e.g. its operation).
+
+## Number
+
+- [*`Number`*.**`abs()`**](number/#numberabs)
+
+  Returns the number’s absolute value, i.e. removes any minus sign
+
+- [*`Number`*.**`ceil()`**](number/#numberceil)
+
+  Rounds the number up to the next whole number
+
+- [*`Number`*.**`floor()`**](number/#numberfloor)
+
+  Rounds the number down to the nearest whole number
+
+- [*`Number`*.**`format(locale?, options?)`**](number/#numberformat)
+
+  Returns a formatted string representing the number. Useful for formatting for a specific language or currency. The same as [`Intl.NumberFormat()`](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat%E2%80%9D).
+
+- [*`Number`*.**`isEmpty()`**](number/#numberisempty)
+
+  Returns `false` for all numbers. Returns `true` for `null`.
+
+- [*`Number`*.**`isEven()`**](number/#numberiseven)
+
+  Returns `true` if the number is even. Throws an error if the number isn’t a whole number.
+
+- [*`Number`*.**`isInteger()`**](number/#numberisinteger)
+
+  Returns `true` if the number is a whole number
+
+- [*`Number`*.**`isOdd()`**](number/#numberisodd)
+
+  Returns `true` if the number is odd. Throws an error if the number isn’t a whole number.
+
+- [*`Number`*.**`round(decimalPlaces?)`**](number/#numberround)
+
+  Returns the number rounded to the nearest whole number (or specified number of decimal places)
+
+- [*`Number`*.**`toBoolean()`**](number/#numbertoboolean)
+
+  Converts the number to a boolean value. `0` becomes `false`; everything else becomes `true`.
+
+- [*`Number`*.**`toDateTime(format?)`**](number/#numbertodatetime)
+
+  Converts a numerical timestamp into a DateTime. The format of the timestamp must be specified if it’s not in milliseconds. Uses the time zone in n8n (or in the workflow’s settings).
+
+- [*`Number`*.**`toLocaleString(locales?, options?)`**](number/#numbertolocalestring)
+
+  Returns a localised string representing the number, i.e. in the language and format corresponding to its locale. Defaults to the system's locale if none specified.
+
+- [*`Number`*.**`toString(radix?)`**](number/#numbertostring)
+
+  Converts the number to a simple textual representation. For more formatting options, see `toLocaleString()`.
+
+## Object
+
+- [*`Object`*.**`compact()`**](object/#objectcompact)
+
+  Removes all fields that have empty values, i.e. are `null` or `""`
+
+- [*`Object`*.**`hasField(name)`**](object/#objecthasfield)
+
+  Returns `true` if there is a field called `name`. Only checks top-level keys. Comparison is case-sensitive.
+
+- [*`Object`*.**`isEmpty()`**](object/#objectisempty)
+
+  Returns `true` if the Object has no keys (fields) set or is `null`
+
+- [*`Object`*.**`isNotEmpty()`**](object/#objectisnotempty)
+
+  Returns `true` if the Object has at least one key (field) set
+
+- [*`Object`*.**`keepFieldsContaining(value)`**](object/#objectkeepfieldscontaining)
+
+  Removes any fields whose values don’t at least partly match the given `value`. Comparison is case-sensitive. Fields that aren’t strings will always be removed.
+
+- [*`Object`*.**`keys()`**](object/#objectkeys)
+
+  Returns an array with all the field names (keys) the object contains. The same as JavaScript’s `Object.keys(obj)`.
+
+- [*`Object`*.**`merge(otherObject)`**](object/#objectmerge)
+
+  Merges the two Objects into a single one. If a key (field name) exists in both Objects, the value from the first (base) Object is used.
+
+- [*`Object`*.**`removeField(key)`**](object/#objectremovefield)
+
+  Removes a field from the Object. The same as JavaScript’s `delete`.
+
+- [*`Object`*.**`removeFieldsContaining(value)`**](object/#objectremovefieldscontaining)
+
+  Removes keys (fields) whose values at least partly match the given `value`. Comparison is case-sensitive. Fields that aren’t strings are always kept.
+
+- [*`Object`*.**`toJsonString()`**](object/#objecttojsonstring)
+
+  Converts the Object to a JSON string. Similar to JavaScript’s `JSON.stringify()`.
+
+- [*`Object`*.**`urlEncode()`**](object/#objecturlencode)
+
+  Generates a URL parameter string from the Object’s keys and values. Only top-level keys are supported.
+
+- [*`Object`*.**`values()`**](object/#objectvalues)
+
+  Returns an array with all the values of the fields the Object contains. The same as JavaScript’s `Object.values(obj)`.
+
+## PrevNodeData
+
+- [**`name`**](prevnodedata/#name)
+
+  The name of the node that the current input came from.
+
+Always uses the current node’s first input connector if there is more than one (e.g. in the ‘Merge’ node).
+
+- [**`outputIndex`**](prevnodedata/#outputindex)
+
+  The index of the output connector that the current input came from. Use this when the previous node had multiple outputs (such as an ‘If’ or ‘Switch’ node).
+
+Always uses the current node’s first input connector if there is more than one (e.g. in the ‘Merge’ node).
+
+- [**`runIndex`**](prevnodedata/#runindex)
+
+  The run of the previous node that generated the current input.
+
+Always uses the current node’s first input connector if there is more than one (e.g. in the ‘Merge’ node).
+
+## Root
+
+- [**`$(nodeName)`**](root/)
+
+  Returns the data of the specified node
+
+- [**`$binary`**](root/#binary)
+
+  Returns any binary input data to the current node, for the current item. Shorthand for `$input.item.binary`.
+
+- [**`$execution`**](root/#execution)
+
+  Retrieve or set metadata for the current execution
+
+- [**`$fromAI(key, description?, type?, defaultValue?)`**](root/#fromai)
+
+  Use when a large language model should provide the value of a node parameter. Consider providing a description for better results.
+
+- [**`$if(condition, valueIfTrue, valueIfFalse)`**](root/#if)
+
+  Returns one of two values depending on the `condition`. Similar to the `?` operator in JavaScript.
+
+- [**`$ifEmpty(value, valueIfEmpty)`**](root/#ifempty)
+
+  Returns the first parameter if it isn’t empty, otherwise returns the second parameter. The following count as empty: `””`, `[]`, `{}`, `null`, `undefined`
+
+- [**`$input`**](root/#input)
+
+  The input data of the current node
+
+- [**`$itemIndex`**](root/#itemindex)
+
+  The position of the item currently being processed in the list of input items
+
+- [**`$jmespath(obj, expression)`**](root/#jmespath)
+
+  Extracts data from an object (or array of objects) using a [JMESPath](%E2%80%9D/code/cookbook/jmespath/%E2%80%9D) expression. Useful for querying complex, nested objects. Returns `undefined` if the expression is invalid.
+
+- [**`$json`**](root/#json)
+
+  Returns the JSON input data to the current node, for the current item. Shorthand for `$input.item.json`. [More info](/data/data-structure/)
+
+- [**`$max(num1, num2, …, numN)`**](root/#max)
+
+  Returns the highest of the given numbers
+
+- [**`$min(num1, num2, …, numN)`**](root/#min)
+
+  Returns the lowest of the given numbers
+
+- [**`$nodeVersion`**](root/#nodeversion)
+
+  The version of the current node (as displayed at the bottom of the nodes’s settings pane)
+
+- [**`$now`**](root/#now)
+
+  A DateTime representing the current moment.
+
+Uses the workflow’s time zone (which can be changed in the workflow settings).
+
+- [**`$pageCount`**](root/#pagecount)
+
+  The number of results pages the node has fetched. Only available in the ‘HTTP Request’ node.
+
+- [**`$parameter`**](root/#parameter)
+
+  The configuration settings of the current node. These are the parameters you fill out within the node’s UI (e.g. its operation).
+
+- [**`$prevNode`**](root/#prevnode)
+
+  Information about the node that the current input came from.
+
+When in a ‘Merge’ node, always uses the first input connector.
+
+- [**`$request`**](root/#request)
+
+  The request object sent during the last run of the node. Only available in the ‘HTTP Request’ node.
+
+- [**`$response`**](root/#response)
+
+  The response returned by the last HTTP call. Only available in the ‘HTTP Request’ node.
+
+- [**`$runIndex`**](root/#runindex)
+
+  The index of the current run of the current node execution. Starts at 0.
+
+- [**`$secrets`**](root/#secrets)
+
+  The secrets from an [external secrets vault](/external-secrets/), if configured. Secret values are never displayed to the user. Only available in credential fields.
+
+- [**`$today`**](root/#today)
+
+  A DateTime representing midnight at the start of the current day.
+
+Uses the instance’s time zone (unless overridden in the workflow’s settings).
+
+- [**`$vars`**](root/#vars)
+
+  The [variables](/code/variables/) available to the workflow
+
+- [**`$workflow`**](root/#workflow)
+
+  Information about the current workflow
+
+## String
+
+- [*`String`*.**`base64Encode()`**](string/#stringbase64decode)
+
+  Converts plain text to a base64-encoded string
+
+- [*`String`*.**`base64Encode()`**](string/#stringbase64encode)
+
+  Converts a base64-encoded string to plain text
+
+- [*`String`*.**`concat(string1, string2?, ..., stringN?)`**](string/#stringconcat)
+
+  Joins one or more strings onto the end of the base string. Alternatively, use the `+` operator (see examples).
+
+- [*`String`*.**`extractDomain()`**](string/#stringextractdomain)
+
+  If the string is an email address or URL, returns its domain (or `undefined` if nothing found).
+
+If the string also contains other content, try using `extractEmail()` or `extractUrl()` first.
+
+- [*`String`*.**`extractEmail()`**](string/#stringextractemail)
+
+  Extracts the first email found in the string. Returns `undefined` if none is found.
+
+- [*`String`*.**`extractUrl()`**](string/#stringextracturl)
+
+  Extracts the first URL found in the string. Returns `undefined` if none is found. Only recognizes full URLs, e.g. those starting with `http`.
+
+- [*`String`*.**`extractUrlPath()`**](string/#stringextracturlpath)
+
+  Returns the part of a URL after the domain, or `undefined` if no URL found.
+
+If the string also contains other content, try using `extractUrl()` first.
+
+- [*`String`*.**`hash(algo?)`**](string/#stringhash)
+
+  Returns the string hashed with the given algorithm. Defaults to md5 if not specified.
+
+- [*`String`*.**`includes(searchString, start?)`**](string/#stringincludes)
+
+  Returns `true` if the string contains the `searchString`. Case-sensitive.
+
+- [*`String`*.**`indexOf(searchString, start?)`**](string/#stringindexof)
+
+  Returns the index (position) of the first occurrence of `searchString` within the base string, or -1 if not found. Case-sensitive.
+
+- [*`String`*.**`isDomain()`**](string/#stringisdomain)
+
+  Returns `true` if the string is a domain
+
+- [*`String`*.**`isEmail()`**](string/#stringisemail)
+
+  Returns `true` if the string is an email
+
+- [*`String`*.**`isEmpty()`**](string/#stringisempty)
+
+  Returns `true` if the string has no characters or is `null`
+
+- [*`String`*.**`isNotEmpty()`**](string/#stringisnotempty)
+
+  Returns `true` if the string has at least one character
+
+- [*`String`*.**`isNumeric()`**](string/#stringisnumeric)
+
+  Returns `true` if the string represents a number
+
+- [*`String`*.**`isUrl()`**](string/#stringisurl)
+
+  Returns `true` if the string is a valid URL
+
+- [*`String`*.**`length`**](string/#stringlength)
+
+  The number of characters in the string
+
+- [*`String`*.**`match(regexp)`**](string/#stringmatch)
+
+  Matches the string against a [regular expression](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions%E2%80%9D). Returns an array containing the first match, or all matches if the `g` flag is set in the regular expression. Returns `null` if no matches are found.
+
+For checking whether text is present, consider `includes()` instead.
+
+- [*`String`*.**`parseJson()`**](string/#stringparsejson)
+
+  Returns the JavaScript Object or value represented by the string, or `undefined` if the string isn’t valid JSON. Single-quoted JSON is not supported.
+
+- [*`String`*.**`quote(mark?)`**](string/#stringquote)
+
+  Wraps a string in quotation marks, and escapes any quotation marks already in the string. Useful when constructing JSON, SQL, etc.
+
+- [*`String`*.**`removeMarkdown()`**](string/#stringremovemarkdown)
+
+  Removes any Markdown formatting from the string. Also removes HTML tags.
+
+- [*`String`*.**`removeTags()`**](string/#stringremovetags)
+
+  Removes tags, such as HTML or XML, from the string
+
+- [*`String`*.**`replace(pattern, replacement)`**](string/#stringreplace)
+
+  Returns a string with the first occurrence of `pattern` replaced by `replacement`.
+
+To replace all occurrences, use `replaceAll()` instead.
+
+- [*`String`*.**`replaceAll(pattern, replacement)`**](string/#stringreplaceall)
+
+  Returns a string with all occurrences of `pattern` replaced by `replacement`
+
+- [*`String`*.**`replaceSpecialChars()`**](string/#stringreplacespecialchars)
+
+  Replaces special characters in the string with the closest ASCII character
+
+- [*`String`*.**`search(regexp)`**](string/#stringsearch)
+
+  Returns the index (position) of the first occurrence of a pattern within the string, or -1 if not found. The pattern is specified using a [regular expression](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions%E2%80%9D). To use text instead, see `indexOf()`.
+
+- [*`String`*.**`slice(start, end?)`**](string/#stringslice)
+
+  Extracts a fragment of the string at the given position. For more advanced extraction, see `match()`.
+
+- [*`String`*.**`split(separator?, limit?)`**](string/#stringsplit)
+
+  Splits the string into an array of substrings. Each split is made at the `separator`, and the separator isn’t included in the output.
+
+The opposite of using `join()` on an array.
+
+- [*`String`*.**`startsWith(searchString, start?)`**](string/#stringstartswith)
+
+  Returns `true` if the string starts with `searchString`. Case-sensitive.
+
+- [*`String`*.**`substring(start, end?)`**](string/#stringsubstring)
+
+  Extracts a fragment of the string at the given position. For more advanced extraction, see `match()`.
+
+- [*`String`*.**`toBoolean()`**](string/#stringtoboolean)
+
+  Converts the string to a boolean value. `0`, `false` and `no` resolve to `false`, everything else to `true`. Case-insensitive.
+
+- [*`String`*.**`toDateTime()`**](string/#stringtodatetime)
+
+  Converts the string to a DateTime. Useful for further transformation. Supported formats for the string are ISO 8601, HTTP, RFC2822, SQL and Unix timestamp in milliseconds.
+
+To parse other formats, use [`DateTime.fromFormat()`](%E2%80%9Dhttps://moment.github.io/luxon/api-docs/index.html#datetimefromformat%E2%80%9D).
+
+- [*`String`*.**`toJsonString()`**](string/#stringtojsonstring)
+
+  Prepares the string to be inserted into a JSON object. Escapes any quotes and special characters (e.g. new lines), and wraps the string in quotes.
+
+The same as JavaScript’s `JSON.stringify()`.
+
+- [*`String`*.**`toLowerCase()`**](string/#stringtolowercase)
+
+  Converts all letters in the string to lower case
+
+- [*`String`*.**`toNumber()`**](string/#stringtonumber)
+
+  Converts a string representing a number to a number. Throws an error if the string doesn’t start with a valid number.
+
+- [*`String`*.**`toSentenceCase()`**](string/#stringtosentencecase)
+
+  Changes the capitalization of the string to sentence case. The first letter of each sentence is capitalized and all others are lowercased.
+
+- [*`String`*.**`toSnakeCase()`**](string/#stringtosnakecase)
+
+  Changes the format of the string to snake case. Spaces and dashes are replaced by `_`, symbols are removed and all letters are lowercased.
+
+- [*`String`*.**`toTitleCase()`**](string/#stringtotitlecase)
+
+  Changes the capitalization of the string to title case. The first letter of each word is capitalized and the others left unchanged. Short prepositions and conjunctions aren’t capitalized (e.g. ‘a’, ‘the’).
+
+- [*`String`*.**`toUpperCase()`**](string/#stringtouppercase)
+
+  Converts all letters in the string to upper case (capitals)
+
+- [*`String`*.**`trim()`**](string/#stringtrim)
+
+  Removes whitespace from both ends of the string. Whitespace includes new lines, tabs, spaces, etc.
+
+- [*`String`*.**`urlDecode(allChars?)`**](string/#stringurldecode)
+
+  Decodes a URL-encoded string. Replaces any character codes in the form of `%XX` with their corresponding characters.
+
+- [*`String`*.**`urlEncode(allChars?)`**](string/#stringurlencode)
+
+  Encodes the string so that it can be used in a URL. Spaces and special characters are replaced with codes of the form `%XX`.
+
+## WorkflowData
+
+- [`$workflow`.**`active`**](workflowdata/#workflowactive)
+
+  Whether the workflow is active
+
+- [`$workflow`.**`id`**](workflowdata/#workflowid)
+
+  The workflow ID. Can also be found in the workflow’s URL.
+
+- [`$workflow`.**`name`**](workflowdata/#workflowname)
+
+  The name of the workflow, as shown at the top of the editor
+
+# Array
+
+## *`Array`*.**`append()`**
+
+**Description:** Adds new elements to the end of the array. Similar to `push()`, but returns the modified array. Consider using spread syntax instead (see examples).
+
+**Syntax:** *`Array`*.append(elem1, elem2?, ..., elemN?)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `elem1` (any) - The first element to append
+- `elem2` (any) - optional - The second element to append
+- `elemN` (any) - optional - The Nth element to append
+
+**Examples:**
 
 ```
-
-#### Persistence
-
-To store credential overwrites in the database and propagate them automatically to all workers in multi-instance/queue mode, enable:
-
+// arr = ['forget', 'me']
+arr.append('not') //=> arr = ['forget', 'me', 'not']
 ```
 
-export CREDENTIALS_OVERWRITE_PERSISTENCE=true
+```
+// arr = [9, 0, 2]
+arr.append(1, 0) //=> [9, 0, 2, 1, 0]
 
+// Consider using spread syntax instead
+[...arr, 1, 0]  //=> [9, 0, 2, 1, 0]
 ```
 
-When enabled, n8n stores the encrypted overwrites in the `settings` table and broadcasts a `reload-overwrite-credentials` event so that workers reload the latest values. When disabled, overwrites remain in memory on the process that loaded them and aren't propagated to workers or preserved across restarts.
+## *`Array`*.**`average()`**
 
-## Environment variables
+**Description:** Returns the average of the numbers in the array. Throws an error if there are any non-numbers.
 
-n8n has many [environment variables](../../hosting/configuration/environment-variables/) you can configure. Here are the most relevant environment variables for your hosted solution:
+**Syntax:** *`Array`*.average()
 
-| Variable | Type | Default | Description |
-| --- | --- | --- | --- |
-| `EXECUTIONS_TIMEOUT` | Number | `-1` | Sets a default timeout (in seconds) to all workflows after which n8n stops their execution. Users can override this for individual workflows up to the duration set in `EXECUTIONS_TIMEOUT_MAX`. Set `EXECUTIONS_TIMEOUT` to `-1` to disable. |
-| `EXECUTIONS_DATA_PRUNE` | Boolean | `true` | Whether to delete data of past executions on a rolling basis. |
-| `EXECUTIONS_DATA_MAX_AGE` | Number | `336` | The execution age (in hours) before it's deleted. |
-| `EXECUTIONS_DATA_PRUNE_MAX_COUNT` | Number | `10000` | Maximum number of executions to keep in the database. 0 = no limit |
-| `NODES_EXCLUDE` | Array of strings | `[\"n8n-nodes-base.executeCommand\", \"n8n-nodes-base.localFileTrigger\"]` | Specify which nodes not to load. For example, to block nodes that can be a security risk if users aren't trustworthy: `NODES_EXCLUDE: "[\"n8n-nodes-base.executeCommand\", \"n8n-nodes-base.readWriteFile\"]"`. To enable all nodes, specify `NODES_EXCLUDE: "[]"`. |
-| `NODES_INCLUDE` | Array of strings | - | Specify which nodes to load. |
-| `N8N_TEMPLATES_ENABLED` | Boolean | `true` | Enable [workflow templates](../../glossary/#template-n8n) (true) or disable (false). |
-| `N8N_TEMPLATES_HOST` | String | `https://api.n8n.io` | Change this if creating your own workflow template library. Note that to use your own workflow templates library, your API must provide the same endpoints and response structure as n8n's. Refer to [Workflow templates](../../workflows/templates/) for more information. |
+**Returns:** Number
 
-## Backend hooks
+**Source:** Custom n8n functionality
 
-It's possible to define external hooks that n8n executes whenever a specific operation runs. You can use these, for example, to log data, change data, or forbid an action by throwing an error.
-
-### Available hooks
-
-| Hook | Arguments | Description |
-| --- | --- | --- |
-| `credentials.create` | `[credentialData: ICredentialsDb]` | Called before new credentials get created. Use to restrict the number of credentials. |
-| `credentials.delete` | `[id: credentialId]` | Called before credentials get deleted. |
-| `credentials.update` | `[credentialData: ICredentialsDb]` | Called before existing credentials are saved. |
-| `frontend.settings` | `[frontendSettings: IN8nUISettings]` | Gets called on n8n startup. Allows you to, for example, overwrite frontend data like the displayed OAuth URL. |
-| `n8n.ready` | `[app: App]` | Called once n8n is ready. Use to, for example, register custom API endpoints. |
-| `n8n.stop` |  | Called when an n8n process gets stopped. Allows you to save some process data. |
-| `oauth1.authenticate` | `[oAuthOptions: clientOAuth1.Options, oauthRequestData: {oauth_callback: string}]` | Called before an OAuth1 authentication. Use to overwrite an OAuth callback URL. |
-| `oauth2.callback` | `[oAuth2Parameters: {clientId: string, clientSecret: string \| undefined, accessTokenUri: string, authorizationUri: string, redirectUri: string, scopes: string[]}]` | Called in an OAuth2 callback. Use to overwrite an OAuth callback URL. |
-| `workflow.activate` | `[workflowData: IWorkflowDb]` | Called before a workflow gets activated. Use to restrict the number of active workflows. |
-| `workflow.afterCreate` | `[workflowId: string]` | Called after a workflow gets created. |
-| `workflow.afterDelete` | `[workflowId: string]` | Called after a workflow gets deleted. |
-| `workflow.afterUpdate` | `[workflowData: IWorkflowBase]` | Called after an existing workflow gets saved. |
-| `workflow.create` | `[workflowData: IWorkflowBase]` | Called before a workflow gets created. Use to restrict the number of saved workflows. |
-| `workflow.delete` | `[workflowId: string]` | Called before a workflow gets delete. |
-| `workflow.postExecute` | `[run: IRun, workflowData: IWorkflowBase]` | Called after a workflow gets executed. |
-| `workflow.preExecute` | `[workflow: Workflow: mode: WorkflowExecuteMode]` | Called before a workflow gets executed. Allows you to count or limit the number of workflow executions. |
-| `workflow.update` | `[workflowData: IWorkflowBase]` | Called before an existing workflow gets saved. |
-| `workflow.afterArchive` | `[workflowId: string]` | Called after you archive a workflow. |
-| `workflow.afterUnarchive` | `[workflowId: string]` | Called after you restore a workflow from the archive. |
-
-### Registering hooks
-
-Set hooks by registering a hook file that contains the hook functions.
-To register a hook, set the environment variable `EXTERNAL_HOOK_FILES`.
-
-You can set the variable to a single file:
-
-`EXTERNAL_HOOK_FILES=/data/hook.js`
-
-Or to contain multiple files separated by a colon:
-
-`EXTERNAL_HOOK_FILES=/data/hook1.js:/data/hook2.js`
-
-### Backend hook files
-
-Hook files are regular JavaScript files that have the following format:
+**Examples:**
 
 ```
+// arr = [12, 1, 5]
+arr.average() //=> 6
+```
 
-module.exports = { "frontend": { "settings": [ async function (settings) { settings.oauthCallbackUrls.oauth1 = 'https://n8n.example.com/oauth1/callback'; settings.oauthCallbackUrls.oauth2 = 'https://n8n.example.com/oauth2/callback'; } ] }, "workflow": { "activate": \[ async function (workflowData) { const activeWorkflows = await this.dbCollections.Workflow.count({ active: true });
+## *`Array`*.**`chunk()`**
+
+**Description:** Splits the array into an array of sub-arrays, each with the given length
+
+**Syntax:** *`Array`*.chunk(length)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `length` (Number) - The number of elements in each chunk
+
+**Examples:**
 
 ```
-            if (activeWorkflows > 1) {
-                throw new Error(
-                    'Active workflow limit reached.'
-                );
+// arr = [1, 2, 3, 4, 5, 6]
+arr.chunk(2) //=> [ [1,2], [3,4], [5,6] ]
+```
+
+## *`Array`*.**`compact()`**
+
+**Description:** Removes any empty values from the array. `null`, `""` and `undefined` count as empty.
+
+**Syntax:** *`Array`*.compact()
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = [2, null, 1, ""]
+arr.compact() //=> [2, 1]
+```
+
+## *`Array`*.**`concat()`**
+
+**Description:** Joins one or more arrays onto the end of the base array
+
+**Syntax:** *`Array`*.concat(array2, array3?, ... arrayN?)
+
+**Returns:** Array
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `array2` (Array) - The first array to be joined on the end of the base array
+- `array3` (Array) - optional - The second array to be joined on to the end of the base array
+- `arrayN` (Array) - optional - The Nth array to be joined on to the end of the base array
+
+**Examples:**
+
+```
+// arr1 = ['Nathan', 'Jan']
+arr1.concat(['Steve', 'Bill']) // ['Nathan', 'Jan', 'Steve', 'Bill']
+```
+
+```
+// arr1 = [5, 4]
+// arr2 = [100, 101]
+// arr3 = ['a', 'b']
+arr1.concat(arr2, arr3) // [5, 4, 100, 101, 'a', 'b']
+```
+
+## *`Array`*.**`difference()`**
+
+**Description:** Compares two arrays. Returns all elements in the base array that aren't present in `otherArray`.
+
+**Syntax:** *`Array`*.difference(otherArray)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `otherArray` (Array) - The array to compare to the base array
+
+**Examples:**
+
+```
+// arr = [1, 2, 3]
+arr.difference([2, 3]) //=> [1]
+```
+
+## *`Array`*.**`filter()`**
+
+**Description:** Returns an array with only the elements satisfying a condition. The condition is a function that returns `true` or `false`.
+
+**Syntax:** *`Array`*.filter(function(element, index?, array?), thisValue?)
+
+**Returns:** Array
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `function()` (function) - A function to run for each array element. If it returns `true`, the element will be kept. Consider using [arrow function notation](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions%E2%80%9D) to save space.
+- `element` (any) - The value of the current element
+- `index` (Number) - optional - The position of the current element in the array (starting at 0)
+- `array` (Array) - optional - The array being processed. Rarely needed.
+- `thisValue` (any) - optional - A value passed to the function as its `this` value. Rarely needed.
+
+**Examples:**
+
+```
+// Keep ages over 18 (using arrow function notation):
+// ages = [12, 33, 16, 40]
+ages.filter(age => (age > 18)) //=> [33, 40]
+```
+
+```
+// Keep names under 5 letters long (using arrow function notation):
+// names = ['Nathan', 'Bob', 'Sebastian']
+ages.filter(age => (age.length < 5)) //=> ["Bob"]
+
+// Or using traditional function notation:
+ages.filter(function(age){return age.length < 5}) //=> ["Bob"]
+```
+
+```
+// Keep numbers at odd indexes
+// nums = [1, 7, 3, 10, 5]
+ages.filter((num, index) => {return index%2 != 0}) //=> [7, 10]
+```
+
+## *`Array`*.**`find()`**
+
+**Description:** Returns the first element from the array that satisfies the provided condition. The condition is a function that returns `true` or `false`. Returns `undefined` if no matches are found.
+
+If you need all matching elements, use `filter()`.
+
+**Syntax:** *`Array`*.find(function(element, index?, array?), thisValue?)
+
+**Returns:** any
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `function()` (function) - A function to run for each array element. As soon as it returns `true`, that element will be returned. Consider using [arrow function notation](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions%E2%80%9D) to save space.
+- `element` (any) - The value of the current element
+- `index` (Number) - optional - The position of the current element in the array (starting at 0)
+- `array` (Array) - optional - The array of the current element. Rarely needed.
+- `thisValue` (any) - optional - A value passed to the function as its `this` value. Rarely needed.
+
+**Examples:**
+
+```
+// Find first age over 18 (using arrow function notation):
+// ages = [12, 33, 16, 40]
+ages.find(age => (age > 18)) //=> 33
+```
+
+```
+// Find first name under 5 letters long (using arrow function notation):
+// names = ['Nathan', 'Bob', 'Sebastian']
+ages.find(age => (age.length < 5)) //=> 'Bob'
+
+// Or using traditional function notation:
+ages.find(function(age){return age.length < 5}) //=> 'Bob'
+```
+
+## *`Array`*.**`first()`**
+
+**Description:** Returns the first element of the array
+
+**Syntax:** *`Array`*.first()
+
+**Returns:** any
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = ['quick', 'brown', 'fox']
+arr.first() //=> 'quick'
+```
+
+## *`Array`*.**`includes()`**
+
+**Description:** Returns `true` if the array contains the specified element
+
+**Syntax:** *`Array`*.includes(element, start?)
+
+**Returns:** Boolean
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `element` (any) - The value to search the array for
+- `start` (Number) - optional - The index to start looking from
+
+**Examples:**
+
+```
+// names = ["Bob", "Bill", "Nat"];
+names.includes("Nat") //=> true
+names.includes("Nathan") //=> false
+```
+
+## *`Array`*.**`indexOf()`**
+
+**Description:** Returns the position of the first matching element in the array, or -1 if the element isn’t found. Positions start at 0.
+
+**Syntax:** *`Array`*.indexOf(element, start?)
+
+**Returns:** Number
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `element` (any) - The value to look for
+- `start` (Number) - optional - The index to start looking from
+
+**Examples:**
+
+```
+// names = ["Bob", "Bill", "Nat"];
+names.indexOf("Nat") //=> 2
+```
+
+```
+// names = ["Bob", "Bill", "Nat"];
+names.indexOf("Nathan") //=> -1
+```
+
+## *`Array`*.**`intersection()`**
+
+**Description:** Compares two arrays. Returns all elements in the base array that are also present in the other array.
+
+**Syntax:** *`Array`*.intersection(otherArray)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `otherArray` (Array) - The array to compare to the base array
+
+**Examples:**
+
+```
+// arr = [1, 2]
+arr.intersection([2, 3]) //=> [2]
+```
+
+## *`Array`*.**`isEmpty()`**
+
+**Description:** Returns `true` if the array has no elements or is `null`
+
+**Syntax:** *`Array`*.isEmpty()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = []
+arr.isEmpty() //=> true
+```
+
+```
+// arr = ['quick', 'brown', 'fox']
+arr.isEmpty() //=> false
+```
+
+## *`Array`*.**`isNotEmpty()`**
+
+**Description:** Returns `true` if the array has at least one element
+
+**Syntax:** *`Array`*.isNotEmpty()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = ['quick', 'brown', 'fox']
+arr.isNotEmpty() //=> true
+```
+
+```
+// arr = []
+arr.isNotEmpty() //=> false
+```
+
+## *`Array`*.**`join()`**
+
+**Description:** Merges all elements of the array into a single string, with an optional separator between each element.
+
+The opposite of `split()`.
+
+**Syntax:** *`Array`*.join(separator?)
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `separator` (String) - optional - The character(s) to insert between each element
+
+**Examples:**
+
+```
+// arr = ['Wind', 'Water', 'Fire']
+a.join(" + ") //=> 'Wind + Water + Fire'
+```
+
+```
+// arr = ['Wind', 'Water', 'Fire']
+a.join() //=> 'Wind,Water,Fire'
+a.join("") //=> 'WindWaterFire'
+```
+
+## *`Array`*.**`last()`**
+
+**Description:** Returns the last element of the array
+
+**Syntax:** *`Array`*.last()
+
+**Returns:** any
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = ['quick', 'brown', 'fox']
+arr.last() //=> 'fox'
+```
+
+## *`Array`*.**`length`**
+
+**Description:** The number of elements in the array
+
+**Syntax:** *`Array`*.length
+
+**Returns:** Number
+
+**Source:** JavaScript function
+
+**Examples:**
+
+```
+// names = ["Bob", "Bill", "Nat"];
+names.length //=> 3
+```
+
+## *`Array`*.**`map()`**
+
+**Description:** Creates a new array by applying a function to each element of the original array
+
+**Syntax:** *`Array`*.map(function(element, index?, array?), thisValue?)
+
+**Returns:** Array
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `function()` (function) - A function to run for each array element. In the new array, the output of this function takes the place of the element. Consider using [arrow function notation](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions%E2%80%9D) to save space.
+- `element` (any) - The value of the current element
+- `index` (Number) - optional - The position of the current element in the array (starting at 0)
+- `array` (Array) - optional - The array of the current element. Rarely needed.
+- `thisValue` (any) - optional - A value passed to the function as its `this` value. Rarely needed.
+
+**Examples:**
+
+```
+// Double all numbers (using arrow function notation):
+// nums = [12, 33, 16]
+nums.map(num => num*2) //=> [24, 66, 32]
+```
+
+```
+// Convert elements to uppercase (using arrow function notation):
+// words = ['hello', 'old', 'chap']
+words.map(word => word.toUpperCase()) //=> ['HELLO', 'OLD', 'CHAP']]
+
+// Or using traditional function notation:
+words.map(function(word){return word.toUpperCase()}) //=> ['HELLO', 'OLD', 'CHAP']]
+```
+
+## *`Array`*.**`max()`**
+
+**Description:** Returns the largest number in the array. Throws an error if there are any non-numbers.
+
+**Syntax:** *`Array`*.max()
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = [1, 12, 5]
+arr.max() //=> 12
+```
+
+## *`Array`*.**`min()`**
+
+**Description:** Returns the smallest number in the array. Throws an error if there are any non-numbers.
+
+**Syntax:** *`Array`*.min()
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = [12, 1, 5]
+arr.min() //=> 1
+```
+
+## *`Array`*.**`pluck()`**
+
+**Description:** Returns an array containing the values of the given field(s) in each Object of the array. Ignores any array elements that aren’t Objects or don’t have a key matching the field name(s) provided.
+
+**Syntax:** *`Array`*.pluck(fieldName1?, fieldName2?, …)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `fieldName1` (String) - optional - The first key to retrieve the value of
+- `fieldName2` (String) - optional - The second key to retrieve the value of
+
+**Examples:**
+
+```
+// arr = [{'name':'Nathan','age':42},{'name':'Jan','city':'Berlin'}]
+arr.pluck('name') //=> ["Nathan", "Jan"]
+```
+
+```
+// arr = [{'name':'Nathan','age':42},{'name':'Jan','city':'Berlin'}]
+arr.pluck('age') //=> [42]
+```
+
+## *`Array`*.**`randomItem()`**
+
+**Description:** Returns a randomly-chosen element from the array
+
+**Syntax:** *`Array`*.randomItem()
+
+**Returns:** any
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = ['quick', 'brown', 'fox']
+arr.randomItem() //=> 'brown'
+arr.randomItem() //=> 'quick'
+```
+
+## *`Array`*.**`reduce()`**
+
+**Description:** Reduces an array to a single value by applying a function to each element. The function combines the current element with the result of reducing the previous elements, producing a new result.
+
+**Syntax:** *`Array`*.reduce(function(prevResult, currentElem, currentIndex?, array?), initResult)
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `function()` (function) - A function to run for each array element. Takes the accumulated result and the current element, and returns a new accumulated result. Consider using [arrow function notation](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Functions/Arrow_functions%E2%80%9D) to save space.
+- `prevResult` (any) - The accumulated result from applying the function to previous elements. When processing the first element, it’s set to `initResult` (or the first array element if not specified).
+- `currentElem` (any) - The value in the array currently being processed
+- `currentIndex` (Number) - optional - The position of the current element in the array (starting at 0)
+- `array` (Array) - optional - The array being processed. Rarely needed.
+- `initResult` (any) - optional - The initial value of the prevResult, used when calling the function on the first array element. When not specified it’s set to the first array element, and the first function call is on the second array element instead of the first.
+
+**Examples:**
+
+```
+// Sum numbers (using arrow function notation):
+// nums = [12, 33, 16]
+nums.reduce((result, num) => (result+num), 0) //=> 61
+```
+
+```
+// Join letters and uppercase (using arrow function notation):
+// chars = ['a', 'b', 'c']
+chars.reduce((result, char) => (result+char.toUpperCase()), '') //=> 'ABC'
+
+// Or using traditional function notation:
+chars.reduce(function(result, char){return result+char.toUpperCase()}, '') //=> 'ABC'
+```
+
+## *`Array`*.**`removeDuplicates()`**
+
+**Description:** Removes any re-occurring elements from the array
+
+**Syntax:** *`Array`*.removeDuplicates(keys?)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `keys` (String) - optional - For use on arrays of Objects. A key, or comma-separated list of keys to restrict the check to. If omitted, all keys are checked.
+
+**Examples:**
+
+```
+// arr = ['quick', 'brown', 'quick']
+arr.removeDuplicates() //=> ['quick', 'brown']
+```
+
+## *`Array`*.**`renameKeys()`**
+
+**Description:** Changes all matching keys (field names) of any Objects in the array. Rename more than one key by adding extra arguments, i.e. `from1, to1, from2, to2, ...`.
+
+**Syntax:** *`Array`*.renameKeys(from, to)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `from` (String) - The key to rename
+- `to` (String) - The new key name
+
+**Examples:**
+
+```
+// arr = [{'name':'bob'},{'name':'meg'}]
+arr.renameKeys('name', 'x') //=> [{"x": "bob"},{"x": "meg"}]]
+```
+
+## *`Array`*.**`reverse()`**
+
+**Description:** Reverses the order of the elements in the array
+
+**Syntax:** *`Array`*.reverse()
+
+**Returns:** Array
+
+**Source:** JavaScript function
+
+**Examples:**
+
+```
+// arr = ['dog', 'bites', 'man']
+arr.reverse() //=> ['man', 'bites', 'dog']
+```
+
+## *`Array`*.**`slice()`**
+
+**Description:** Returns a portion of the array, from the `start` index up to (but not including) the `end` index. Indexes start at 0.
+
+**Syntax:** *`Array`*.slice(start, end)
+
+**Returns:** Array
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `start` (Number) - optional - The position to start from. Positions start at 0. Negative numbers count back from the end of the array.
+- `end` (Number) - optional - The position to select up to. The element at the end position is not included. Negative numbers select from the end of the array. If omitted, will extract to the end of the array.
+
+**Examples:**
+
+```
+// arr = [1, 2, 3, 4, 5]
+arr.slice(2, 4) //=> [3, 4]
+```
+
+```
+// arr = [1, 2, 3, 4, 5]
+arr.slice(2) //=> [3, 4, 5]
+```
+
+```
+// arr = [1, 2, 3, 4, 5]
+arr.slice(-2) //=> [4, 5]
+```
+
+## *`Array`*.**`smartJoin()`**
+
+**Description:** Creates a single Object from an array of Objects. Each Object in the array provides one field for the returned Object. Each Object in the array must contain a field with the key name and a field with the value.
+
+**Syntax:** *`Array`*.smartJoin(keyField, nameField)
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `keyField` (String) - The field in each Object containing the key name
+- `nameField` (String) - The field in each Object containing the value
+
+**Examples:**
+
+```
+// arr => [{'field':'age','value':2},{'field':'city','value':'Berlin'}]
+arr.smartJoin('field','value') //=> {"age": 2, "city": "Berlin"}
+```
+
+## *`Array`*.**`sort()`**
+
+**Description:** Reorders the elements of the array. For sorting strings alphabetically, no parameter is required. For sorting numbers or Objects, see examples.
+
+**Syntax:** *`Array`*.sort(compareFunction(a, b)?)
+
+**Returns:** Array
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `compareFunction` (function) - optional - A function to compare two array elements and return a number indicating which one comes first: **Return < 0**: `a` comes before `b` **Return 0**: `a` and `b` are equal (leave order unchanged) **Return > 0**: `b` comes before `a`
+
+If no function is specified, converts all values to strings and compares their character codes. * `a` (any) - The first element to compare in the function * `b` (any) - The second element to compare in the function
+
+**Examples:**
+
+```
+// No need for a param when sorting strings
+// arr = ['d', 'a', 'c', 'b']
+arr.sort() //=> ['a', 'b', 'c', 'd']
+```
+
+```
+// To sort numbers, you must use a function
+// arr = [4, 2, 1, 3]
+arr.sort((a, b) => (a - b)) //=> [1, 2, 3, 4]
+
+// Or using traditional function notation:
+arr.sort(function(a, b){return a - b}) //=> [1, 2, 3, 4]
+```
+
+```
+// Sort in reverse alphabetical order
+// arr = ['d', 'a', 'c', 'b']
+arr.sort((a, b) => b.localeCompare(a)) //=> ['d', 'c', 'b', 'a']
+```
+
+```
+// Sort array of objects by a property
+// arr = [{name:'Zak'}, {name:'Abe'}, {name:'Bob'}]
+arr.sort((a, b) => a.name.localeCompare(b.name)) //=> [{name:'Abe'}, {name:'Bob'}, {name:'Zak'}]
+```
+
+## *`Array`*.**`sum()`**
+
+**Description:** Returns the total of all the numbers in the array. Throws an error if there are any non-numbers.
+
+**Syntax:** *`Array`*.sum()
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = [12, 1, 5]
+arr.sum() //=> 18
+```
+
+## *`Array`*.**`toJsonString()`**
+
+**Description:** Converts the array to a JSON string. The same as JavaScript’s `JSON.stringify()`.
+
+**Syntax:** *`Array`*.toJsonString()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// obj = ['quick', 'brown', 'fox']
+obj.toJsonString() //=> '["quick","brown","fox"]'
+```
+
+## *`Array`*.**`toSpliced()`**
+
+**Description:** Adds and/or removes array elements at a given position.
+
+See also `slice()` and `append()`.
+
+**Syntax:** *`Array`*.toSpliced(start, deleteCount, elem1, ....., elemN)
+
+**Returns:** Array
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `start` (Number) - The index (position) to add or remove elements at. New elements are inserted before the element at this index. A negative index counts back from the end of the array.
+- `deleteCount` (Number) - optional - The number of elements to remove. If omitted, removes all elements from the `start` index onwards.
+- `elem1` (any) - optional - The first new element to be added
+- `elem2` (any) - optional - The second new element to be added
+- `elemN` (any) - optional - The Nth new element to be added
+
+**Examples:**
+
+```
+// Insert element at index 1
+// months = ['Jan', 'Mar']
+months.toSpliced(1, 0, "Feb") // ['Jan', 'Feb', 'Mar']
+```
+
+```
+// Delete 2 elements starting at index 1
+// arr = ["don't", "make", "me", "do", "this"]
+arr.toSpliced(1, 2) // ["don't", "do", "this"]
+```
+
+```
+// Replace 2 elements starting at index 1
+// arr = ["don't", "be", "evil"]
+arr.toSpliced(1, 2, 'eat', 'slugs') // ["don't", "eat", "slugs"]
+```
+
+## *`Array`*.**`toString()`**
+
+**Description:** Converts the array to a string, with values separated by commas. To use a different separator, use `join()` instead.
+
+**Syntax:** *`Array`*.toString()
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Examples:**
+
+```
+// words = ['make', 'my', 'day']
+words.toString() //=> 'make,my,day'
+```
+
+## *`Array`*.**`union()`**
+
+**Description:** Concatenates two arrays and then removes any duplicates
+
+**Syntax:** *`Array`*.union(otherArray)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `otherArray` (Array) - The array to union with the base array
+
+**Examples:**
+
+```
+// arr = [1, 2]
+arr.union([2, 3]) //=> [1, 2, 3]
+```
+
+## *`Array`*.**`unique()`**
+
+**Description:** Removes any duplicate elements from the array
+
+**Syntax:** *`Array`*.unique()
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// arr = ['quick', 'brown', 'quick']
+arr.unique() //=> ['quick', 'brown']
+```
+
+# BinaryFile
+
+## `binaryFile`.**`directory`**
+
+**Description:** The path to the directory that the file is stored in. Useful for distinguishing between files with the same name in different directories. Not set if n8n is configured to store files in its database.
+
+**Syntax:** `binaryFile`.**`directory`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `binaryFile`.**`fileExtension`**
+
+**Description:** The suffix attached to the filename (e.g. `txt`)
+
+**Syntax:** `binaryFile`.**`fileExtension`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `binaryFile`.**`fileName`**
+
+**Description:** The name of the file, including extension
+
+**Syntax:** `binaryFile`.**`fileName`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `binaryFile`.**`fileSize`**
+
+**Description:** A string representing the size of the file
+
+**Syntax:** `binaryFile`.**`fileSize`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `binaryFile`.**`fileType`**
+
+**Description:** A string representing the type of the file, e.g. `image`. Corresponds to the first part of the MIME type.
+
+**Syntax:** `binaryFile`.**`fileType`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `binaryFile`.**`id`**
+
+**Description:** The unique ID of the file. Used to identify the file when it is stored on disk or in a storage service such as S3.
+
+**Syntax:** `binaryFile`.**`id`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `binaryFile`.**`mimeType`**
+
+**Description:** A string representing the format of the file’s contents, e.g. `image/jpeg`
+
+**Syntax:** `binaryFile`.**`mimeType`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+# Boolean
+
+## *`Boolean`*.**`isEmpty()`**
+
+**Description:** Returns `false` for all booleans. Returns `true` for `null`.
+
+**Syntax:** *`Boolean`*.isEmpty()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// bool = true
+bool.isEmpty() // => false
+```
+
+```
+// bool = false
+bool.isEmpty() // => false
+```
+
+```
+// bool = null
+bool.isEmpty() // => true
+```
+
+## *`Boolean`*.**`toNumber()`**
+
+**Description:** Converts `true` to 1 and `false` to 0
+
+**Syntax:** *`Boolean`*.toNumber()
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+true.toNumber() //=> 1
+```
+
+```
+false.toNumber() //=> 0
+```
+
+## *`Boolean`*.**`toString()`**
+
+**Description:** Converts `true` to the string ‘true’ and `false` to the string ‘false’
+
+**Syntax:** *`Boolean`*.toString()
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Examples:**
+
+```
+// bool = true
+bool.toString() //=> 'true'
+```
+
+```
+// bool = false
+bool.toString() //=> 'false'
+```
+
+# CustomData
+
+## `$execution.customData`.**`get()`**
+
+**Description:** Returns the custom execution data stored under the given key. [More info](/workflows/executions/custom-executions-data/)
+
+**Syntax:** `$execution.customData`.get(key)
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `key` (String) - The key (identifier) under which the data is stored
+
+**Examples:**
+
+```
+// Get the user's email (which was previously stored)
+$execution.customData.get("user_email") //=> "me@example.com"
+```
+
+## `$execution.customData`.**`getAll()`**
+
+**Description:** Returns all the key-value pairs of custom data that have been set in the current execution. [More info](/workflows/executions/custom-executions-data/)
+
+**Syntax:** `$execution.customData`.getAll()
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+$execution.customData.getAll() //=> {"user_email": "me@example.com", "id": 1234}
+```
+
+## `$execution.customData`.**`set()`**
+
+**Description:** Stores custom execution data under the key specified. Use this to easily filter executions by this data. [More info](/workflows/executions/custom-executions-data/)
+
+**Syntax:** `$execution.customData`.set(key, value)
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `key` (String) - The key (identifier) under which the data is stored
+- `value` (String) - The data to store
+
+**Examples:**
+
+```
+// Store the user's email, to easily retrieve all execs related to that user later
+$execution.customData.set("user_email", "me@example.com")
+```
+
+## `$execution.customData`.**`setAll()`**
+
+**Description:** Sets multiple key-value pairs of custom data for the execution. Use this to easily filter executions by this data. [More info](/workflows/executions/custom-executions-data/)
+
+**Syntax:** `$execution.customData`.setAll(obj)
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `obj` (Object) - A JavaScript object containing key-value pairs of the data to set
+
+**Examples:**
+
+```
+$execution.customData.setAll({"user_email": "me@example.com", "id": 1234})
+```
+
+# Date
+
+## *`Date`*.**`toDateTime()`**
+
+**Description:** Converts a JavaScript Date to a Luxon DateTime. The DateTime contains the same information, but is easier to manipulate.
+
+**Syntax:** *`Date`*.toDateTime()
+
+**Returns:** DateTime
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// date = new Date("2024-03-30T18:49")
+date.toDateTime().plus(5, 'days') //=> 2024-05-05T18:49
+```
+
+# DateTime
+
+## *`DateTime`*.**`day`**
+
+**Description:** The day of the month (1-31)
+
+**Syntax:** *`DateTime`*.day
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.day //=> 30
+```
+
+## *`DateTime`*.**`diffTo()`**
+
+**Description:** Returns the difference between two DateTimes, in the given unit(s)
+
+**Syntax:** *`DateTime`*.diffTo(otherDateTime, unit)
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `otherDateTime` (String|DateTime) - The moment to subtract the base DateTime from. Can be an ISO date string or a Luxon DateTime.
+- `unit` (String|Array) - optional - The unit, or array of units, to return the result in. Possible values: `years`, `months`, `weeks`, `days`, `hours`, `minutes`, `seconds`, `milliseconds`.
+
+**Examples:**
+
+```
+// dt1 = "2024-03-30T18:49:07.234".toDateTime()
+dt1.diffTo('2025-01-01', 'days') //=> 276.21
+```
+
+```
+// dt1 = "2024-03-30T18:49:07.234".toDateTime()
+// dt2 = "2025-01-01T00:00:00.000".toDateTime()
+dt1.diffTo(dt2, ['months', 'days']) //=> {'months':, 'days':}
+```
+
+```
+Note: should support both day and days, etc.
+```
+
+## *`DateTime`*.**`diffToNow()`**
+
+**Description:** Returns the difference between the current moment and the DateTime, in the given unit(s). For a textual representation, use `toRelative()` instead.
+
+**Syntax:** *`DateTime`*.diffToNow(unit)
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `unit` (String|Array) - optional - The unit, or array of units, to return the result in. Possible values: `years`, `months`, `weeks`, `days`, `hours`, `minutes`, `seconds`, `milliseconds`.
+
+**Examples:**
+
+```
+// dt = "2023-03-30T18:49:07.234".toDateTime()
+dt.diffToNow('days') //=> 371.9
+```
+
+```
+// dt = "2023-03-30T18:49:07.234".toDateTime()
+dt.diffToNow(['months', 'days']) //=> {"months":12, "days":5.9}
+```
+
+```
+Note: should support both day and days, etc.
+```
+
+## *`DateTime`*.**`endOf()`**
+
+**Description:** Rounds the DateTime up to the end of one of its units, e.g. the end of the month
+
+**Syntax:** *`DateTime`*.endOf(unit, opts)
+
+**Returns:** DateTime
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `unit` (String) - The unit to round to the end of. Can be `year`, `quarter`, `month`, `week`, `day`, `hour`, `minute`, `second`, or `millisecond`.
+- `opts` (Object) - optional - Object with options that affect the output. Possible properties: `useLocaleWeeks` (boolean): Whether to use the locale when calculating the start of the week. Defaults to false.
+
+**Examples:**
+
+```
+// dt = "2024-03-20T18:49".toDateTime()
+dt.endOf('month') //=> 2024-03-31T23:59
+```
+
+## *`DateTime`*.**`equals()`**
+
+**Description:** Returns `true` if the two DateTimes represent exactly the same moment and are in the same time zone. For a less strict comparison, use `hasSame()`.
+
+**Syntax:** *`DateTime`*.equals(other)
+
+**Returns:** Boolean
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `other` (DateTime) - The other DateTime to compare
+
+**Examples:**
+
+```
+// dt1 = "2024-03-20T18:49+01:00".toDateTime()
+// dt2 = "2024-03-20T19:49+02:00".toDateTime()
+dt1.equals(dt2) //=> false
+```
+
+## *`DateTime`*.**`extract()`**
+
+**Description:** Extracts a part of the date or time, e.g. the month, as a number. To extract textual names instead, see `format()`.
+
+**Syntax:** *`DateTime`*.extract(unit?)
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `unit` (String) - optional - The part of the date or time to return. One of: `year`, `month`, `week`, `day`, `hour`, `minute`, `second`
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.extract('month') //=> 3
+```
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.extract('hour') //=> 18
+```
+
+## *`DateTime`*.**`format()`**
+
+**Description:** Converts the DateTime to a string, using the format specified. [Formatting guide](https://moment.github.io/luxon/#/formatting?id=table-of-tokens). For common formats, `toLocaleString()` may be easier.
+
+**Syntax:** *`DateTime`*.format(fmt)
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `fmt` (String) - The [format](https://moment.github.io/luxon/#/formatting?id=table-of-tokens) of the string to return
+
+**Examples:**
+
+```
+// dt = "2024-04-30T18:49".toDateTime()
+dt.format('dd/LL/yyyy') //=> '30/04/2024'
+```
+
+```
+// dt = "2024-04-30T18:49".toDateTime()
+dt.format('dd LLL yy') //=> '30 Apr 24'
+dt.setLocale('fr').format('dd LLL yyyy') //=> '30 avr. 2024'
+dt.format("HH 'hours and' mm 'minutes'") //=> '18 hours and 49 minutes'
+```
+
+## *`DateTime`*.**`hasSame()`**
+
+**Description:** Returns `true` if the two DateTimes are the same, down to the unit specified. Time zones are ignored (only local times are compared), so use `toUTC()` first if needed.
+
+**Syntax:** *`DateTime`*.hasSame(otherDateTime, unit)
+
+**Returns:** Boolean
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `otherDateTime` (DateTime) - The other DateTime to compare
+- `unit` (String) - The unit of time to check sameness down to. One of `year`, `quarter`, `month`, `week`, `day`, `hour`, `minute`, `second`, or `millisecond`.
+
+**Examples:**
+
+```
+// dt1 = "2024-03-20".toDateTime()
+// dt2 = "2024-03-18".toDateTime()
+dt1.hasSame(dt2, 'month') //=> true
+```
+
+```
+// dt1 = "1982-03-20".toDateTime()
+// dt2 = "2024-03-18".toDateTime()
+dt1.hasSame(dt2, 'month') //=> false
+```
+
+## *`DateTime`*.**`hour`**
+
+**Description:** The hour of the day (0-23)
+
+**Syntax:** *`DateTime`*.hour
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.hour //=> 18
+```
+
+## *`DateTime`*.**`isBetween()`**
+
+**Description:** Returns `true` if the DateTime lies between the two moments specified
+
+**Syntax:** *`DateTime`*.isBetween(date1, date2)
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `date1` (String|DateTime) - The moment that the base DateTime must be after. Can be an ISO date string or a Luxon DateTime.
+- `date2` (String|DateTime) - The moment that the base DateTime must be before. Can be an ISO date string or a Luxon DateTime.
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.isBetween('2020-06-01', '2025-06-01') //=> true
+```
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.isBetween('2020', $now) //=> true
+```
+
+## *`DateTime`*.**`isInDST`**
+
+**Description:** Whether the DateTime is in daylight saving time
+
+**Syntax:** *`DateTime`*.isInDST
+
+**Returns:** Boolean
+
+**Type:** Luxon
+
+## *`DateTime`*.**`locale`**
+
+**Description:** The locale of a DateTime, such 'en-GB'. The locale is used when formatting the DateTime.
+
+**Syntax:** *`DateTime`*.locale
+
+**Returns:** String
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+$now.locale //=> 'en-US'
+```
+
+## *`DateTime`*.**`millisecond`**
+
+**Description:** The millisecond of the second (0-999)
+
+**Syntax:** *`DateTime`*.millisecond
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49:07.234".toDateTime()
+dt.millisecond //=> 234
+```
+
+## *`DateTime`*.**`minus()`**
+
+**Description:** Subtracts a given period of time from the DateTime
+
+**Syntax:** *`DateTime`*.minus(n, unit?)
+
+**Returns:** DateTime
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `n` (Number|Object) - The number of units to subtract. Or use a Luxon [Duration](%E2%80%9Dhttps://moment.github.io/luxon/api-docs/index.html#duration%E2%80%9D) object to subtract multiple units at once.
+- `unit` (String) - optional - The units of the number. One of: `years`, `months`, `weeks`, `days`, `hours`, `minutes`, `seconds`, `milliseconds`
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.minus(7, 'days') //=> 2024-04-23T18:49
+```
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.minus(4, 'years') //=> 2020-04-30T18:49
+```
+
+## *`DateTime`*.**`minute`**
+
+**Description:** The minute of the hour (0-59)
+
+**Syntax:** *`DateTime`*.minute
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.minute //=> 49
+```
+
+## *`DateTime`*.**`month`**
+
+**Description:** The month (1-12)
+
+**Syntax:** *`DateTime`*.month
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.month //=> 3
+```
+
+## *`DateTime`*.**`monthLong`**
+
+**Description:** The textual long month name, e.g. 'October'. Defaults to the system's locale if no locale has been specified.
+
+**Syntax:** *`DateTime`*.monthLong
+
+**Returns:** String
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.monthLong //=> 'March'
+```
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.setLocale('de-DE').monthLong //=> 'März'
+```
+
+## *`DateTime`*.**`monthShort`**
+
+**Description:** The textual abbreviated month name, e.g. 'Oct'. Defaults to the system's locale if no locale has been specified.
+
+**Syntax:** *`DateTime`*.monthShort
+
+**Returns:** String
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.monthShort //=> 'Mar'
+```
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.setLocale('de-DE').monthShort //=> 'Mär'
+```
+
+## *`DateTime`*.**`plus()`**
+
+**Description:** Adds a given period of time to the DateTime
+
+**Syntax:** *`DateTime`*.plus(n, unit?)
+
+**Returns:** DateTime
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `n` (Number|Object) - The number of units to add. Or use a Luxon [Duration](%E2%80%9Dhttps://moment.github.io/luxon/api-docs/index.html#duration%E2%80%9D) object to add multiple units at once.
+- `unit` (String) - optional - The units of the number. One of: `years`, `months`, `weeks`, `days`, `hours`, `minutes`, `seconds`, `milliseconds`
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.plus(7, 'days') //=> 2024-05-07T18:49
+```
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.plus(4, 'years') //=> 2028-04-30T18:49
+```
+
+## *`DateTime`*.**`quarter`**
+
+**Description:** The quarter of the year (1-4)
+
+**Syntax:** *`DateTime`*.quarter
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.quarter //=> 1
+```
+
+## *`DateTime`*.**`second`**
+
+**Description:** The second of the minute (0-59)
+
+**Syntax:** *`DateTime`*.second
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49:07.234".toDateTime()
+dt.second //=> 7
+```
+
+## *`DateTime`*.**`set()`**
+
+**Description:** Assigns new values to specified units of the DateTime. To round a DateTime, see also `startOf()` and `endOf()`.
+
+**Syntax:** *`DateTime`*.set(values)
+
+**Returns:** DateTime
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `values` (Object) - An object containing the units to set and corresponding values to assign. Possible keys are `year`, `month`, `day`, `hour`, `minute`, `second` and `millsecond`.
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.set({year:1982, month:10}) //=> 1982-10-20T18:49
+```
+
+## *`DateTime`*.**`setLocale()`**
+
+**Description:** Sets the locale, which determines the language and formatting for the DateTime. Useful when generating a textual representation of the DateTime, e.g. with `format()` or `toLocaleString()`.
+
+**Syntax:** *`DateTime`*.setLocale(locale)
+
+**Returns:** DateTime
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `locale` (String) - The locale to assign, e.g. ‘en-GB’ for British English or ‘pt-BR’ for Brazilian Portuguese. [List](%E2%80%9Dhttps://www.localeplanet.com/icu/%E2%80%9D) (unofficial)
+
+**Examples:**
+
+```
+$now.setLocale('de-DE').toLocaleString({'dateStyle':'long'}) //=> 5. Oktober 2024
+```
+
+```
+$now.setLocale('fr-FR').toLocaleString({'dateStyle':'long'}) //=> 5 octobre 2024
+```
+
+## *`DateTime`*.**`setZone()`**
+
+**Description:** Converts the DateTime to the given time zone. The DateTime still represents the same moment unless specified in the options. See also `toLocal()` and `toUTC()`.
+
+**Syntax:** *`DateTime`*.setZone(zone, opts)
+
+**Returns:** DateTime
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `zone` (String) - optional - A zone identifier, either in the format ‘America/New_York’, 'UTC+3', or the strings 'local' or 'utc'
+- `opts` (Object) - optional - Options that affect the output. Possible properties: `keepCalendarTime` (boolean): Whether to keep the time the same and only change the offset. Defaults to false.
+
+**Examples:**
+
+```
+// dt = "2024-01-01T00:00:00.000+02:00".toDateTime()
+dt.setZone('America/Buenos_aires') //=> 2023-12-31T19:00:00.000-03:00
+```
+
+```
+// dt = "2024-01-01T00:00:00.000+02:00".toDateTime()
+dt.setZone('UTC+7') //=> 2024-01-01T05:00:00.000+07:00
+```
+
+## *`DateTime`*.**`startOf()`**
+
+**Description:** Rounds the DateTime down to the beginning of one of its units, e.g. the start of the month
+
+**Syntax:** *`DateTime`*.startOf(unit, opts)
+
+**Returns:** DateTime
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `unit` (String) - The unit to round to the beginning of. One of `year`, `quarter`, `month`, `week`, `day`, `hour`, `minute`, `second`, or `millisecond`.
+- `opts` (Object) - optional - Object with options that affect the output. Possible properties: `useLocaleWeeks` (boolean): Whether to use the locale when calculating the start of the week. Defaults to false.
+
+**Examples:**
+
+```
+// dt = "2024-03-20T18:49".toDateTime()
+dt.startOf('month') //=> 2024-03-01T00:00
+```
+
+## *`DateTime`*.**`toISO()`**
+
+**Description:** Returns an ISO 8601-compliant string representation of the DateTime
+
+**Syntax:** *`DateTime`*.toISO(opts)
+
+**Returns:** String
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `opts` (Object) - optional - Configuration options. See [Luxon docs](%E2%80%9Dhttps://moment.github.io/luxon/api-docs/index.html#datetimetoiso%E2%80%9D) for more info.
+
+**Examples:**
+
+```
+$now.toISO() //=> 2024-04-05T18:44:55.525+02:00
+```
+
+## *`DateTime`*.**`toLocal()`**
+
+**Description:** Converts a DateTime to the workflow’s local time zone. The DateTime still represents the same moment unless specified in the parameters. The workflow’s time zone can be set in the workflow settings.
+
+**Syntax:** *`DateTime`*.toLocal()
+
+**Returns:** DateTime
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-01-01T00:00:00.000Z".toDateTime()
+dt.toLocal() //=> 2024-01-01T01:00:00.000+01:00, if time zone is Europe/Berlin
+```
+
+## *`DateTime`*.**`toLocaleString()`**
+
+**Description:** Returns a localised string representing the DateTime, i.e. in the language and format corresponding to its locale. Defaults to the system's locale if none specified.
+
+**Syntax:** *`DateTime`*.toLocaleString(formatOpts)
+
+**Returns:** String
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `formatOpts` (Object) - optional - Configuration options for the rendering. See [Intl.DateTimeFormat](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/DateTimeFormat/DateTimeFormat#parameters%E2%80%9D) for a full list. Defaults to rendering a short date.
+
+**Examples:**
+
+```
+$now.toLocaleString() //=> '4/30/2024'
+$now.toLocaleString({'dateStyle':'medium', 'timeStyle':'short'}) //=> 'Apr 30, 2024, 10:00 PM'
+// (if in US English locale)
+```
+
+```
+$now.setLocale('de-DE').toLocaleString() //=> '30.4.2024'
+```
+
+```
+$now.toLocaleString({'dateStyle':'short'}) //=> '4/30/2024'
+$now.toLocaleString({'dateStyle':'medium'}) //=> 'Apr 30, 2024'
+$now.toLocaleString({'dateStyle':'long'}) //=> 'April 30, 2024'
+$now.toLocaleString({'dateStyle':'full'}) //=> 'Tuesday, April 30, 2024'
+// (if in US English locale)
+```
+
+```
+$now.toLocaleString({'year':'numeric', 'month':'numeric', 'day':'numeric'}) //=> '4/30/2024'
+$now.toLocaleString({'year':'2-digit', 'month':'2-digit', 'day':'2-digit'}) //=> '04/30/24'
+$now.toLocaleString({'month':'short', 'weekday':'short', 'day':'numeric'}) //=> 'Tue, Apr 30'
+$now.toLocaleString({'month':'long', 'weekday':'long', 'day':'numeric'}) //=> 'Tuesday, April 30'
+// (if in US English locale)
+```
+
+```
+$now.toLocaleString({'timeStyle':'short'}) //=> '10:00 PM'
+$now.toLocaleString({'timeStyle':'medium'}) //=> '10:00:58 PM'
+$now.toLocaleString({'timeStyle':'long'}) //=> '10:00:58 PM GMT+2'
+$now.toLocaleString({'timeStyle':'full'}) //=> '10:00:58 PM Central European Summer Time'
+// (if in US English locale)
+```
+
+```
+$now.toLocaleString({'hour':'numeric', 'minute':'numeric', hourCycle:'h24'}) //=> '22:00'
+$now.toLocaleString({'hour':'2-digit', 'minute':'2-digit', hourCycle:'h12'}) //=> '10:00 PM'
+// (if in US English locale)
+```
+
+## *`DateTime`*.**`toMillis()`**
+
+**Description:** Returns a Unix timestamp in milliseconds (the number elapsed since 1st Jan 1970)
+
+**Syntax:** *`DateTime`*.toMillis()
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+$now.toMillis() //=> 1712334324677
+```
+
+## *`DateTime`*.**`toRelative()`**
+
+**Description:** Returns a textual representation of the time relative to now, e.g. ‘in two days’. Rounds down by default.
+
+**Syntax:** *`DateTime`*.toRelative(options)
+
+**Returns:** String
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `options` (Object) - optional - Options that affect the output. Possible properties: `unit` = the unit to default to (`years`, `months`, `days`, etc.). `locale` = the language and formatting to use (e.g. `de`, `fr`)
+
+**Examples:**
+
+```
+$now.plus(1, 'day').toRelative() //=> "in 1 day"
+```
+
+```
+$now.plus(1, 'day').toRelative({unit:'hours'}) //=> "in 24 hours"
+```
+
+```
+$now.plus(1, 'day').toRelative({locale:'es'}) //=> "dentro de 1 día"
+```
+
+## *`DateTime`*.**`toSeconds()`**
+
+**Description:** Returns a Unix timestamp in seconds (the number elapsed since 1st Jan 1970)
+
+**Syntax:** *`DateTime`*.toSeconds()
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+$now.toSeconds() //=> 1712334442.372
+```
+
+## *`DateTime`*.**`toString()`**
+
+**Description:** Returns a string representation of the DateTime. Similar to `toISO()`. For more formatting options, see `format()` or `toLocaleString()`.
+
+**Syntax:** *`DateTime`*.toString()
+
+**Returns:** string
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+$now.toString() //=> 2024-04-05T18:44:55.525+02:00
+```
+
+## *`DateTime`*.**`toUTC()`**
+
+**Description:** Converts a DateTime to the UTC time zone. The DateTime still represents the same moment unless specified in the parameters. Use `setZone()` to convert to other zones.
+
+**Syntax:** *`DateTime`*.toUTC(offset, opts)
+
+**Returns:** DateTime
+
+**Type:** Luxon
+
+**Parameters:**
+
+- `offset` (Number) - optional - An offset from UTC in minutes
+- `opts` (Object) - optional - Object with options that affect the output. Possible properties: `keepCalendarTime` (boolean): Whether to keep the time the same and only change the offset. Defaults to false.
+
+**Examples:**
+
+```
+// dt = "2024-01-01T00:00:00.000+02:00".toDateTime()
+dt.toUTC() //=> 2023-12-31T22:00:00.000Z
+```
+
+## *`DateTime`*.**`weekday`**
+
+**Description:** The day of the week. 1 is Monday and 7 is Sunday.
+
+**Syntax:** *`DateTime`*.weekday
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.weekday //=> 6
+```
+
+## *`DateTime`*.**`weekdayLong`**
+
+**Description:** The textual long weekday name, e.g. 'Wednesday'. Defaults to the system's locale if no locale has been specified.
+
+**Syntax:** *`DateTime`*.weekdayLong
+
+**Returns:** String
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.weekdayLong //=> 'Saturday'
+```
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.setLocale('de-DE').weekdayLong //=> 'Samstag'
+```
+
+## *`DateTime`*.**`weekdayShort`**
+
+**Description:** The textual abbreviated weekday name, e.g. 'Wed'. Defaults to the system's locale if no locale has been specified.
+
+**Syntax:** *`DateTime`*.weekdayShort
+
+**Returns:** String
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.weekdayShort //=> 'Sat'
+```
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.setLocale('fr-FR').weekdayShort //=> 'sam.'
+```
+
+## *`DateTime`*.**`weekNumber`**
+
+**Description:** The week number of the year (1-52ish)
+
+**Syntax:** *`DateTime`*.weekNumber
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.weekNumber //=> 13
+```
+
+## *`DateTime`*.**`year`**
+
+**Description:** The year
+
+**Syntax:** *`DateTime`*.year
+
+**Returns:** Number
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+// dt = "2024-03-30T18:49".toDateTime()
+dt.year //=> 2024
+```
+
+## *`DateTime`*.**`zone`**
+
+**Description:** The time zone associated with the DateTime
+
+**Syntax:** *`DateTime`*.zone
+
+**Returns:** Object
+
+**Type:** Luxon
+
+**Examples:**
+
+```
+$now.zone //=> {"zoneName": "Europe/Berlin", "valid": true}
+```
+
+# ExecData
+
+## `$exec`.**`customData`**
+
+**Description:** Set and get custom execution data (e.g. to filter executions by). You can also do this with the ‘Execution Data’ node. [More info](/workflows/executions/custom-executions-data/)
+
+**Syntax:** `$exec`.`$exec`.**`customData`**
+
+**Returns:** CustomData
+
+**Source:** Custom n8n functionality
+
+## `$exec`.**`id`**
+
+**Description:** The ID of the current workflow execution
+
+**Syntax:** `$exec`.`$exec`.**`id`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `$exec`.**`mode`**
+
+**Description:** Can be one of 3 values: either `test` (meaning the execution was triggered by clicking a button in n8n) or `production` (meaning the execution was triggered automatically). When running workflow tests, `evaluation` is used.
+
+**Syntax:** `$exec`.`$exec`.**`mode`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `$exec`.**`resumeFormUrl`**
+
+**Description:** The URL to access a form generated by the [’Wait’ node](/integrations/builtin/core-nodes/n8n-nodes-base.wait/).
+
+**Syntax:** `$exec`.`$exec`.**`resumeFormUrl`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `$exec`.**`resumeUrl`**
+
+**Description:** The webhook URL to call to resume a workflow waiting at a [’Wait’ node](/integrations/builtin/core-nodes/n8n-nodes-base.wait/).
+
+**Syntax:** `$exec`.`$exec`.**`resumeUrl`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+# HTTPResponse
+
+## `$response`.**`body`**
+
+**Description:** The body of the response object from the last HTTP call. Only available in the ‘HTTP Request’ node
+
+**Syntax:** `$response`.`$response`.**`body`**
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+## `$response`.**`headers`**
+
+**Description:** The headers returned by the last HTTP call. Only available in the ‘HTTP Request’ node.
+
+**Syntax:** `$response`.`$response`.**`headers`**
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+## `$response`.**`statusCode`**
+
+**Description:** The HTTP status code returned by the last HTTP call. Only available in the ‘HTTP Request’ node.
+
+**Syntax:** `$response`.`$response`.**`statusCode`**
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+## `$response`.**`statusMessage`**
+
+**Description:** An optional message regarding the request status. Only available in the ‘HTTP Request’ node.
+
+**Syntax:** `$response`.`$response`.**`statusMessage`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+# Item
+
+## `$item`.**`binary`**
+
+**Description:** Returns any binary data the item contains
+
+**Syntax:** `$item`.`$item`.**`binary`**
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+## `$item`.**`json`**
+
+**Description:** Returns the JSON data the item contains. [More info](/data/data-structure/)
+
+**Syntax:** `$item`.`$item`.**`json`**
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+# NodeInputData
+
+## `$input`.**`all()`**
+
+**Description:** Returns an array of the current node’s input items
+
+**Syntax:** `$input`.all(branchIndex?, runIndex?)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `branchIndex` (Number) - optional - The output branch index of the node to use. Defaults to the first branch (index 0)
+- `runIndex` (Number) - optional - The run of the node to use. Defaults to the first run (index 0)
+
+## `$input`.**`first()`**
+
+**Description:** Returns the current node’s first input item
+
+**Syntax:** `$input`.first(branchIndex?, runIndex?)
+
+**Returns:** Item
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `branchIndex` (Number) - optional - The output branch index of the node to use. Defaults to the first branch (index 0)
+- `runIndex` (Number) - optional - The run of the node to use. Defaults to the first run (index 0)
+
+## `$input`.**`item`**
+
+**Description:** Returns the input item currently being processed
+
+**Syntax:** `$input`.`$input`.**`item`**
+
+**Returns:** Item
+
+**Source:** Custom n8n functionality
+
+## `$input`.**`last()`**
+
+**Description:** Returns the current node’s last input item
+
+**Syntax:** `$input`.last(branchIndex?, runIndex?)
+
+**Returns:** Item
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `branchIndex` (Number) - optional - The output branch index of the node to use. Defaults to the first branch (index 0)
+- `runIndex` (Number) - optional - The run of the node to use. Defaults to the first run (index 0)
+
+## `$input`.**`params`**
+
+**Description:** The configuration settings of the current node. These are the parameters you fill out within the node when configuring it (e.g. its operation).
+
+**Syntax:** `$input`.`$input`.**`params`**
+
+**Returns:** NodeParams
+
+**Source:** Custom n8n functionality
+
+# NodeOutputData
+
+## `$()`.**`all()`**
+
+**Description:** Returns an array of the node’s output items
+
+**Syntax:** `$()`.all(branchIndex?, runIndex?)
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `branchIndex` (Number) - optional - The output branch of the node to use. Defaults to the first branch (index 0)
+- `runIndex` (Number) - optional - The run of the node to use. Defaults to the first run (index 0)
+
+## `$()`.**`first()`**
+
+**Description:** Returns the first item output by the node
+
+**Syntax:** `$()`.first(branchIndex?, runIndex?)
+
+**Returns:** Item
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `branchIndex` (Number) - optional - The output branch of the node to use. Defaults to the first branch (index 0)
+- `runIndex` (Number) - optional - The run of the node to use. Defaults to the first run (index 0)
+
+## `$()`.**`isExecuted`**
+
+**Description:** Is `true` if the node has executed, `false` otherwise
+
+**Syntax:** `$()`.`$()`.**`isExecuted`**
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+## `$()`.**`item`**
+
+**Description:** Returns the matching item, i.e. the one used to produce the current item in the current node. [More info](/data/data-mapping/data-item-linking/)
+
+**Syntax:** `$()`.`$()`.**`item`**
+
+**Returns:** Item
+
+**Source:** Custom n8n functionality
+
+## `$()`.**`itemMatching()`**
+
+**Description:** Returns the matching item, i.e. the one used to produce the item in the current node at the specified index. [More info](/data/data-mapping/data-item-linking/)
+
+**Syntax:** `$()`.itemMatching(currentItemIndex?)
+
+**Returns:** Item
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `currentItemIndex` (Number) - The index of the item in the current node to be matched with.
+
+## `$()`.**`last()`**
+
+**Description:** Returns the last item output by the node
+
+**Syntax:** `$()`.last(branchIndex?, runIndex?)
+
+**Returns:** Item
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `branchIndex` (Number) - optional - The output branch of the node to use. Defaults to the first branch (index 0)
+- `runIndex` (Number) - optional - The run of the node to use. Defaults to the first run (index 0)
+
+## `$()`.**`params`**
+
+**Description:** The configuration settings of the given node. These are the parameters you fill out within the node’s UI (e.g. its operation).
+
+**Syntax:** `$()`.`$()`.**`params`**
+
+**Returns:** NodeParams
+
+**Source:** Custom n8n functionality
+
+# Number
+
+## *`Number`*.**`abs()`**
+
+**Description:** Returns the number’s absolute value, i.e. removes any minus sign
+
+**Syntax:** *`Number`*.abs()
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// x = -1.7
+x.abs() //=> 1.7
+```
+
+## *`Number`*.**`ceil()`**
+
+**Description:** Rounds the number up to the next whole number
+
+**Syntax:** *`Number`*.ceil()
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// x = 1.234
+x.ceil() //=> 2
+```
+
+## *`Number`*.**`floor()`**
+
+**Description:** Rounds the number down to the nearest whole number
+
+**Syntax:** *`Number`*.floor()
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// x = 1.234
+x.floor() //=> 1
+```
+
+## *`Number`*.**`format()`**
+
+**Description:** Returns a formatted string representing the number. Useful for formatting for a specific language or currency. The same as [`Intl.NumberFormat()`](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat%E2%80%9D).
+
+**Syntax:** *`Number`*.format(locale?, options?)
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `locale` (String) - optional - A [locale tag](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl#locales_argument%E2%80%9D) for formatting the number, e.g. `fr-FR`, `en-GB`, `pr-BR`
+- `options` (Object) - optional - Configuration options for number formatting. [More info](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat)
+
+**Examples:**
+
+```
+// number = 123456.789;
+number.format('de-DE') //=> 123.456,789
+```
+
+```
+// number = 123456.789;
+number.format('de-DE', {'style': 'currency', 'currency': 'EUR'}) //=> 123.456,79 €
+```
+
+## *`Number`*.**`isEmpty()`**
+
+**Description:** Returns `false` for all numbers. Returns `true` for `null`.
+
+**Syntax:** *`Number`*.isEmpty()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// num = 10
+num.isEmpty() // => false
+```
+
+```
+// num = 0
+num.isEmpty() // => false
+```
+
+```
+// num = null
+num.isEmpty() // => true
+```
+
+## *`Number`*.**`isEven()`**
+
+**Description:** Returns `true` if the number is even. Throws an error if the number isn’t a whole number.
+
+**Syntax:** *`Number`*.isEven()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// number = 33
+number.isEven() //=> false
+```
+
+## *`Number`*.**`isInteger()`**
+
+**Description:** Returns `true` if the number is a whole number
+
+**Syntax:** *`Number`*.isInteger()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// number = 4
+number.isInteger() //=> true
+```
+
+```
+// number = 4.12
+number.isInteger() //=> false
+```
+
+## *`Number`*.**`isOdd()`**
+
+**Description:** Returns `true` if the number is odd. Throws an error if the number isn’t a whole number.
+
+**Syntax:** *`Number`*.isOdd()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// number = 33
+number.isOdd() //=> true
+```
+
+## *`Number`*.**`round()`**
+
+**Description:** Returns the number rounded to the nearest whole number (or specified number of decimal places)
+
+**Syntax:** *`Number`*.round(decimalPlaces?)
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `decimalPlaces` (Number) - optional - The number of decimal places to round to
+
+**Examples:**
+
+```
+// number = 1.256
+number.round() //=> 1
+```
+
+```
+// number = 1.256
+number.round(1) //=> 1.3
+number.round(2) //=> 1.26
+```
+
+## *`Number`*.**`toBoolean()`**
+
+**Description:** Converts the number to a boolean value. `0` becomes `false`; everything else becomes `true`.
+
+**Syntax:** *`Number`*.toBoolean()
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// number = 12
+number.toBoolean() //=> true
+```
+
+```
+// number = 0
+number.toBoolean() //=> false
+```
+
+## *`Number`*.**`toDateTime()`**
+
+**Description:** Converts a numerical timestamp into a DateTime. The format of the timestamp must be specified if it’s not in milliseconds. Uses the time zone in n8n (or in the workflow’s settings).
+
+**Syntax:** *`Number`*.toDateTime(format?)
+
+**Returns:** DateTime
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `format` (String) - optional - The type of timestamp to convert. Options are `ms` (for Unix timestamp in milliseconds), `s` (for Unix timestamp in seconds) or `excel` (for days since 1900).
+
+**Examples:**
+
+```
+// ts = 1708695471
+ts.toDateTime('s') //=> 2024-02-23T14:37:51+01:00
+```
+
+```
+// ts = 1708695471000
+ts.toDateTime('ms') //=> 2024-02-23T14:37:51+01:00
+```
+
+```
+// ts = 45345
+ts.toDateTime('excel') //=> 2024-02-23T01:00:00+01:00
+```
+
+## *`Number`*.**`toLocaleString()`**
+
+**Description:** Returns a localised string representing the number, i.e. in the language and format corresponding to its locale. Defaults to the system's locale if none specified.
+
+**Syntax:** *`Number`*.toLocaleString(locales?, options?)
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `locales` (String|Array) - optional - The locale to assign, e.g. ‘en-GB’ for British English or ‘pt-BR’ for Brazilian Portuguese. See [full list](%E2%80%9Dhttps://www.localeplanet.com/icu/%E2%80%9D) (unofficial). Also accepts an array of locales. Defaults to the system locale if not specified.
+- `options` (Object) - optional - An object with [formatting options](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/NumberFormat/NumberFormat#parameters%E2%80%9D)
+
+**Examples:**
+
+```
+// num = 500000.125
+num.toLocaleString() //=> '500,000.125' (if in US English locale)
+```
+
+```
+// num = 500000.125
+num.toLocaleString('fr-FR') //=> '500 000,125'
+```
+
+```
+// num = 500000.125
+num.toLocaleString('fr-FR', {style:'currency', currency:'EUR'}) //=> '500 000,13 €'
+```
+
+## *`Number`*.**`toString()`**
+
+**Description:** Converts the number to a simple textual representation. For more formatting options, see `toLocaleString()`.
+
+**Syntax:** *`Number`*.toString(radix?)
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `radix` (Number) - optional - The base to use. Must be an integer between 2 and 36. E.g. base `2` is binary and base `16` is hexadecimal.
+
+**Examples:**
+
+```
+// num = 500000.125
+num.toString() //=> '500000.125'
+```
+
+```
+// num = 500000.125
+num.toString(16) //=> '7a120.2'
+```
+
+# Object
+
+## *`Object`*.**`compact()`**
+
+**Description:** Removes all fields that have empty values, i.e. are `null` or `""`
+
+**Syntax:** *`Object`*.compact()
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// obj = {'x':null, 'y':2, 'z':''}
+obj.compact() //=> {'y':2}
+```
+
+## *`Object`*.**`hasField()`**
+
+**Description:** Returns `true` if there is a field called `name`. Only checks top-level keys. Comparison is case-sensitive.
+
+**Syntax:** *`Object`*.hasField(name)
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `name` (String) - The name of the key to search for
+
+**Examples:**
+
+```
+// obj = {'name':'Nathan', 'age':42}
+obj.hasField('name') //=> true
+```
+
+```
+// obj = {'name':'Nathan', 'age':42}
+obj.hasField('Name') //=> false
+obj.hasField('inventedField') //=> false
+```
+
+## *`Object`*.**`isEmpty()`**
+
+**Description:** Returns `true` if the Object has no keys (fields) set or is `null`
+
+**Syntax:** *`Object`*.isEmpty()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// obj = {'name': 'Nathan'}
+obj.isEmpty() //=> false
+```
+
+```
+// obj = {}
+obj.isEmpty() //=> true
+```
+
+## *`Object`*.**`isNotEmpty()`**
+
+**Description:** Returns `true` if the Object has at least one key (field) set
+
+**Syntax:** *`Object`*.isNotEmpty()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// obj = {'name': 'Nathan'}
+obj.isNotEmpty() //=> true
+```
+
+```
+// obj = {}
+obj.isNotEmpty() //=> false
+```
+
+## *`Object`*.**`keepFieldsContaining()`**
+
+**Description:** Removes any fields whose values don’t at least partly match the given `value`. Comparison is case-sensitive. Fields that aren’t strings will always be removed.
+
+**Syntax:** *`Object`*.keepFieldsContaining(value)
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `value` (String) - The text that a value must contain in order to be kept
+
+**Examples:**
+
+```
+// obj = {'name': 'Mr Nathan', 'city':'hanoi', age: 42 }
+obj.keepFieldsContaining('Nathan') //=> {'name': 'Mr Nathan'}
+```
+
+```
+// obj = {'name': 'Mr Nathan', 'city':'hanoi', age: 42 }
+obj.keepFieldsContaining('nathan') //=> {}
+obj.keepFieldsContaining('han') //=> {'name': 'Mr Nathan', 'city':'hanoi'}
+```
+
+## *`Object`*.**`keys()`**
+
+**Description:** Returns an array with all the field names (keys) the object contains. The same as JavaScript’s `Object.keys(obj)`.
+
+**Syntax:** *`Object`*.keys()
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// obj = {'name': 'Mr Nathan', age: 42 }
+obj.keys() //=> ['name', 'age']
+```
+
+## *`Object`*.**`merge()`**
+
+**Description:** Merges the two Objects into a single one. If a key (field name) exists in both Objects, the value from the first (base) Object is used.
+
+**Syntax:** *`Object`*.merge(otherObject)
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `otherObject` (Object) - The Object to merge with the base Object.
+
+**Examples:**
+
+```
+// obj1 = {'name':'Nathan', 'age': 42}
+// obj2 = {'name':'Jan', 'city': 'hanoi'}
+obj1.merge(obj2) //=> {'name':'Jan', 'city': 'hanoi', 'age':42}
+```
+
+## *`Object`*.**`removeField()`**
+
+**Description:** Removes a field from the Object. The same as JavaScript’s `delete`.
+
+**Syntax:** *`Object`*.removeField(key)
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `key` (String) - The name of the field to remove
+
+**Examples:**
+
+```
+// obj = {'name':'Nathan', 'city':'hanoi'}
+obj.removeField('name') //=> {'city':'hanoi'}
+```
+
+## *`Object`*.**`removeFieldsContaining()`**
+
+**Description:** Removes keys (fields) whose values at least partly match the given `value`. Comparison is case-sensitive. Fields that aren’t strings are always kept.
+
+**Syntax:** *`Object`*.removeFieldsContaining(value)
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `value` (String) - The text that a value must contain in order to be removed
+
+**Examples:**
+
+```
+// obj = {'name': 'Mr Nathan', 'city':'hanoi', age: 42}
+obj.removeFieldsContaining('Nathan') //=> {'city':'hanoi', age: 42}
+```
+
+```
+// obj = {'name': 'Mr Nathan', 'city':'hanoi', age: 42}
+obj.removeFieldsContaining('han') //=> {age: 42}
+obj.removeFieldsContaining('nathan') //=> {'name': 'Mr Nathan', 'city':'hanoi', age: 42}
+```
+
+## *`Object`*.**`toJsonString()`**
+
+**Description:** Converts the Object to a JSON string. Similar to JavaScript’s `JSON.stringify()`.
+
+**Syntax:** *`Object`*.toJsonString()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// obj = {'name':'Nathan', age:42}
+obj.toJsonString() //=> '{"name":"Nathan","age":42}'
+```
+
+## *`Object`*.**`urlEncode()`**
+
+**Description:** Generates a URL parameter string from the Object’s keys and values. Only top-level keys are supported.
+
+**Syntax:** *`Object`*.urlEncode()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// obj = {'name':'Mr Nathan', 'city':'hanoi'}
+obj.urlEncode() //=> 'name=Mr+Nathan&city=hanoi'
+```
+
+## *`Object`*.**`values()`**
+
+**Description:** Returns an array with all the values of the fields the Object contains. The same as JavaScript’s `Object.values(obj)`.
+
+**Syntax:** *`Object`*.values()
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// obj = {'name': 'Mr Nathan', age: 42 }
+obj.values() //=> ['Mr Nathan', 42]
+```
+
+# PrevNodeData
+
+## **`name`**
+
+**Description:** The name of the node that the current input came from.
+
+Always uses the current node’s first input connector if there is more than one (e.g. in the ‘Merge’ node).
+
+**Syntax:** **`name`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## **`outputIndex`**
+
+**Description:** The index of the output connector that the current input came from. Use this when the previous node had multiple outputs (such as an ‘If’ or ‘Switch’ node).
+
+Always uses the current node’s first input connector if there is more than one (e.g. in the ‘Merge’ node).
+
+**Syntax:** **`outputIndex`**
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+## **`runIndex`**
+
+**Description:** The run of the previous node that generated the current input.
+
+Always uses the current node’s first input connector if there is more than one (e.g. in the ‘Merge’ node).
+
+**Syntax:** **`runIndex`**
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+# Root
+
+## **`$()`**
+
+**Description:** Returns the data of the specified node
+
+**Syntax:** $(nodeName)
+
+**Returns:** NodeData
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `nodeName` (String) - The name of the node to retrieve data for
+
+## **`$binary`**
+
+**Description:** Returns any binary input data to the current node, for the current item. Shorthand for `$input.item.binary`.
+
+**Syntax:** **`$binary`**
+
+**Returns:** Array
+
+**Source:** Custom n8n functionality
+
+## **`$execution`**
+
+**Description:** Retrieve or set metadata for the current execution
+
+**Syntax:** **`$execution`**
+
+**Returns:** ExecData
+
+**Source:** Custom n8n functionality
+
+## **`$fromAI()`**
+
+**Description:** Use when a large language model should provide the value of a node parameter. Consider providing a description for better results.
+
+**Syntax:** $fromAI(key, description?, type?, defaultValue?)
+
+**Returns:** any
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `key` (String) - The name of the field to fetch. May only contain letters, numbers, underscores and hyphens.
+- `description` (String) - optional - Use to give the model more context on exactly what it should return
+- `type` (String) - optional - The type of the value to return. One of `string`, `number`, `boolean`, `json`, `date`, `datetime`. Defaults to `string`.
+- `defaultValue` (any) - optional - A value to use if the model doesn’t return the key
+
+**Examples:**
+
+```
+// Ask the model to provide a name, and use it here
+$fromAI('name')
+```
+
+```
+// Ask the model to provide the age of the person (as a number with a default value of 18), and use it here
+$fromAI('age', 'The age of the person', 'number', 18)
+```
+
+```
+// Ask the model to provide a boolean signifying whether the person is a student (with default value false), and use it here
+$fromAI('isStudent', 'Is the person a student', 'boolean', false)
+```
+
+## **`$if()`**
+
+**Description:** Returns one of two values depending on the `condition`. Similar to the `?` operator in JavaScript.
+
+**Syntax:** $if(condition, valueIfTrue, valueIfFalse)
+
+**Returns:** any
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `condition` (Boolean) - The check to make. Should evaluate to either `true` or `false`
+- `valueIfTrue` (any) - The value to return if the condition is true
+- `valueIfFalse` (any) - The value to return if the condition is false
+
+**Examples:**
+
+```
+// Return "Good day" if time is before 5pm, otherwise "Good evening"
+$if($now.hour < 17, "Good day", "Good evening")
+```
+
+```
+// $if() calls can be combined:
+// Return "Good morning" if time is before 10am, "Good day" it's before 5pm, otherwise "Good evening"
+$if($now.hour < 10, "Good morning", $if($now.hour < 17, "Good day", "Good evening"))
+```
+
+## **`$ifEmpty()`**
+
+**Description:** Returns the first parameter if it isn’t empty, otherwise returns the second parameter. The following count as empty: `””`, `[]`, `{}`, `null`, `undefined`
+
+**Syntax:** $ifEmpty(value, valueIfEmpty)
+
+**Returns:** any
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `value` (any) - The value to return, provided it isn’t empty
+- `valueIfEmpty` (any) - What to return if `value` is empty
+
+**Examples:**
+
+```
+"Hi " + $ifEmpty(name, "there") // e.g. "Hi Nathan" or "Hi there"
+```
+
+## **`$input`**
+
+**Description:** The input data of the current node
+
+**Syntax:** **`$input`**
+
+**Returns:** NodeData
+
+**Source:** Custom n8n functionality
+
+## **`$itemIndex`**
+
+**Description:** The position of the item currently being processed in the list of input items
+
+**Syntax:** **`$itemIndex`**
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+## **`$jmespath()`**
+
+**Description:** Extracts data from an object (or array of objects) using a [JMESPath](%E2%80%9D/code/cookbook/jmespath/%E2%80%9D) expression. Useful for querying complex, nested objects. Returns `undefined` if the expression is invalid.
+
+**Syntax:** $jmespath(obj, expression)
+
+**Returns:** any
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `obj` (Object|Array) - The Object or array of Objects to retrieve data from
+- `expression` (String) - A [JMESPath expression](%E2%80%9Dhttps://jmespath.org/examples.html%E2%80%9D) defining the data to retrieve from the object
+
+**Examples:**
+
+```
+data = {
+  "people": [
+    {
+      "age": 20,
+      "other": "foo",
+      "name": "Bob"
+    },
+    {
+      "age": 25,
+      "other": "bar",
+      "name": "Fred"
+    },
+    {
+      "age": 30,
+      "other": "baz",
+      "name": "George"
+    }
+  ]
+}
+
+// Get all names, in an array
+{{ $jmespath(data, '[*].name') }} //=> ["Bob", "Fred", "George"]
+
+// Get the names and ages of everyone under 20
+$jmespath(data, '[?age > `20`].[name, age]') //=> [ ["Fred",25], ["George",30] ]
+
+// Get the name of the first person under 20
+$jmespath($json.people, '[?age > `20`].name | [0]') //=> Fred
+```
+
+```
+data = {
+    "reservations": [
+      {
+        "id": 1,
+        "guests": [
+          {
+            "name": "Nathan",
+            "requirements": {
+              "room": "double",
+              "meal": "vegetarian"
             }
-        }
+          },
+          {
+            "name": "Meg",
+            "requirements": {
+              "room": "single"
+            }
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "guests": [
+          {
+            "name": "Lex",
+            "requirements": {
+              "room": "double"
+            }
+          }
+        ]
+      }
     ]
-}
-```
-
-}
-
-```
-
-### Backend hook functions
-
-A hook or a hook file can contain multiple hook functions, with all functions executed one after another.
-
-If the parameters of the hook function are objects, it's possible to change the data of that parameter to change the behavior of n8n.
-
-You can also access the database in any hook function using `this.dbCollections` (refer to the code sample in [Backend hook files](#backend-hook-files).
-
-## Frontend external hooks
-
-Like backend external hooks, it's possible to define external hooks in the frontend code that get executed by n8n whenever a user performs a specific operation. You can use them, for example, to log data and change data.
-
-### Available hooks
-
-| Hook | Description |
-| --- | --- |
-| `credentialsEdit.credentialTypeChanged` | Called when an existing credential's type changes. |
-| `credentials.create` | Called when someone creates a new credential. |
-| `credentialsList.dialogVisibleChanged` |  |
-| `dataDisplay.nodeTypeChanged` |  |
-| `dataDisplay.onDocumentationUrlClick` | Called when someone selects the help documentation link. |
-| `execution.open` | Called when an existing execution opens. |
-| `executionsList.openDialog` | Called when someone selects an execution from existing Workflow Executions. |
-| `expressionEdit.itemSelected` |  |
-| `expressionEdit.dialogVisibleChanged` |  |
-| `nodeCreateList.filteredNodeTypesComputed` |  |
-| `nodeCreateList.nodeFilterChanged` | Called when someone makes any changes to the node panel filter. |
-| `nodeCreateList.selectedTypeChanged` |  |
-| `nodeCreateList.mounted` |  |
-| `nodeCreateList.destroyed` |  |
-| `nodeSettings.credentialSelected` |  |
-| `nodeSettings.valueChanged` |  |
-| `nodeView.createNodeActiveChanged` |  |
-| `nodeView.addNodeButton` |  |
-| `nodeView.createNodeActiveChanged` |  |
-| `nodeView.mount` |  |
-| `pushConnection.executionFinished` |  |
-| `showMessage.showError` |  |
-| `runData.displayModeChanged` |  |
-| `workflow.activeChange` |  |
-| `workflow.activeChangeCurrent` |  |
-| `workflow.afterUpdate` | Called when someone updates an existing workflow. |
-| `workflow.open` |  |
-| `workflowRun.runError` |  |
-| `workflowRun.runWorkflow` | Called when a workflow executes. |
-| `workflowSettings.dialogVisibleChanged` |  |
-| `workflowSettings.saveSettings` | Called when someone saves the settings of a workflow. |
-
-### Registering hooks
-
-You can set hooks by loading the hooks script on the page. One way to do this is by creating a hooks file in the project and adding a script tag in your `editor-ui/public/index.html` file:
-
-```
-
-<script src="frontend-hooks.js"></script>
-
-```
-
-### Frontend hook files
-
-Frontend external hook files are regular JavaScript files which have the following format:
-
-```
-
-window.n8nExternalHooks = { nodeView: { mount: [ function (store, meta) { // do something }, ], createNodeActiveChanged: [ function (store, meta) { // do something }, function (store, meta) { // do something else }, ], addNodeButton: [ function (store, meta) { // do something }, ], }, };
-
-````
-
-### Frontend hook functions
-
-You can define multiple hook functions per hook. Each hook function is invoked with the following arguments arguments:
-
-- `store`: The Vuex store object. You can use this to change or get data from the store.
-- `metadata`: The object that contains any data provided by the hook. To see what's passed, search for the hook in the `editor-ui` package.```
-````
-
-# Deployment
-
-Feature availability
-
-Embed requires an embed license. For more information about when to use Embed, as well as costs and licensing processes, refer to [Embed](https://n8n.io/embed/) on the n8n website.
-
-See the [hosting documentation](../../hosting/installation/server-setups/) for detailed setup options.
-
-## User data
-
-n8n recommends that you follow the same or similar practices used internally for n8n Cloud: Save user data using [Rook](https://rook.io/) and, if an n8n server goes down, a new instance starts on another machine using the same data.
-
-Due to this, you don't need to use backups except in case of a catastrophic failure, or when a user wants to reactivate their account within your prescribed retention period (two weeks for n8n Cloud).
-
-## Backups
-
-n8n recommends creating nightly backups by attaching another container, and copying all data to this second container. In this manner, RAM usage is negligible, and so doesn't impact the amount of users you can place on the server.
-
-## Restarting
-
-If your instance is down or restarting, missed executions (for example, Cron or Webhook nodes) during this time aren't recoverable. If it's important for you to maintain 100% uptime, you need to build another proxy in front of it which caches the data.
-
-# Workflow management in Embed
-
-Feature availability
-
-Embed requires an embed license. For more information about when to use Embed, as well as costs and licensing processes, refer to [Embed](https://n8n.io/embed/) on the n8n website.
-
-When managing an embedded n8n deployment, spanning across teams or organizations, you will likely need to run the same (or similar) workflows for multiple users. There are two available options for doing so:
-
-| Solution                                                              | Pros                                                               | Cons                                           |
-| --------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------- |
-| Create a workflow for each user                                       | No limitation on how workflow starts (can use any trigger)         | Requires managing multiple workflows.          |
-| Create a single workflow, and pass it user credentials when executing | Simplified workflow management (only need to change one workflow). | To run the workflow, your product must call it |
-
-Warning
-
-The APIs referenced in this document are subject to change at any time. Be sure the check for continued functionality with each version upgrade.
-
-## Workflow per user
-
-There are three general steps to follow:
-
-- Obtain the credentials for each user, and any additional parameters that may be required based on the workflow.
-- Create the [n8n credentials](../../glossary/#credential-n8n) for this user.
-- Create the workflow.
-
-### 1. Obtain user credentials
-
-Here you need to capture all credentials for any node/service this user must authenticate with, along with any additional parameters required for the particular workflow. The credentials and any parameters needed will depend on your workflow and what you are trying to do.
-
-### 2. Create user credentials
-
-After all relevant credential details have been obtained, you can proceed to create the relevant service credentials in n8n. This can be done using the Editor UI or API call.
-
-#### Using the Editor UI
-
-1. From the menu select **Credentials** > **New**.
-1. Use the drop-down to select the **Credential type** to create, for example *Airtable*.
-1. In the **Create New Credentials** modal, enter the corresponding credentials details for the user, and select the nodes that will have access to these credentials.
-1. Click **Create** to finish and save.
-
-#### Using the API
-
-The frontend API used by the Editor UI can also be called to achieve the same result. The API endpoint is in the format: `https://<n8n-domain>/rest/credentials`.
-
-For example, to create the credentials in the Editor UI example above, the request would be:
-
-```
-POST https://<n8n-domain>/rest/credentials
-```
-
-With the request body:
-
-```
-{
-   "name":"MyAirtable",
-   "type":"airtableApi",
-   "nodesAccess":[
-      {
-         "nodeType":"n8n-nodes-base.airtable"
-      }
-   ],
-   "data":{
-      "apiKey":"q12we34r5t67yu"
-   }
-}
-```
-
-The response will contain the ID of the new credentials, which you will use when creating the workflow for this user:
-
-```
-{
-   "data":{
-      "name":"MyAirtable",
-      "type":"airtableApi",
-      "data":{
-         "apiKey":"q12we34r5t67yu"
-      },
-      "nodesAccess":[
-         {
-            "nodeType":"n8n-nodes-base.airtable",
-            "date":"2021-09-10T07:41:27.770Z"
-         }
-      ],
-      "id":"29",
-      "createdAt":"2021-09-10T07:41:27.777Z",
-      "updatedAt":"2021-09-10T07:41:27.777Z"
-   }
-}
-```
-
-### 3. Create the workflow
-
-Best practice is to have a “base” workflow that you then duplicate and customize for each new user with their credentials (and any other details).
-
-You can duplicate and customize your template workflow using either the Editor UI or API call.
-
-#### Using the Editor UI
-
-1. From the menu select **Workflows** > **Open** to open the template workflow to be duplicated.
-1. Select **Workflows** > **Duplicate**, then enter a name for this new workflow and click **Save**.
-1. Update all relevant nodes to use the credentials for this user (created above).
-1. **Save** this workflow set it to **Active** using the toggle in the top-right corner.
-
-#### Using the API
-
-1. Fetch the JSON of the template workflow using the endpoint: `https://<n8n-domain>/rest/workflows/<workflow_id>`
-
-   ```
-   GET https://<n8n-domain>/rest/workflows/1012
-   ```
-
-The response will contain the JSON data of the selected workflow:
-
-```
-{
-  "data": {
-    "id": "1012",
-    "name": "Nathan's Workflow",
-    "active": false,
-    "nodes": [
-      {
-        "parameters": {},
-        "name": "Start",
-        "type": "n8n-nodes-base.start",
-        "typeVersion": 1,
-        "position": [
-          130,
-          640
-        ]
-      },
-      {
-        "parameters": {
-          "authentication": "headerAuth",
-          "url": "https://internal.users.n8n.cloud/webhook/custom-erp",
-          "options": {
-            "splitIntoItems": true
-          },
-          "headerParametersUi": {
-            "parameter": [
-              {
-                "name": "unique_id",
-                "value": "recLhLYQbzNSFtHNq"
-              }
-            ]
-          }
-        },
-        "name": "HTTP Request",
-        "type": "n8n-nodes-base.httpRequest",
-        "typeVersion": 1,
-        "position": [
-          430,
-          300
-        ],
-        "credentials": {
-          "httpHeaderAuth": "beginner_course"
-        }
-      },
-      {
-        "parameters": {
-          "operation": "append",
-          "application": "appKBGQfbm6NfW6bv",
-          "table": "processingOrders",
-          "options": {}
-        },
-        "name": "Airtable",
-        "type": "n8n-nodes-base.airtable",
-        "typeVersion": 1,
-        "position": [
-          990,
-          210
-        ],
-        "credentials": {
-          "airtableApi": "Airtable"
-        }
-      },
-      {
-        "parameters": {
-          "conditions": {
-            "string": [
-              {
-                "value1": "={{$json[\"orderStatus\"]}}",
-                "value2": "processing"
-              }
-            ]
-          }
-        },
-        "name": "IF",
-        "type": "n8n-nodes-base.if",
-        "typeVersion": 1,
-        "position": [
-          630,
-          300
-        ]
-      },
-      {
-        "parameters": {
-          "keepOnlySet": true,
-          "values": {
-            "number": [
-              {
-                "name": "=orderId",
-                "value": "={{$json[\"orderID\"]}}"
-              }
-            ],
-            "string": [
-              {
-                "name": "employeeName",
-                "value": "={{$json[\"employeeName\"]}}"
-              }
-            ]
-          },
-          "options": {}
-        },
-        "name": "Set",
-        "type": "n8n-nodes-base.set",
-        "typeVersion": 1,
-        "position": [
-          800,
-          210
-        ]
-      },
-      {
-        "parameters": {
-          "functionCode": "let totalBooked = items.length;\nlet bookedSum = 0;\n\nfor(let i=0; i < items.length; i++) {\n  bookedSum = bookedSum + items[i].json.orderPrice;\n}\nreturn [{json:{totalBooked, bookedSum}}]\n"
-        },
-        "name": "Function",
-        "type": "n8n-nodes-base.function",
-        "typeVersion": 1,
-        "position": [
-          800,
-          400
-        ]
-      },
-      {
-        "parameters": {
-          "webhookUri": "https://discord.com/api/webhooks/865213348202151968/oD5_WPDQwtr22Vjd_82QP3-_4b_lGhAeM7RynQ8Js5DzyXrQEnj0zeAQIA6fki1JLtXE",
-          "text": "=This week we have {{$json[\"totalBooked\"]}} booked orders with a total value of {{$json[\"bookedSum\"]}}. My Unique ID: {{ $(\"HTTP Request\").params.headerParameters.parameters[0].value }}"
-        },
-        "name": "Discord",
-        "type": "n8n-nodes-base.discord",
-        "typeVersion": 1,
-        "position": [
-          1000,
-          400
-        ]
-      },
-      {
-        "parameters": {
-          "triggerTimes": {
-            "item": [
-              {
-                "mode": "everyWeek",
-                "hour": 9
-              }
-            ]
-          }
-        },
-        "name": "Cron",
-        "type": "n8n-nodes-base.cron",
-        "typeVersion": 1,
-        "position": [
-          220,
-          300
-        ]
-      }
-    ],
-    "connections": {
-      "HTTP Request": {
-        "main": [
-          [
-            {
-              "node": "IF",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Start": {
-        "main": [
-          []
-        ]
-      },
-      "IF": {
-        "main": [
-          [
-            {
-              "node": "Set",
-              "type": "main",
-              "index": 0
-            }
-          ],
-          [
-            {
-              "node": "Function",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Set": {
-        "main": [
-          [
-            {
-              "node": "Airtable",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Function": {
-        "main": [
-          [
-            {
-              "node": "Discord",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      },
-      "Cron": {
-        "main": [
-          [
-            {
-              "node": "HTTP Request",
-              "type": "main",
-              "index": 0
-            }
-          ]
-        ]
-      }
-    },
-    "createdAt": "2021-07-16T11:15:46.066Z",
-    "updatedAt": "2021-07-16T12:05:44.045Z",
-    "settings": {},
-    "staticData": null,
-    "tags": []
   }
-}
+
+// Get the names of all the guests in each reservation that require a double room
+$jmespath(data, 'reservations[].guests[?requirements.room==`double`].name')
 ```
 
-1. Save the returned JSON data and update any relevant credentials and fields for the new user.
+## **`$json`**
 
-1. Create a new workflow using the updated JSON as the request body at endpoint: `https://<n8n-domain>/rest/workflows`
+**Description:** Returns the JSON input data to the current node, for the current item. Shorthand for `$input.item.json`. [More info](/data/data-structure/)
 
-   ```
-   POST https://<n8n-domain>/rest/workflows/
-   ```
+**Syntax:** **`$json`**
 
-The response will contain the ID of the new workflow, which you will use in the next step.
+**Returns:** Object
 
-1. Lastly, publish the new workflow:
+**Source:** Custom n8n functionality
 
-   ```
-   PATCH https://<n8n-domain>/rest/workflows/1012
-   ```
+## **`$max()`**
 
-Passing the additional value `active` in your JSON payload:
+**Description:** Returns the highest of the given numbers
+
+**Syntax:** $max(num1, num2, …, numN)
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `num1` (Number) - The first number to compare
+- `num2` (Number) - The second number to compare
+
+## **`$min()`**
+
+**Description:** Returns the lowest of the given numbers
+
+**Syntax:** $min(num1, num2, …, numN)
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `num1` (Number) - The first number to compare
+- `num2` (Number) - The second number to compare
+
+## **`$nodeVersion`**
+
+**Description:** The version of the current node (as displayed at the bottom of the nodes’s settings pane)
+
+**Syntax:** **`$nodeVersion`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## **`$now`**
+
+**Description:** A DateTime representing the current moment.
+
+Uses the workflow’s time zone (which can be changed in the workflow settings).
+
+**Syntax:** **`$now`**
+
+**Returns:** DateTime
+
+**Source:** Custom n8n functionality
+
+## **`$pageCount`**
+
+**Description:** The number of results pages the node has fetched. Only available in the ‘HTTP Request’ node.
+
+**Syntax:** **`$pageCount`**
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+## **`$parameter`**
+
+**Description:** The configuration settings of the current node. These are the parameters you fill out within the node’s UI (e.g. its operation).
+
+**Syntax:** **`$parameter`**
+
+**Returns:** NodeParams
+
+**Source:** Custom n8n functionality
+
+## **`$prevNode`**
+
+**Description:** Information about the node that the current input came from.
+
+When in a ‘Merge’ node, always uses the first input connector.
+
+**Syntax:** **`$prevNode`**
+
+**Returns:** PrevNodeData
+
+**Source:** Custom n8n functionality
+
+## **`$request`**
+
+**Description:** The request object sent during the last run of the node. Only available in the ‘HTTP Request’ node.
+
+**Syntax:** **`$request`**
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+## **`$response`**
+
+**Description:** The response returned by the last HTTP call. Only available in the ‘HTTP Request’ node.
+
+**Syntax:** **`$response`**
+
+**Returns:** HTTPResponse
+
+**Source:** Custom n8n functionality
+
+## **`$runIndex`**
+
+**Description:** The index of the current run of the current node execution. Starts at 0.
+
+**Syntax:** **`$runIndex`**
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+## **`$secrets`**
+
+**Description:** The secrets from an [external secrets vault](/external-secrets/), if configured. Secret values are never displayed to the user. Only available in credential fields.
+
+**Syntax:** **`$secrets`**
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+## **`$today`**
+
+**Description:** A DateTime representing midnight at the start of the current day.
+
+Uses the instance’s time zone (unless overridden in the workflow’s settings).
+
+**Syntax:** **`$today`**
+
+**Returns:** DateTime
+
+**Source:** Custom n8n functionality
+
+## **`$vars`**
+
+**Description:** The [variables](/code/variables/) available to the workflow
+
+**Syntax:** **`$vars`**
+
+**Returns:** Object
+
+**Source:** Custom n8n functionality
+
+## **`$workflow`**
+
+**Description:** Information about the current workflow
+
+**Syntax:** **`$workflow`**
+
+**Returns:** WorkflowData
+
+**Source:** Custom n8n functionality
+
+# String
+
+## *`String`*.**`base64Decode()`**
+
+**Description:** Converts plain text to a base64-encoded string
+
+**Syntax:** *`String`*.base64Encode()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
 
 ```
-// ...
-"active":true,
-"settings": {},
-"staticData": null,
-"tags": []
+"aGVsbG8=".base64Decode() //=> "hello"
 ```
 
-## Single workflow
+## *`String`*.**`base64Encode()`**
 
-There are four steps to follow to implement this method:
+**Description:** Converts a base64-encoded string to plain text
 
-- Obtain the credentials for each user, and any additional parameters that may be required based on the workflow. See [Obtain user credentials](#1-obtain-user-credentials) above.
-- Create the n8n credentials for this user. See [Create user credentials](#2-create-user-credentials) above.
-- Create the workflow.
-- Call the workflow as needed.
+**Syntax:** *`String`*.base64Encode()
 
-### Create the workflow
+**Returns:** String
 
-The details and scope of this workflow will vary greatly according to the individual use case, however there are a few design implementations to keep in mind:
+**Source:** Custom n8n functionality
 
-- This workflow must be triggered by a [Webhook](../../integrations/builtin/core-nodes/n8n-nodes-base.webhook/) node.
-- The incoming webhook call must contain the user’s credentials and any other workflow parameters required.
-- Each node where the user’s credentials are needed should use an [expression](../../code/expressions/) so that the node’s credential field reads the credential provided in the webhook call.
-- Save and publish the workflow, ensuring the production URL is selected for the Webhook node. Refer to [webhook node](../../integrations/builtin/core-nodes/n8n-nodes-base.webhook/) for more information.
-
-### Call the workflow
-
-For each new user, or for any existing user as may be needed, call the webhook defined as the workflow trigger and provide the necessary credentials (and any other workflow parameters).
-
-# Prerequisites
-
-Feature availability
-
-Embed requires an embed license. For more information about when to use Embed, as well as costs and licensing processes, refer to [Embed](https://n8n.io/embed/) on the n8n website.
-
-The requirements provided here are an example based on n8n Cloud and are for illustrative purposes only. Your requirements may vary depending on the number of users, workflows, and executions. Contact n8n for more information.
-
-| Component | Sizing                                   | Supported                   |
-| --------- | ---------------------------------------- | --------------------------- |
-| CPU/vCPU  | Minimum 10 CPU cycles, scaling as needed | Any public or private cloud |
-| Database  | 512 MB - 4 GB SSD                        | SQLite or PostgreSQL        |
-| Memory    | 320 MB - 2 GB                            |                             |
-
-## CPU considerations
-
-n8n isn't CPU intensive so even small instances (of providers such as AWS and GCP) should be enough for most use cases. Usually, memory requirements supersede CPU requirements, so focus resources there when planning your infrastructure.
-
-## Database considerations
-
-n8n uses its database to store [credentials](../../glossary/#credential-n8n), past executions, and workflows.
-
-A core feature of n8n is the flexibility to choose a database. All the supported databases have different advantages and disadvantages, which you have to consider individually and pick the one that best suits your needs. By default n8n creates an SQLite database if no database exists at the given location.
-
-n8n recommends that every n8n instance have a dedicated database. This helps to prevent dependencies and potential performance degradation. If it isn't possible to provide a dedicated database for every n8n instance, n8n recommends making use of Postgres's schema feature.
-
-For Postgres, the database must already exist on the DB-instance. The database user for the n8n process needs to have full permissions on all tables that they're using or creating. n8n creates and maintains the database schema.
-
-### Best practices
-
-- SSD storage.
-- In containerized cloud environments, ensure that the volume is persisted and mounted when stopping/starting a container. If not, all data is lost.
-- If using Postgres, don't use the `tablePrefix` configuration option. It will be deprecated in the near future.
-- Pay attention to the changelog of new versions and consider reverting migrations before downgrading.
-- Set up at least the basic database security and stability mechanisms such as IP allow lists and backups.
-
-## Memory considerations
-
-An n8n instance doesn't typically require large amounts of available memory. For example an n8n Cloud instance at idle requires ~100MB. It's the nature of your workflows and the data being processed that determines your memory requirements.
-
-For example, while most nodes just pass data to the next node in the workflow, the [Code node](../../code/code-node/) creates a pre-processing and post-processing copy of the data. When dealing will large binary files, this can consume all available resources.
-
-# White labelling
-
-Feature availability
-
-Embed requires an embed license. For more information about when to use Embed, as well as costs and licensing processes, refer to [Embed](https://n8n.io/embed/) on the n8n website.
-
-White labelling n8n means customizing the frontend styling and assets to match your brand identity. The process involves changing two packages in n8n's source code [github.com/n8n-io/n8n](https://github.com/n8n-io/n8n):
-
-- [packages/frontend/@n8n/design-system](https://github.com/n8n-io/n8n/tree/master/packages/frontend/@n8n/design-system): n8n's [storybook](https://storybook.js.org/) design system with CSS styles and Vue.js components
-- [packages/frontend/editor-ui](https://github.com/n8n-io/n8n/tree/master/packages/frontend/editor-ui): n8n's [Vue.js](https://vuejs.org/) frontend build with [Vite.js](https://vitejs.dev)
-
-## Prerequisites
-
-You need the following installed on your development machine:
-
-- [git](https://git-scm.com/downloads)
-- Node.js and npm. Minimum version Node 18.17.0. You can find instructions on how to install both using nvm (Node Version Manager) for Linux, Mac, and WSL [here](https://github.com/nvm-sh/nvm). For Windows users, refer to Microsoft's guide to [Install NodeJS on Windows](https://docs.microsoft.com/en-us/windows/dev-environment/javascript/nodejs-on-windows).
-
-Create a fork of [n8n's repository](https://github.com/n8n-io/n8n) and clone your new repository.
+**Examples:**
 
 ```
-git clone https://github.com/<your-organization>/n8n.git n8n
-cd n8n
+"hello".base64Encode() //=> "aGVsbG8="
 ```
 
-Install all dependencies, build and start n8n.
+## *`String`*.**`concat()`**
+
+**Description:** Joins one or more strings onto the end of the base string. Alternatively, use the `+` operator (see examples).
+
+**Syntax:** *`String`*.concat(string1, string2?, ..., stringN?)
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `string1` (String) - The first string to append
+- `string2` (String) - optional - The second string to append
+- `stringN` (String) - optional - The Nth string to append
+
+**Examples:**
 
 ```
-npm install
-npm run build
-npm run start
-```
-
-Whenever you make changes you need to rebuild and restart n8n. While developing you can use `npm run dev` to automatically rebuild and restart n8n anytime you make code changes.
-
-## Theme colors
-
-To customize theme colors open [packages/frontend/@n8n/design-system](https://github.com/n8n-io/n8n/tree/master/packages/frontend/@n8n/design-system) and start with:
-
-- [packages/frontend/@n8n/design-system/src/css/\_tokens.scss](https://github.com/n8n-io/n8n/blob/master/packages/frontend/@n8n/design-system/src/css/_tokens.scss)
-- [packages/frontend/@n8n/design-system/src/css/\_tokens.dark.scss](https://github.com/n8n-io/n8n/blob/master/packages/frontend/@n8n/design-system/src/css/_tokens.dark.scss)
-
-At the top of `_tokens.scss` you will find `--color-primary` variables as HSL colors:
-
-```
-@mixin theme {
-	--color-primary-h: 6.9;
-	--color-primary-s: 100%;
-	--color-primary-l: 67.6%;
-```
-
-In the following example the primary color changes to #0099ff. To convert to HSL you can use a [color converter tool](https://www.w3schools.com/colors/colors_converter.asp).
-
-```
-@mixin theme {
-	--color-primary-h: 204;
-	--color-primary-s: 100%;
-	--color-primary-l: 50%;
-```
-
-## Theme logos
-
-To change the editor’s logo assets look into [packages/frontend/editor-ui/public](https://github.com/n8n-io/n8n/tree/master/packages/frontend/editor-ui/public) and replace:
-
-- favicon-16x16.png
-- favicon-32x32.png
-- favicon.ico
-- n8n-logo.svg
-- n8n-logo-collapsed.svg
-- n8n-logo-expanded.svg
-
-Replace these logo assets. n8n uses them in Vue.js components, including:
-
-- [MainSidebar.vue](https://github.com/n8n-io/n8n/blob/master/packages/frontend/editor-ui/src/components/MainSidebar.vue): top/left logo in the main sidebar.
-- [Logo.vue](https://github.com/n8n-io/n8n/blob/master/packages/frontend/editor-ui/src/components/Logo/Logo.vue): reused in other components.
-
-In the following example replace `n8n-logo-collapsed.svg` and `n8n-logo-expanded.svg` to update the main sidebar's logo assets.
-
-If your logo assets require different sizing or placement you can customize SCSS styles at the bottom of [MainSidebar.vue](https://github.com/n8n-io/n8n/blob/master/packages/frontend/editor-ui/src/components/MainSidebar.vue).
-
-```
-.logoItem {
-	display: flex;
-	justify-content: space-between;
-	height: $header-height;
-	line-height: $header-height;
-	margin: 0 !important;
-	border-radius: 0 !important;
-	border-bottom: var(--border-width-base) var(--border-style-base) var(--color-background-xlight);
-	cursor: default;
-
-	&:hover, &:global(.is-active):hover {
-		background-color: initial !important;
-	}
-
-	* { vertical-align: middle; }
-	.icon {
-		height: 18px;
-		position: relative;
-		left: 6px;
-	}
-
-}
-```
-
-## Text localization
-
-To change all text occurrences like `n8n` or `n8n.io` to your brand identity you can customize n8n's English internationalization file: [packages/frontend/@n8n/i18n/src/locales/en.json](https://github.com/n8n-io/n8n/blob/master/packages/frontend/@n8n/i18n/src/locales/en.json).
-
-n8n uses the [Vue I18n](https://kazupon.github.io/vue-i18n/) internationalization plugin for Vue.js to translate the majority of UI texts. To search and replace text occurrences inside `en.json` you can use [Linked locale messages](https://kazupon.github.io/vue-i18n/guide/messages.html#linked-locale-messages).
-
-In the following example add the `_brand.name` translation key to white label n8n's [AboutModal.vue](https://github.com/n8n-io/n8n/blob/master/packages/frontend/editor-ui/src/components/AboutModal.vue).
-
-```
-{
-	"_brand.name": "My Brand",
-	//replace n8n with link to _brand.name
-	"about.aboutN8n": "About @:_brand.name",
-	"about.n8nVersion": "@:_brand.name Version",
-}
-```
-
-### Window title
-
-To change n8n's window title to your brand name, edit the following:
-
-- [packages/frontend/editor-ui/index.html](https://github.com/n8n-io/n8n/blob/master/packages/frontend/editor-ui/index.html)
-- [packages/frontend/editor-ui/src/composables/useDocumentTitle.ts](https://github.com/n8n-io/n8n/blob/master/packages/frontend/editor-ui/src/composables/useDocumentTitle.ts)
-
-The following example replaces all occurrences of `n8n` and `n8n.io` with `My Brand` in `index.html` and `useDocumentTitle.ts`.
-
-```
-<!DOCTYPE html>
-<html lang="en">
-<head>
-	<!-- Replace html title attribute -->
-	<title>My Brand - Workflow Automation</title>
-</head>
+'sea'.concat('food') //=> 'seafood'
+'sea' + 'food' //=> 'seafood'
 ```
 
 ```
-import { useSettingsStore } from '@/stores/settings.store';
-
-// replace n8n
-const DEFAULT_TITLE = 'My Brand';
-const DEFAULT_TAGLINE = 'Workflow Automation';
+'work'.concat('a', 'holic') //=> 'workaholic'
 ```
 
-# Workflow templates
+## *`String`*.**`extractDomain()`**
 
-Feature availability
+**Description:** If the string is an email address or URL, returns its domain (or `undefined` if nothing found).
 
-Embed requires an embed license. For more information about when to use Embed, as well as costs and licensing processes, refer to [Embed](https://n8n.io/embed/) on the n8n website.
+If the string also contains other content, try using `extractEmail()` or `extractUrl()` first.
 
-n8n provides a library of workflow [templates](../../glossary/#template-n8n). When embedding n8n, you can:
+**Syntax:** *`String`*.extractDomain()
 
-- Continue to use n8n's workflow templates library (this is the default behavior)
-- Disable workflow templates
-- Create your own workflow templates library
+**Returns:** String
 
-## Disable workflow templates
+**Source:** Custom n8n functionality
 
-In your environment variables, set `N8N_TEMPLATES_ENABLED` to false.
-
-## Use your own workflow templates library
-
-In your environment variables, set `N8N_TEMPLATES_HOST` to the base URL of your API.
-
-### Endpoints
-
-Your API must provide the same endpoints and data structure as n8n's.
-
-The endpoints are:
-
-| Method | Path                          |
-| ------ | ----------------------------- |
-| GET    | /templates/workflows/`<id>`   |
-| GET    | /templates/search             |
-| GET    | /templates/collections/`<id>` |
-| GET    | /templates/collections        |
-| GET    | /templates/categories         |
-| GET    | /health                       |
-
-### Query parameters
-
-The `/templates/search` endpoint accepts the following query parameters:
-
-| Parameter  | Type                                         | Description                                      |
-| ---------- | -------------------------------------------- | ------------------------------------------------ |
-| `page`     | integer                                      | The page of results to return                    |
-| `rows`     | integer                                      | The maximum number of results to return per page |
-| `category` | comma-separated list of strings (categories) | The categories to search within                  |
-| `search`   | string                                       | The search query                                 |
-
-The `/templates/collections` endpoint accepts the following query parameters:
-
-| Parameter  | Type                                         | Description                     |
-| ---------- | -------------------------------------------- | ------------------------------- |
-| `category` | comma-separated list of strings (categories) | The categories to search within |
-| `search`   | string                                       | The search query                |
-
-### Data schema
-
-You can explore the data structure of the items in the response object returned by endpoints here:
-
-Show `workflow` item data schema
+**Examples:**
 
 ```
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "Generated schema for Root",
-  "type": "object",
-  "properties": {
-    "id": {
-      "type": "number"
+"me@example.com".extractDomain() //=> 'example.com'
+```
+
+```
+"http://n8n.io/workflows".extractDomain() //=> 'n8n.io'
+```
+
+```
+"It's me@example.com".extractEmail().extractDomain() //=> 'example.com'
+```
+
+## *`String`*.**`extractEmail()`**
+
+**Description:** Extracts the first email found in the string. Returns `undefined` if none is found.
+
+**Syntax:** *`String`*.extractEmail()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"My email is me@example.com".extractEmail() //=> 'me@example.com'
+```
+
+## *`String`*.**`extractUrl()`**
+
+**Description:** Extracts the first URL found in the string. Returns `undefined` if none is found. Only recognizes full URLs, e.g. those starting with `http`.
+
+**Syntax:** *`String`*.extractUrl()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"Check out http://n8n.io".extractUrl() //=> 'http://n8n.io'
+```
+
+## *`String`*.**`extractUrlPath()`**
+
+**Description:** Returns the part of a URL after the domain, or `undefined` if no URL found.
+
+If the string also contains other content, try using `extractUrl()` first.
+
+**Syntax:** *`String`*.extractUrlPath()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"http://n8n.io/workflows".extractUrlPath() //=> '/workflows'
+```
+
+```
+"Check out http://n8n.io/workflows".extractUrl().extractUrlPath() //=> '/workflows'
+```
+
+## *`String`*.**`hash()`**
+
+**Description:** Returns the string hashed with the given algorithm. Defaults to md5 if not specified.
+
+**Syntax:** *`String`*.hash(algo?)
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `algo` (String) - optional - The hashing algorithm to use. One of `md5`, `base64`, `sha1`, `sha224`, `sha256`, `sha384`, `sha512`, `sha3`, `ripemd160`
+
+**Examples:**
+
+```
+"hello".hash() //=> '5d41402abc4b2a76b9719d911017c592'
+```
+
+## *`String`*.**`includes()`**
+
+**Description:** Returns `true` if the string contains the `searchString`. Case-sensitive.
+
+**Syntax:** *`String`*.includes(searchString, start?)
+
+**Returns:** Boolean
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `searchString` (String) - The text to search for
+- `start` (Number) - optional - The position (index) to start searching from
+
+**Examples:**
+
+```
+'team'.includes('tea') //=> true
+'team'.includes('i') //=> false
+```
+
+```
+// Returns false if the case doesn't match, so consider using .toLowerCase() first
+'team'.includes('Tea') //=> false
+'Team'.toLowerCase().includes('tea') //=> true
+```
+
+## *`String`*.**`indexOf()`**
+
+**Description:** Returns the index (position) of the first occurrence of `searchString` within the base string, or -1 if not found. Case-sensitive.
+
+**Syntax:** *`String`*.indexOf(searchString, start?)
+
+**Returns:** Number
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `searchString` (String) - The text to search for
+- `start` (Number) - optional - The position (index) to start searching from
+
+**Examples:**
+
+```
+'steam'.indexOf('tea') //=> 1
+'steam'.indexOf('i') //=> -1
+```
+
+```
+// Returns -1 if the case doesn't match, so consider using .toLowerCase() first
+'STEAM'.indexOf('tea') //=> -1
+'STEAM'.toLowerCase().indexOf('tea') //=> 1
+```
+
+## *`String`*.**`isDomain()`**
+
+**Description:** Returns `true` if the string is a domain
+
+**Syntax:** *`String`*.isDomain()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"n8n.io".isDomain() //=> true
+```
+
+```
+"http://n8n.io".isDomain() //=> false
+```
+
+```
+"hello".isDomain() //=> false
+```
+
+## *`String`*.**`isEmail()`**
+
+**Description:** Returns `true` if the string is an email
+
+**Syntax:** *`String`*.isEmail()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"me@example.com".isEmail() //=> true
+```
+
+```
+"It's me@example.com".isEmail() //=> false
+```
+
+```
+"hello".isEmail() //=> false
+```
+
+## *`String`*.**`isEmpty()`**
+
+**Description:** Returns `true` if the string has no characters or is `null`
+
+**Syntax:** *`String`*.isEmpty()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"".isEmpty() // => true
+```
+
+```
+"hello".isEmpty() // => false
+```
+
+## *`String`*.**`isNotEmpty()`**
+
+**Description:** Returns `true` if the string has at least one character
+
+**Syntax:** *`String`*.isNotEmpty()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"hello".isNotEmpty() // => true
+```
+
+```
+"".isNotEmpty() // => false
+```
+
+## *`String`*.**`isNumeric()`**
+
+**Description:** Returns `true` if the string represents a number
+
+**Syntax:** *`String`*.isNumeric()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"1.2234".isNumeric() // true
+```
+
+```
+"hello".isNumeric() // false
+```
+
+```
+"123E23".isNumeric() // true
+```
+
+## *`String`*.**`isUrl()`**
+
+**Description:** Returns `true` if the string is a valid URL
+
+**Syntax:** *`String`*.isUrl()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"https://n8n.io".isUrl() //=> true
+```
+
+```
+"n8n.io".isUrl() //=> false
+```
+
+```
+"hello".isUrl() //=> false
+```
+
+## *`String`*.**`length`**
+
+**Description:** The number of characters in the string
+
+**Syntax:** *`String`*.length
+
+**Returns:** Number
+
+**Source:** JavaScript function
+
+**Examples:**
+
+```
+"hello".length //=> 5
+```
+
+## *`String`*.**`match()`**
+
+**Description:** Matches the string against a [regular expression](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions%E2%80%9D). Returns an array containing the first match, or all matches if the `g` flag is set in the regular expression. Returns `null` if no matches are found.
+
+For checking whether text is present, consider `includes()` instead.
+
+**Syntax:** *`String`*.match(regexp)
+
+**Returns:** Array
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `regexp` (RegExp) - A [regular expression](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions%E2%80%9D) with the pattern to look for. Will look for multiple matches if the `g` flag is present (see examples).
+
+**Examples:**
+
+```
+// Match all words starting with 'r'
+"rock and roll".match(/r[^ ]*/g) //=> ['rock', 'roll']
+```
+
+```
+// Match first word starting with 'r' (no 'g' flag)
+"rock and roll".match(/r[^ ]*/) //=> ['rock']
+```
+
+```
+// For case-insensitive, add 'i' flag
+"ROCK and roll".match(/r[^ ]*/ig) //=> ['ROCK', 'roll']
+```
+
+## *`String`*.**`parseJson()`**
+
+**Description:** Returns the JavaScript Object or value represented by the string, or `undefined` if the string isn’t valid JSON. Single-quoted JSON is not supported.
+
+**Syntax:** *`String`*.parseJson()
+
+**Returns:** any
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+'{"name":"Nathan"}'.parseJson() //=> {"name":"Nathan"}
+```
+
+```
+"{'name':'Nathan'}".parseJson() //=> undefined
+```
+
+```
+'hello'.parseJson() //=> undefined
+```
+
+## *`String`*.**`quote()`**
+
+**Description:** Wraps a string in quotation marks, and escapes any quotation marks already in the string. Useful when constructing JSON, SQL, etc.
+
+**Syntax:** *`String`*.quote(mark?)
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `mark` (String) - optional - The type of quotation mark to use
+
+**Examples:**
+
+```
+'Nathan says "hi"'.quote() //=> '"Nathan says \"hi\""'
+```
+
+## *`String`*.**`removeMarkdown()`**
+
+**Description:** Removes any Markdown formatting from the string. Also removes HTML tags.
+
+**Syntax:** *`String`*.removeMarkdown()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"*bold*, [link]()".removeMarkdown() //=> "bold, link"
+```
+
+## *`String`*.**`removeTags()`**
+
+**Description:** Removes tags, such as HTML or XML, from the string
+
+**Syntax:** *`String`*.removeTags()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"<b>bold</b>, <a>link</a>".removeTags() //=> "bold, link"
+```
+
+## *`String`*.**`replace()`**
+
+**Description:** Returns a string with the first occurrence of `pattern` replaced by `replacement`.
+
+To replace all occurrences, use `replaceAll()` instead.
+
+**Syntax:** *`String`*.replace(pattern, replacement)
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `pattern` (String|RegExp) - The pattern in the string to replace. Can be a string to match or a [regular expression](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions%E2%80%9D).
+- `replacement` (String) - The new text to replace with
+
+**Examples:**
+
+```
+'Red or blue or green'.replace('or', 'and') //=> 'Red and blue or green'
+```
+
+```
+// A global, case-insensitive replacement:
+let text = "Mr Blue has a blue house and a blue car";
+let result = text.replace(/blue/gi, "red");
+```
+
+```
+// A function to return the replacement text:
+let text = "Mr Blue has a blue house and a blue car";
+let result = text.replace(/blue|house|car/i, function (x) {
+  return x.toUpperCase();
+});
+```
+
+## *`String`*.**`replaceAll()`**
+
+**Description:** Returns a string with all occurrences of `pattern` replaced by `replacement`
+
+**Syntax:** *`String`*.replaceAll(pattern, replacement)
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `pattern` (String|RegExp) - The pattern in the string to replace. Can be a string to match or a [regular expression](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions%E2%80%9D).
+- `replacement` (String|function) - The new text to replace with. Can be a string or a function that returns a string (see examples).
+
+**Examples:**
+
+```
+'Red or blue or green'.replace('or', 'and') //=> 'Red and blue and green'
+```
+
+```
+// Uppercase any occurrences of 'blue' or 'car'
+// (You must include the 'g' flag when using a regex)
+
+// text = 'Mr Blue has a blue car'
+text.replaceAll(/blue|car/gi, x => x.toUpperCase()) //=> 'Mr BLUE has a BLUE CAR'
+
+// Or with traditional function notation:
+text.replaceAll(/blue|car/gi, function(x){return x.toUpperCase()}) //=> 'Mr BLUE has a BLUE CAR'
+```
+
+## *`String`*.**`replaceSpecialChars()`**
+
+**Description:** Replaces special characters in the string with the closest ASCII character
+
+**Syntax:** *`String`*.replaceSpecialChars()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"déjà".replaceSpecialChars() //=> "deja"
+```
+
+## *`String`*.**`search()`**
+
+**Description:** Returns the index (position) of the first occurrence of a pattern within the string, or -1 if not found. The pattern is specified using a [regular expression](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions%E2%80%9D). To use text instead, see `indexOf()`.
+
+**Syntax:** *`String`*.search(regexp)
+
+**Returns:** Number
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `regexp` (RegExp) - A [regular expression](%E2%80%9Dhttps://developer.mozilla.org/en-US/docs/Web/JavaScript/Guide/Regular_expressions%E2%80%9D) with the pattern to look for
+
+**Examples:**
+
+```
+// Pos of first word starting with 'n'
+"Neat n8n node".search(/n[^ ]*/) //=> 5
+```
+
+```
+// Case-insensitive match with 'i'
+// Pos of first word starting with 'n' or 'N'
+"Neat n8n node".search(/n[^ ]*/i) //=> 0
+```
+
+## *`String`*.**`slice()`**
+
+**Description:** Extracts a fragment of the string at the given position. For more advanced extraction, see `match()`.
+
+**Syntax:** *`String`*.slice(start, end?)
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `start` (Number) - The position to start from. Positions start at 0. Negative numbers count back from the end of the string.
+- `end` (String) - optional - The position to select up to. The character at the end position is not included. Negative numbers select from the end of the string. If omitted, will extract to the end of the string.
+
+**Examples:**
+
+```
+'Hello from n8n'.slice(0, 5) //=> 'Hello'
+```
+
+```
+'Hello from n8n'.slice(6) //=> 'from n8n'
+```
+
+```
+'Hello from n8n'.slice(-3) //=> 'n8n'
+```
+
+## *`String`*.**`split()`**
+
+**Description:** Splits the string into an array of substrings. Each split is made at the `separator`, and the separator isn’t included in the output.
+
+The opposite of using `join()` on an array.
+
+**Syntax:** *`String`*.split(separator?, limit?)
+
+**Returns:** Array
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `separator` (String) - optional - The string (or regular expression) to use for splitting. If omitted, an array with the original string is returned.
+- `limit` (Number) - optional - The max number of array elements to return. Returns all elements if omitted.
+
+**Examples:**
+
+```
+"wind,fire,water".split(",") //=> ['wind', 'fire', 'water']
+```
+
+```
+"me and you and her".split("and") //=> ['me ', ' you ', ' her']
+```
+
+```
+// Split one or more of space, comma and '?' using a regular expression
+"me? you, and her".split(/[ ,?]+/) //=> ['me', 'you', 'and', 'her']
+```
+
+## *`String`*.**`startsWith()`**
+
+**Description:** Returns `true` if the string starts with `searchString`. Case-sensitive.
+
+**Syntax:** *`String`*.startsWith(searchString, start?)
+
+**Returns:** Boolean
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `searchString` (String) - The text to check against the start of the base string
+- `start` (Number) - optional - The position (index) to start searching from
+
+**Examples:**
+
+```
+'team'.startsWith('tea') //=> true
+'team'.startsWith('Tea') //=> false
+```
+
+```
+// Returns false if the case doesn't match, so consider using .toLowerCase() first
+'Team'.toLowerCase().startsWith('tea') //=> true
+```
+
+## *`String`*.**`substring()`**
+
+**Description:** Extracts a fragment of the string at the given position. For more advanced extraction, see `match()`.
+
+**Syntax:** *`String`*.substring(start, end?)
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Parameters:**
+
+- `start` (Number) - The position to start from. Positions start at 0.
+- `end` (String) - optional - The position to select up to. The character at the end position is not included. If omitted, will extract to the end of the string.
+
+**Examples:**
+
+```
+'Hello from n8n'.substring(0, 5) //=> 'Hello'
+```
+
+```
+'Hello from n8n'.substring(6) //=> 'from n8n'
+```
+
+## *`String`*.**`toBoolean()`**
+
+**Description:** Converts the string to a boolean value. `0`, `false` and `no` resolve to `false`, everything else to `true`. Case-insensitive.
+
+**Syntax:** *`String`*.toBoolean()
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"true".toBoolean() //=> true
+```
+
+```
+"false".toBoolean() //=> false
+```
+
+```
+"0".toBoolean() //=> false
+```
+
+```
+"hello".toBoolean() //=> true
+```
+
+## *`String`*.**`toDateTime()`**
+
+**Description:** Converts the string to a DateTime. Useful for further transformation. Supported formats for the string are ISO 8601, HTTP, RFC2822, SQL and Unix timestamp in milliseconds.
+
+To parse other formats, use [`DateTime.fromFormat()`](%E2%80%9Dhttps://moment.github.io/luxon/api-docs/index.html#datetimefromformat%E2%80%9D).
+
+**Syntax:** *`String`*.toDateTime()
+
+**Returns:** DateTime
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"2024-03-29T18:06:31.798+01:00".toDateTime()
+```
+
+```
+"Fri, 29 Mar 2024 18:08:01 +0100".toDateTime()
+```
+
+```
+"20240329".toDateTime()
+```
+
+```
+"1711732132990".toDateTime()
+```
+
+## *`String`*.**`toJsonString()`**
+
+**Description:** Prepares the string to be inserted into a JSON object. Escapes any quotes and special characters (e.g. new lines), and wraps the string in quotes.
+
+The same as JavaScript’s `JSON.stringify()`.
+
+**Syntax:** *`String`*.toJsonString()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+// str = 'The "best" colours: red\nbrown'
+str.toJsonString() //=> '"The \\"best\\" colours: red\\nbrown"'
+```
+
+## *`String`*.**`toLowerCase()`**
+
+**Description:** Converts all letters in the string to lower case
+
+**Syntax:** *`String`*.toLowerCase()
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Examples:**
+
+```
+"I'm SHOUTing".toLowerCase() //=> "i'm shouting"
+```
+
+## *`String`*.**`toNumber()`**
+
+**Description:** Converts a string representing a number to a number. Throws an error if the string doesn’t start with a valid number.
+
+**Syntax:** *`String`*.toNumber()
+
+**Returns:** Number
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"123".toNumber() //=> 123
+```
+
+```
+"1.23E10".toNumber() //=> 12300000000
+```
+
+## *`String`*.**`toSentenceCase()`**
+
+**Description:** Changes the capitalization of the string to sentence case. The first letter of each sentence is capitalized and all others are lowercased.
+
+**Syntax:** *`String`*.toSentenceCase()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"quick! brown FOX".toSentenceCase() //=> "Quick! Brown fox"
+```
+
+## *`String`*.**`toSnakeCase()`**
+
+**Description:** Changes the format of the string to snake case. Spaces and dashes are replaced by `_`, symbols are removed and all letters are lowercased.
+
+**Syntax:** *`String`*.toSnakeCase()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"quick brown $FOX".toSnakeCase() //=> "quick_brown_fox"
+```
+
+## *`String`*.**`toTitleCase()`**
+
+**Description:** Changes the capitalization of the string to title case. The first letter of each word is capitalized and the others left unchanged. Short prepositions and conjunctions aren’t capitalized (e.g. ‘a’, ‘the’).
+
+**Syntax:** *`String`*.toTitleCase()
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Examples:**
+
+```
+"quick a brown FOX".toTitleCase() //=> "Quick a Brown Fox"
+```
+
+## *`String`*.**`toUpperCase()`**
+
+**Description:** Converts all letters in the string to upper case (capitals)
+
+**Syntax:** *`String`*.toUpperCase()
+
+**Source:** JavaScript function
+
+**Examples:**
+
+```
+"I'm not angry".toUpperCase() //=> "I'M NOT ANGRY"
+```
+
+## *`String`*.**`trim()`**
+
+**Description:** Removes whitespace from both ends of the string. Whitespace includes new lines, tabs, spaces, etc.
+
+**Syntax:** *`String`*.trim()
+
+**Returns:** String
+
+**Source:** JavaScript function
+
+**Examples:**
+
+```
+'   lonely   '.trim() //=> 'lonely'
+```
+
+## *`String`*.**`urlDecode()`**
+
+**Description:** Decodes a URL-encoded string. Replaces any character codes in the form of `%XX` with their corresponding characters.
+
+**Syntax:** *`String`*.urlDecode(allChars?)
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `allChars` (Boolean) - optional - Whether to decode characters that are part of the URI syntax (e.g. `=`, `?`)
+
+**Examples:**
+
+```
+"name%3DNathan%20Automat".urlDecode() //=> "name=Nathan Automat"
+```
+
+```
+"name%3DNathan%20Automat".urlDecode(true) //=> "name%3DNathan Automat"
+```
+
+## *`String`*.**`urlEncode()`**
+
+**Description:** Encodes the string so that it can be used in a URL. Spaces and special characters are replaced with codes of the form `%XX`.
+
+**Syntax:** *`String`*.urlEncode(allChars?)
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+**Parameters:**
+
+- `allChars` (Boolean) - optional - Whether to encode characters that are part of the URI syntax (e.g. `=`, `?`)
+
+**Examples:**
+
+```
+"name=Nathan Automat".urlEncode() //=> "name%3DNathan%20Automat"
+```
+
+```
+"name=Nathan Automat".urlEncode(true) //=> "name=Nathan%20Automat"
+```
+
+# WorkflowData
+
+## `$workflow`.**`active`**
+
+**Description:** Whether the workflow is active
+
+**Syntax:** `$workflow`.`$workflow`.**`active`**
+
+**Returns:** Boolean
+
+**Source:** Custom n8n functionality
+
+## `$workflow`.**`id`**
+
+**Description:** The workflow ID. Can also be found in the workflow’s URL.
+
+**Syntax:** `$workflow`.`$workflow`.**`id`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+## `$workflow`.**`name`**
+
+**Description:** The name of the workflow, as shown at the top of the editor
+
+**Syntax:** `$workflow`.`$workflow`.**`name`**
+
+**Returns:** String
+
+**Source:** Custom n8n functionality
+
+# Binary data
+
+Binary data is any file-type data, such as image files or documents.
+
+This page collects resources relating to binary data in n8n.
+
+## Working with binary data in your workflows
+
+You can process binary data in n8n workflows. n8n provides nodes to help you work with binary data. You can also use code.
+
+### Nodes
+
+There are three key nodes dedicated to handling binary data files:
+
+- [Convert to File](../../../integrations/builtin/core-nodes/n8n-nodes-base.converttofile/) to take input data and output it as a file.
+- [Extract From File](../../../integrations/builtin/core-nodes/n8n-nodes-base.extractfromfile/) to get data from a binary format and convert it to JSON.
+- [Read/Write Files from Disk](../../../integrations/builtin/core-nodes/n8n-nodes-base.readwritefile/) to read and write files from/to the machine where n8n is running.
+
+There are separate nodes for working with XML and HTML data:
+
+- [HTML](../../../integrations/builtin/core-nodes/n8n-nodes-base.html/)
+- [XML](../../../integrations/builtin/core-nodes/n8n-nodes-base.xml/)
+
+And nodes for performing common tasks:
+
+- [Compression](../../../integrations/builtin/core-nodes/n8n-nodes-base.compression/)
+- [Edit Image](../../../integrations/builtin/core-nodes/n8n-nodes-base.editimage/)
+- [FTP](../../../integrations/builtin/core-nodes/n8n-nodes-base.ftp/)
+
+You can trigger a workflow based on changes to a local file using the [Local File trigger](../../../integrations/builtin/core-nodes/n8n-nodes-base.localfiletrigger/).
+
+To split or concatenate binary data items, use the [data transformation nodes](../../expressions/#other-data-transformation-nodes).
+
+### Code
+
+You can use the [Code node](../../../code/code-node/) to manipulate binary data in your workflows. For example, [Get the binary data buffer](../../../code/cookbook/code-node/get-binary-data-buffer/): get the binary data available in your workflow.
+
+## Configure binary data mode when self-hosting
+
+You can configure how your self-hosted n8n instance handles binary data using the [Binary data environment variables](../../../hosting/configuration/environment-variables/binary-data/). This includes tasks such as setting the storage path and choosing how to store binary data.
+
+Your configuration affects how well n8n scales: [Scaling | Binary data filesystem mode](../../../hosting/scaling/binary-data/).
+
+Reading and writing binary files can have security implications. If you want to disable reading and writing binary data, use the `NODES_EXCLUDE` environment variable. Refer to [Environment variables | Nodes](../../../hosting/configuration/environment-variables/nodes/) for more information.
+
+# Query JSON with JMESPath
+
+[JMESPath](https://jmespath.org/) is a query language for JSON that you can use to extract and transform elements from a JSON document. For full details of how to use JMESPath, refer to the [JMESPath documentation](https://jmespath.org/tutorial.html).
+
+## The `jmespath()` method
+
+n8n provides a custom method, `jmespath()`. Use this method to perform a search on a JSON object using the JMESPath query language.
+
+The basic syntax is:
+
+```
+$jmespath(object, searchString)
+```
+
+```
+_jmespath(object, searchString)
+```
+
+To help understand what the method does, here is the equivalent longer JavaScript:
+
+```
+var jmespath = require('jmespath');
+jmespath.search(object, searchString);
+```
+
+Expressions must be single-line
+
+The longer code example doesn't work in Expressions, as they must be single-line.
+
+`object` is a JSON object, such as the output of a previous node. `searchString` is an expression written in the JMESPath query language. The [JMESPath Specification](https://jmespath.org/specification.html#jmespath-specification) provides a list of supported expressions, while their [Tutorial](https://jmespath.org/tutorial.html) and [Examples](https://jmespath.org/examples.html) provide interactive examples.
+
+Search parameter order
+
+The examples in the [JMESPath Specification](https://jmespath.org/specification.html#jmespath-specification) follow the pattern `search(searchString, object)`. The [JMESPath JavaScript library](https://github.com/jmespath/jmespath.js/), which n8n uses, supports `search(object, searchString)` instead. This means that when using examples from the JMESPath documentation, you may need to change the order of the search function parameters.
+
+## Common tasks
+
+This section provides examples for some common operations. More examples, and detailed guidance, are available in [JMESPath's own documentation](https://jmespath.org/tutorial.html).
+
+When trying out these examples, you need to set the Code node **Mode** to **Run Once for Each Item**.
+
+### Apply a JMESPath expression to a collection of elements with projections
+
+From the [JMESPath projections documentation](https://jmespath.org/tutorial.html#projections):
+
+> Projections are one of the key features of JMESPath. Use it to apply an expression to a collection of elements. JMESPath supports five kinds of projections:
+>
+> - List Projections
+> - Slice Projections
+> - Object Projections
+> - Flatten Projections
+> - Filter Projections
+
+The following example shows basic usage of list, slice, and object projections. Refer to the [JMESPath projections documentation](https://jmespath.org/tutorial.html#projections) for detailed explanations of each projection type, and more examples.
+
+Given this JSON from a webhook node:
+
+```
+[
+  {
+    "headers": {
+      "host": "n8n.instance.address",
+      ...
     },
-    "name": {
-      "type": "string"
-    },
-    "totalViews": {
-      "type": "number"
-    },
-    "price": {},
-    "purchaseUrl": {},
-    "recentViews": {
-      "type": "number"
-    },
-    "createdAt": {
-      "type": "string"
-    },
-    "user": {
-      "type": "object",
-      "properties": {
-        "username": {
-          "type": "string"
+    "params": {},
+    "query": {},
+    "body": {
+      "people": [
+        {
+          "first": "James",
+          "last": "Green"
         },
-        "verified": {
-          "type": "boolean"
+        {
+          "first": "Jacob",
+          "last": "Jones"
+        },
+        {
+          "first": "Jayden",
+          "last": "Smith"
         }
-      },
-      "required": [
-        "username",
-        "verified"
-      ]
-    },
-    "nodes": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          },
-          "icon": {
-            "type": "string"
-          },
-          "name": {
-            "type": "string"
-          },
-          "codex": {
-            "type": "object",
-            "properties": {
-              "data": {
-                "type": "object",
-                "properties": {
-                  "details": {
-                    "type": "string"
-                  },
-                  "resources": {
-                    "type": "object",
-                    "properties": {
-                      "generic": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "url": {
-                              "type": "string"
-                            },
-                            "icon": {
-                              "type": "string"
-                            },
-                            "label": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "url",
-                            "label"
-                          ]
-                        }
-                      },
-                      "primaryDocumentation": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "url": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "url"
-                          ]
-                        }
-                      }
-                    },
-                    "required": [
-                      "primaryDocumentation"
-                    ]
-                  },
-                  "categories": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  },
-                  "nodeVersion": {
-                    "type": "string"
-                  },
-                  "codexVersion": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "categories"
-                ]
-              }
-            }
-          },
-          "group": {
-            "type": "string"
-          },
-          "defaults": {
-            "type": "object",
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "color": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "name"
-            ]
-          },
-          "iconData": {
-            "type": "object",
-            "properties": {
-              "icon": {
-                "type": "string"
-              },
-              "type": {
-                "type": "string"
-              },
-              "fileBuffer": {
-                "type": "string"
-              }
-            },
-            "required": [
-              "type"
-            ]
-          },
-          "displayName": {
-            "type": "string"
-          },
-          "typeVersion": {
-            "type": "number"
-          },
-          "nodeCategories": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "number"
-                },
-                "name": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "name"
-              ]
-            }
-          }
+      ],
+      "dogs": {
+        "Fido": {
+          "color": "brown",
+          "age": 7
         },
-        "required": [
-          "id",
-          "icon",
-          "name",
-          "codex",
-          "group",
-          "defaults",
-          "iconData",
-          "displayName",
-          "typeVersion"
-        ]
+        "Spot": {
+          "color": "black and white",
+          "age": 5
+        }
       }
     }
-  },
-  "required": [
-    "id",
-    "name",
-    "totalViews",
-    "price",
-    "purchaseUrl",
-    "recentViews",
-    "createdAt",
-    "user",
-    "nodes"
-  ]
-}
+  }
+]
 ```
 
-Show `category` item data schema
+Retrieve a [list](https://jmespath.org/tutorial.html#list-and-slice-projections) of all the people's first names:
 
 ```
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "id": {
-      "type": "number"
-    },
-    "name": {
-      "type": "string"
-    }
-  },
-  "required": [
-    "id",
-    "name"
-  ]
-}
+{{$jmespath($json.body.people, "[*].first" )}}
+// Returns ["James", "Jacob", "Jayden"]
 ```
 
-Show `collection` item data schema
+```
+let firstNames = $jmespath($json.body.people, "[*].first" )
+return {firstNames};
+/* Returns:
+[
+	{
+		"firstNames": [
+			"James",
+			"Jacob",
+			"Jayden"
+		]
+	}
+]
+*/
+```
 
 ```
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "type": "object",
-  "properties": {
-    "id": {
-      "type": "number"
+firstNames = _jmespath(_json.body.people, "[*].first" )
+return {"firstNames":firstNames}
+"""
+Returns:
+[
+ 	{
+		"firstNames": [
+			"James",
+			"Jacob",
+			"Jayden"
+		]
+	}
+]
+"""
+```
+
+Get a [slice](https://jmespath.org/tutorial.html#list-and-slice-projections) of the first names:
+
+```
+{{$jmespath($json.body.people, "[:2].first")}}
+// Returns ["James", "Jacob"]
+```
+
+```
+let firstTwoNames = $jmespath($json.body.people, "[:2].first");
+return {firstTwoNames};
+/* Returns:
+[
+	{
+		"firstNames": [
+			"James",
+			"Jacob",
+			"Jayden"
+		]
+	}
+]
+*/
+```
+
+```
+firstTwoNames = _jmespath(_json.body.people, "[:2].first" )
+return {"firstTwoNames":firstTwoNames}
+"""
+Returns:
+[
+	{
+		"firstTwoNames": [
+		"James",
+		"Jacob"
+		]
+	}
+]
+"""
+```
+
+Get a list of the dogs' ages using [object projections](https://jmespath.org/tutorial.html#object-projections):
+
+```
+{{$jmespath($json.body.dogs, "*.age")}}
+// Returns [7,5]
+```
+
+```
+let dogsAges = $jmespath($json.body.dogs, "*.age");
+return {dogsAges};
+/* Returns:
+[
+	{
+		"dogsAges": [
+			7,
+			5
+		]
+	}
+]
+*/
+```
+
+```
+dogsAges = _jmespath(_json.body.dogs, "*.age")
+return {"dogsAges": dogsAges}
+"""
+Returns:
+[
+	{
+		"dogsAges": [
+			7,
+			5
+		]
+	}
+]
+"""
+```
+
+### Select multiple elements and create a new list or object
+
+Use [Multiselect](https://jmespath.org/tutorial.html#multiselect) to select elements from a JSON object and combine them into a new list or object.
+
+Given this JSON from a webhook node:
+
+```
+[
+  {
+    "headers": {
+      "host": "n8n.instance.address",
+      ...
     },
-    "rank": {
-      "type": "number"
-    },
-    "name": {
-      "type": "string"
-    },
-    "totalViews": {},
-    "createdAt": {
-      "type": "string"
-    },
-    "workflows": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "number"
-          }
+    "params": {},
+    "query": {},
+    "body": {
+      "people": [
+        {
+          "first": "James",
+          "last": "Green"
         },
-        "required": [
-          "id"
-        ]
+        {
+          "first": "Jacob",
+          "last": "Jones"
+        },
+        {
+          "first": "Jayden",
+          "last": "Smith"
+        }
+      ],
+      "dogs": {
+        "Fido": {
+          "color": "brown",
+          "age": 7
+        },
+        "Spot": {
+          "color": "black and white",
+          "age": 5
+        }
       }
-    },
-    "nodes": {
-      "type": "array",
-      "items": {}
     }
-  },
-  "required": [
-    "id",
-    "rank",
-    "name",
-    "totalViews",
-    "createdAt",
-    "workflows",
-    "nodes"
-  ]
-}
+  }
+]
 ```
 
-You can also interactively explore n8n's API endpoints:
+Use multiselect list to get the first and last names and create new lists containing both names:
 
-<https://api.n8n.io/templates/categories>\
-<https://api.n8n.io/templates/collections>\
-<https://api.n8n.io/templates/search>\
-<https://api.n8n.io/health>
+```
+{{$jmespath($json.body.people, "[].[first, last]")}}
+// Returns [["James","Green"],["Jacob","Jones"],["Jayden","Smith"]]
+```
 
-You can [contact us](mailto:help@n8n.io) for more support.
+```
+let newList = $jmespath($json.body.people, "[].[first, last]");
+return {newList};
+/* Returns:
+[
+	{
+		"newList": [
+			[
+				"James",
+				"Green"
+			],
+			[
+				"Jacob",
+				"Jones"
+			],
+			[
+				"Jayden",
+				"Smith"
+			]
+		]
+	}
+]
+*/
+```
 
-## Add your workflows to the n8n library
+```
+newList = _jmespath(_json.body.people, "[].[first, last]")
+return {"newList":newList}
+"""
+Returns:
+[
+	{
+		"newList": [
+			[
+				"James",
+				"Green"
+			],
+			[
+				"Jacob",
+				"Jones"
+			],
+			[
+				"Jayden",
+				"Smith"
+			]
+		]
+	}
+]
+"""
+```
 
-You can submit your workflows to n8n's template library.
+### An alternative to arrow functions in expressions
 
-n8n is working on a creator program, and developing a marketplace of templates. This is an ongoing project, and details are likely to change.
+For example, generate some input data by returning the below code from the Code node:
 
-Refer to [n8n Creator hub](https://www.notion.so/n8n/n8n-Creator-hub-7bd2cbe0fce0449198ecb23ff4a2f76f) for information on how to submit templates and become a creator.
+```
+return[
+  {
+    "json": {      
+      "num_categories": "0",
+      "num_products": "45",
+      "category_id": 5529735,
+      "parent_id": 1407340,
+      "pos_enabled": 1,
+      "pos_favorite": 0,
+      "name": "HP",
+      "description": "",
+      "image": ""
+    }
+  },
+  {
+    "json": {
+      "num_categories": "0",
+      "num_products": "86",
+      "category_id": 5529740,
+      "parent_id": 1407340,
+      "pos_enabled": 1,
+      "pos_favorite": 0,
+      "name": "Lenovo",
+      "description": "",
+      "image": ""
+    }
+  }  
+]
+```
+
+You could do a search like "find the item with the name Lenovo and tell me their category ID."
+
+```
+{{ $jmespath($("Code").all(), "[?json.name=='Lenovo'].json.category_id") }}
+```
+
+# Date and time with Luxon
+
+[Luxon](https://github.com/moment/luxon/) is a JavaScript library that makes it easier to work with date and time. For full details of how to use Luxon, refer to [Luxon's documentation](https://moment.github.io/luxon/#/?id=luxon).
+
+n8n passes dates between nodes as strings, so you need to parse them. Luxon makes this easier.
+
+Python support
+
+Luxon is a JavaScript library. The two convenience [variables](#get-the-current-datetime-or-date) created by n8n are available when using Python in the Code node, but their functionality is limited:
+
+- You can't perform Luxon operations on these variables. For example, there is no Python equivalent for `$today.minus(...)`.
+- The generic Luxon functionality, such as [Convert date string to Luxon](#convert-date-string-to-luxon), isn't available for Python users.
+
+## Date and time behavior in n8n
+
+Be aware of the following:
+
+- In a workflow, n8n converts dates and times to strings between nodes. Keep this in mind when doing arithmetic on dates and times from other nodes.
+- Using Luxon's `DateTime()` is the recommended approach in n8n. Using vanilla JavaScript's `Date()` doesn't work with some n8n features. For example, it doesn't respect the [Workflow-specific Time Zone](https://docs.n8n.io/workflows/settings/#timezone).
+- With vanilla JavaScript, you can convert a string to a date with `new Date('2019-06-23')`. In Luxon, you must use a function explicitly stating the format, such as `DateTime.fromISO('2019-06-23')` or `DateTime.fromFormat("23-06-2019", "dd-MM-yyyy")`.
+
+## Setting the timezone in n8n
+
+Luxon uses the n8n timezone. This value is either:
+
+- Default: `America/New York`
+- A custom timezone for your n8n instance, set using the `GENERIC_TIMEZONE` environment variable.
+- A custom timezone for an individual workflow, configured in workflow settings.
+
+## Common tasks
+
+This section provides examples for some common operations. More examples, and detailed guidance, are available in [Luxon's own documentation](https://moment.github.io/luxon/#/?id=luxon).
+
+### Get the current datetime or date
+
+Use the `$now` and `$today` Luxon objects to get the current time or day:
+
+- `now`: a Luxon object containing the current timestamp. Equivalent to `DateTime.now()`.
+- `today`: a Luxon object containing the current timestamp, rounded down to the day. Equivalent to `DateTime.now().set({ hour: 0, minute: 0, second: 0, millisecond: 0 })`.
+
+Note that these variables can return different time formats when cast as a string:
+
+```
+{{$now}}
+// n8n displays the ISO formatted timestamp
+// For example 2022-03-09T14:02:37.065+00:00
+{{"Today's date is " + $now}}
+// n8n displays "Today's date is <unix timestamp>"
+// For example "Today's date is 1646834498755"
+```
+
+```
+$now
+// n8n displays <ISO formatted timestamp>
+// For example 2022-03-09T14:00:25.058+00:00
+let rightNow = "Today's date is " + $now
+// n8n displays "Today's date is <unix timestamp>"
+// For example "Today's date is 1646834498755"
+```
+
+```
+_now
+# n8n displays <ISO formatted timestamp>
+# For example 2022-03-09T14:00:25.058+00:00
+rightNow = "Today's date is " + str(_now)
+# n8n displays "Today's date is <unix timestamp>"
+# For example "Today's date is 1646834498755"
+```
+
+n8n provides built-in convenience functions to support data transformation in expressions for dates. Refer to [Expression reference](../../expression-reference/) for more information.
+
+### Convert JavaScript dates to Luxon
+
+To convert a native JavaScript date to a Luxon date:
+
+- In expressions, use the `.toDateTime()` method. For example, `{{ (new Date()).toDateTime() }}`.
+- In the Code node, use `DateTime.fromJSDate()`. For example, `let luxondate = DateTime.fromJSDate(new Date())`.
+
+### Convert date string to Luxon
+
+You can convert date strings and other date formats to a Luxon DateTime object. You can convert from standard formats and from arbitrary strings.
+
+A difference between Luxon DateTime and JavaScript Date
+
+With vanilla JavaScript, you can convert a string to a date with `new Date('2019-06-23')`. In Luxon, you must use a function explicitly stating the format, such as `DateTime.fromISO('2019-06-23')` or `DateTime.fromFormat("23-06-2019", "dd-MM-yyyy")`.
+
+#### If you have a date in a supported standard technical format:
+
+Most dates use `fromISO()`. This creates a Luxon DateTime from an ISO 8601 string. For example:
+
+```
+{{DateTime.fromISO('2019-06-23T00:00:00.00')}}
+```
+
+```
+let luxonDateTime = DateTime.fromISO('2019-06-23T00:00:00.00')
+```
+
+Luxon's API documentation has more information on [fromISO](https://moment.github.io/luxon/api-docs/index.html#datetimefromiso).
+
+Luxon provides functions to handle conversions for a range of formats. Refer to Luxon's guide to [Parsing technical formats](https://moment.github.io/luxon/#/parsing?id=parsing-technical-formats) for details.
+
+#### If you have a date as a string that doesn't use a standard format:
+
+Use Luxon's [Ad-hoc parsing](https://moment.github.io/luxon/#/parsing?id=ad-hoc-parsing). To do this, use the `fromFormat()` function, providing the string and a set of [tokens](https://moment.github.io/luxon/#/parsing?id=table-of-tokens) that describe the format.
+
+For example, you have n8n's founding date, 23rd June 2019, formatted as `23-06-2019`. You want to turn this into a Luxon object:
+
+```
+{{DateTime.fromFormat("23-06-2019", "dd-MM-yyyy")}}
+```
+
+```
+let newFormat = DateTime.fromFormat("23-06-2019", "dd-MM-yyyy")
+```
+
+When using ad-hoc parsing, note Luxon's warning about [Limitations](https://moment.github.io/luxon/#/parsing?id=limitations). If you see unexpected results, try their [Debugging](https://moment.github.io/luxon/#/parsing?id=debugging) guide.
+
+### Get n days from today
+
+Get a number of days before or after today.
+
+For example, you want to set a field to always show the date seven days before the current date.
+
+In the expressions editor, enter:
+
+```
+{{$today.minus({days: 7})}}
+```
+
+On the 23rd June 2019, this returns `[Object: "2019-06-16T00:00:00.000+00:00"]`.
+
+This example uses n8n's custom variable `$today` for convenience. It's the equivalent of `DateTime.now().set({ hour: 0, minute: 0, second: 0, millisecond: 0 }).minus({days: 7})`.
+
+For example, you want a variable containing the date seven days before the current date.
+
+In the code editor, enter:
+
+```
+let sevenDaysAgo = $today.minus({days: 7})
+```
+
+On the 23rd June 2019, this returns `[Object: "2019-06-16T00:00:00.000+00:00"]`.
+
+This example uses n8n's custom variable `$today` for convenience. It's the equivalent of `DateTime.now().set({ hour: 0, minute: 0, second: 0, millisecond: 0 }).minus({days: 7})`.
+
+For more detailed information and examples, refer to:
+
+- Luxon's [guide to math](https://moment.github.io/luxon/#/math)
+- Their API documentation on [DateTime plus](https://moment.github.io/luxon/api-docs/index.html#datetimeplus) and [DateTime minus](https://moment.github.io/luxon/api-docs/index.html#datetimeminus)
+
+### Create human-readable dates
+
+In [Get n days from today](#get-n-days-from-today), the example gets the date seven days before the current date, and returns it as `[Object: "yyyy-mm-dd-T00:00:00.000+00:00"]` (for expressions) or `yyyy-mm-dd-T00:00:00.000+00:00` (in the Code node). To make this more readable, you can use Luxon's formatting functions.
+
+For example, you want the field containing the date to be formatted as DD/MM/YYYY, so that on the 23rd June 2019, it returns `23/06/2019`.
+
+This expression gets the date seven days before today, and converts it to the DD/MM/YYYY format.
+
+```
+{{$today.minus({days: 7}).toLocaleString()}}
+```
+
+```
+let readableSevenDaysAgo = $today.minus({days: 7}).toLocaleString()
+```
+
+You can alter the format. For example:
+
+```
+{{$today.minus({days: 7}).toLocaleString({month: 'long', day: 'numeric', year: 'numeric'})}}
+```
+
+On 23rd June 2019, this returns "16 June 2019".
+
+```
+let readableSevenDaysAgo = $today.minus({days: 7}).toLocaleString({month: 'long', day: 'numeric', year: 'numeric'})
+```
+
+On 23rd June 2019, this returns "16 June 2019".
+
+Refer to Luxon's guide on [toLocaleString (strings for humans)](https://moment.github.io/luxon/#/formatting?id=tolocalestring-strings-for-humans) for more information.
+
+### Get the time between two dates
+
+To get the time between two dates, use Luxon's diffs feature. This subtracts one date from another and returns a duration.
+
+For example, get the number of months between two dates:
+
+```
+{{DateTime.fromISO('2019-06-23').diff(DateTime.fromISO('2019-05-23'), 'months').toObject()}}
+```
+
+This returns `[Object: {"months":1}]`.
+
+```
+let monthsBetweenDates = DateTime.fromISO('2019-06-23').diff(DateTime.fromISO('2019-05-23'), 'months').toObject()
+```
+
+This returns `{"months":1}`.
+
+Refer to Luxon's [Diffs](https://moment.github.io/luxon/#/math?id=diffs) for more information.
+
+### A longer example: How many days to Christmas?
+
+This example brings together several Luxon features, uses JMESPath, and does some basic string manipulation.
+
+The scenario: you want a countdown to 25th December. Every day, it should tell you the number of days remaining to Christmas. You don't want to update it for next year - it needs to seamlessly work for every year.
+
+```
+{{"There are " + $today.diff(DateTime.fromISO($today.year + '-12-25'), 'days').toObject().days.toString().substring(1) + " days to Christmas!"}}
+```
+
+This outputs `"There are <number of days> days to Christmas!"`. For example, on 9th March, it outputs "There are 291 days to Christmas!".
+
+A detailed explanation of what the expression does:
+
+- `{{`: indicates the start of the expression.
+- `"There are "`: a string.
+- `+`: used to join two strings.
+- `$today.diff()`: This is similar to the example in [Get the time between two dates](#get-the-time-between-two-dates), but it uses n8n's custom `$today` variable.
+- `DateTime.fromISO($today.year + '-12-25'), 'days'`: this part gets the current year using `$today.year`, turns it into an ISO string along with the month and date, and then takes the whole ISO string and converts it to a Luxon DateTime data structure. It also tells Luxon that you want the duration in days.
+- `toObject()` turns the result of diff() into a more usable object. At this point, the expression returns `[Object: {"days":-<number-of-days>}]`. For example, on 9th March, `[Object: {"days":-291}]`.
+- `.days` uses JMESPath syntax to retrieve just the number of days from the object. For more information on using JMESPath with n8n, refer to our [JMESpath](../jmespath/) documentation. This gives you the number of days to Christmas, as a negative number.
+- `.toString().substring(1)` turns the number into a string and removes the `-`.
+- `+ " days to Christmas!"`: another string, with a `+` to join it to the previous string.
+- `}}`: indicates the end of the expression.
+
+```
+let daysToChristmas = "There are " + $today.diff(DateTime.fromISO($today.year + '-12-25'), 'days').toObject().days.toString().substring(1) + " days to Christmas!";
+```
+
+This outputs `"There are <number of days> days to Christmas!"`. For example, on 9th March, it outputs "There are 291 days to Christmas!".
+
+A detailed explanation of what the code does:
+
+- `"There are "`: a string.
+- `+`: used to join two strings.
+- `$today.diff()`: This is similar to the example in [Get the time between two dates](#get-the-time-between-two-dates), but it uses n8n's custom `$today` variable.
+- `DateTime.fromISO($today.year + '-12-25'), 'days'`: this part gets the current year using `$today.year`, turns it into an ISO string along with the month and date, and then takes the whole ISO string and converts it to a Luxon DateTime data structure. It also tells Luxon that you want the duration in days.
+- `toObject()` turns the result of diff() into a more usable object. At this point, the expression returns `[Object: {"days":-<number-of-days>}]`. For example, on 9th March, `[Object: {"days":-291}]`.
+- `.days` uses JMESPath syntax to retrieve just the number of days from the object. For more information on using JMESPath with n8n, refer to our [JMESpath](../jmespath/) documentation. This gives you the number of days to Christmas, as a negative number.
+- `.toString().substring(1)` turns the number into a string and removes the `-`.
+- `+ " days to Christmas!"`: another string, with a `+` to join it to the previous string.
 
 # Flow logic
 
@@ -11821,7 +16385,7 @@ This section covers:
 
 ## Related sections
 
-You need some understanding of [Data](../data/) in n8n, including [Data structure](../data/data-structure/) and [Data flow within nodes](../data/data-flow-nodes/).
+You need some understanding of [Data](../data/) in n8n, including [Data structure](../data/data-structure/) and [Data flow within nodes](../data/data-structure/#how-data-flows-within-nodes).
 
 When building your logic, you'll use n8n's [Core nodes](../integrations/builtin/core-nodes/), including:
 
@@ -12245,7 +16809,7 @@ It may also be helpful to include a [HAR (HTTP Archive) file](<https://en.wikipe
 
 # Self-hosting n8n
 
-This section provides guidance on setting up n8n for both the Enterprise and Community self-hosted editions. The Community edition is free, the Enterprise edition isn't.
+This section provides guidance on setting up self-hosted n8n. All self-hosted installations use the same core product. Without a license key, n8n runs as the free Community edition. Adding a Business or Enterprise license key enables those editions.
 
 See [Community edition features](community-edition-features/) for a list of available features.
 
@@ -12477,13 +17041,14 @@ When exporting workflows and credentials, n8n also exports their IDs. If you hav
 
 Available flags:
 
-| Flag        | Description                                                                                |
-| ----------- | ------------------------------------------------------------------------------------------ |
-| --help      | Help prompt.                                                                               |
-| --input     | Input file name or directory if you use --separate.                                        |
-| --projectId | Import the workflow or credential to the specified project. Can't be used with `--userId`. |
-| --separate  | Imports `*.json` files from directory provided by --input.                                 |
-| --userId    | Import the workflow or credential to the specified user. Can't be used with `--projectId`. |
+| Flag                  | Description                                                                                |
+| --------------------- | ------------------------------------------------------------------------------------------ |
+| --help                | Help prompt.                                                                               |
+| --input               | Input file name or directory if you use --separate.                                        |
+| --projectId           | Import the workflow or credential to the specified project. Can't be used with `--userId`. |
+| --separate            | Imports `*.json` files from directory provided by --input.                                 |
+| --userId              | Import the workflow or credential to the specified user. Can't be used with `--projectId`. |
+| --skipMigrationChecks | Skip migration validation checks.                                                          |
 
 Migrating to SQLite
 
@@ -12634,7 +17199,7 @@ The community edition doesn't include these features:
 - Sharing ([workflows](../../workflows/sharing/), [credentials](../../credentials/credential-sharing/)) (Only the instance owner and the user who creates them can access workflows and credentials)
 - [Version control using Git](../../source-control-environments/)
 
-These features are available on the Enterprise Cloud plan, including the self-hosted Enterprise edition. Some of these features are available on the Starter and Pro Cloud plan.
+These features are available on: the Enterprise Cloud plan, including the self-hosted Enterprise edition. Some of these features are available on the Starter and Pro Cloud plans, and the Business self-hosted plan.
 
 See [pricing](https://n8n.io/pricing/) for reference.
 
@@ -12864,6 +17429,249 @@ DB_POSTGRESDB_SSL_KEY_FILE=/path/to/ssl_key
 DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED_FILE=/path/to/ssl_reject_unauth
 ```
 
+# Credential overwrites
+
+Credential overwrites let you set credential data globally. This data isn't visible to users, but n8n uses it automatically in the background - for example, to enable OAuth login using a "Connect" button without exposing client secrets.
+
+In the Editor UI, n8n hides all overwritten fields by default, so users can authenticate with OAuth using the "Connect" button on the credential.
+
+For the environment variables used to configure credential overwrites, refer to [Credentials environment variables](../environment-variables/credentials/).
+
+## Using environment variables
+
+Set `CREDENTIALS_OVERWRITE_DATA` to `{ CREDENTIAL_NAME: { PARAMETER: VALUE }}`.
+
+Warning
+
+This approach isn't recommended. Environment variables aren't protected in n8n, so the data can leak to users.
+
+## Using the REST API
+
+The recommended approach is to load the data using a custom REST endpoint.
+
+1. Set `CREDENTIALS_OVERWRITE_ENDPOINT` to the path where the endpoint should be available:
+
+   ```
+   export CREDENTIALS_OVERWRITE_ENDPOINT=send-credentials
+   ```
+
+   Optionally, set `CREDENTIALS_OVERWRITE_ENDPOINT_AUTH_TOKEN` to require a bearer token for accessing the endpoint.
+
+   Note
+
+   Without an auth token, the endpoint can only be called once for security reasons.
+
+1. Prepare a JSON file with the credentials to overwrite. For example, `oauth-credentials.json` for Asana and GitHub:
+
+   ```
+   {
+       "asanaOAuth2Api": {
+           "clientId": "<id>",
+           "clientSecret": "<secret>"
+       },
+       "githubOAuth2Api": {
+           "clientId": "<id>",
+           "clientSecret": "<secret>"
+       }
+   }
+   ```
+
+1. Send the file to your n8n instance:
+
+   ```
+   curl -H "Content-Type: application/json" --data @oauth-credentials.json http://localhost:5678/send-credentials
+   ```
+
+   If `CREDENTIALS_OVERWRITE_ENDPOINT_AUTH_TOKEN` is set to `secure-token`:
+
+   ```
+   curl -H "Content-Type: application/json" -H "Authorization: Bearer secure-token" --data @oauth-credentials.json http://localhost:5678/send-credentials
+   ```
+
+Note
+
+Credentials can extend other credentials. For example, `googleSheetsOAuth2Api` extends `googleOAuth2Api`. You can set parameters on the parent (`googleOAuth2Api`) and all child credentials will use them.
+
+## Persistence
+
+To store credential overwrites in the database and propagate them to all workers in multi-instance or queue mode, enable:
+
+```
+export CREDENTIALS_OVERWRITE_PERSISTENCE=true
+```
+
+When enabled, n8n stores the encrypted overwrites in the `settings` table and broadcasts a `reload-overwrite-credentials` event so workers reload the latest values. When disabled, overwrites remain in memory on the process that loaded them and n8n doesn't propagate them to workers or preserve them across restarts.
+
+# External hooks
+
+External hooks let you run custom code whenever n8n performs a specific operation. Use them to log data, change data, or forbid an action by throwing an error.
+
+There are two types:
+
+- **Backend hooks**: run server-side, registered using the `EXTERNAL_HOOK_FILES` environment variable.
+- **Frontend hooks**: run in the browser, loaded with a script tag.
+
+For the environment variables used to register hooks, refer to [External hooks environment variables](../environment-variables/external-hooks/).
+
+## Backend hooks
+
+### Available hooks
+
+| Hook                      | Arguments                                                                                                                                                            | Description                                                                                                   |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `credentials.create`      | `[credentialData: ICredentialsDb]`                                                                                                                                   | Called before new credentials get created. Use to restrict the number of credentials.                         |
+| `credentials.delete`      | `[id: credentialId]`                                                                                                                                                 | Called before credentials get deleted.                                                                        |
+| `credentials.update`      | `[credentialData: ICredentialsDb]`                                                                                                                                   | Called before n8n saves existing credentials.                                                                 |
+| `frontend.settings`       | `[frontendSettings: IN8nUISettings]`                                                                                                                                 | Gets called on n8n startup. Allows you to, for example, overwrite frontend data like the displayed OAuth URL. |
+| `n8n.ready`               | `[app: App]`                                                                                                                                                         | Called once n8n is ready. Use to, for example, register custom API endpoints.                                 |
+| `n8n.stop`                |                                                                                                                                                                      | Called when an n8n process gets stopped. Allows you to save some process data.                                |
+| `oauth1.authenticate`     | `[oAuthOptions: clientOAuth1.Options, oauthRequestData: {oauth_callback: string}]`                                                                                   | Called before an OAuth1 authentication. Use to overwrite an OAuth callback URL.                               |
+| `oauth2.callback`         | `[oAuth2Parameters: {clientId: string, clientSecret: string \| undefined, accessTokenUri: string, authorizationUri: string, redirectUri: string, scopes: string[]}]` | Called in an OAuth2 callback. Use to overwrite an OAuth callback URL.                                         |
+| `workflow.activate`       | `[workflowData: IWorkflowDb]`                                                                                                                                        | Called before a workflow gets activated. Use to restrict the number of active workflows.                      |
+| `workflow.afterCreate`    | `[workflowId: string]`                                                                                                                                               | Called after a workflow gets created.                                                                         |
+| `workflow.afterDelete`    | `[workflowId: string]`                                                                                                                                               | Called after a workflow gets deleted.                                                                         |
+| `workflow.afterUpdate`    | `[workflowData: IWorkflowBase]`                                                                                                                                      | Called after an existing workflow gets saved.                                                                 |
+| `workflow.create`         | `[workflowData: IWorkflowBase]`                                                                                                                                      | Called before a workflow gets created. Use to restrict the number of saved workflows.                         |
+| `workflow.delete`         | `[workflowId: string]`                                                                                                                                               | Called before a workflow gets deleted.                                                                        |
+| `workflow.postExecute`    | `[run: IRun, workflowData: IWorkflowBase]`                                                                                                                           | Called after a workflow gets executed.                                                                        |
+| `workflow.preExecute`     | `[workflow: Workflow: mode: WorkflowExecuteMode]`                                                                                                                    | Called before a workflow gets executed. Allows you to count or limit the number of workflow executions.       |
+| `workflow.update`         | `[workflowData: IWorkflowBase]`                                                                                                                                      | Called before an existing workflow gets saved.                                                                |
+| `workflow.afterArchive`   | `[workflowId: string]`                                                                                                                                               | Called after you archive a workflow.                                                                          |
+| `workflow.afterUnarchive` | `[workflowId: string]`                                                                                                                                               | Called after you restore a workflow from the archive.                                                         |
+
+### Registering hooks
+
+Set hooks by registering a hook file that contains the hook functions. To register a hook, set the environment variable `EXTERNAL_HOOK_FILES`.
+
+You can set the variable to a single file:
+
+`EXTERNAL_HOOK_FILES=/data/hook.js`
+
+Or to contain multiple files separated by a colon:
+
+`EXTERNAL_HOOK_FILES=/data/hook1.js:/data/hook2.js`
+
+### Hook files
+
+Hook files are regular JavaScript files that have the following format:
+
+```
+module.exports = {
+    "frontend": {
+        "settings": [
+            async function (settings) {
+                settings.oauthCallbackUrls.oauth1 = 'https://n8n.example.com/oauth1/callback';
+                settings.oauthCallbackUrls.oauth2 = 'https://n8n.example.com/oauth2/callback';
+            }
+        ]
+    },
+    "workflow": {
+        "activate": [
+            async function (workflowData) {
+                const activeWorkflows = await this.dbCollections.Workflow.count({ active: true });
+
+                if (activeWorkflows > 1) {
+                    throw new Error(
+                        'Active workflow limit reached.'
+                    );
+                }
+            }
+        ]
+    }
+}
+```
+
+### Hook functions
+
+A hook or a hook file can contain multiple hook functions, with all functions executed one after another.
+
+If the parameters of the hook function are objects, it's possible to change the data of that parameter to change the behavior of n8n.
+
+You can also access the database in any hook function using `this.dbCollections` (refer to the code sample in [Hook files](#hook-files) above).
+
+## Frontend external hooks
+
+Like backend external hooks, it's possible to define external hooks in the frontend code that get executed by n8n whenever a user performs a specific operation. You can use them, for example, to log data and change data.
+
+### Available hooks
+
+| Hook                                       | Description                                                                 |
+| ------------------------------------------ | --------------------------------------------------------------------------- |
+| `credentialsEdit.credentialTypeChanged`    | Called when an existing credential's type changes.                          |
+| `credentials.create`                       | Called when someone creates a new credential.                               |
+| `credentialsList.dialogVisibleChanged`     |                                                                             |
+| `dataDisplay.nodeTypeChanged`              |                                                                             |
+| `dataDisplay.onDocumentationUrlClick`      | Called when someone selects the help documentation link.                    |
+| `execution.open`                           | Called when an existing execution opens.                                    |
+| `executionsList.openDialog`                | Called when someone selects an execution from existing Workflow Executions. |
+| `expressionEdit.itemSelected`              |                                                                             |
+| `expressionEdit.dialogVisibleChanged`      |                                                                             |
+| `nodeCreateList.filteredNodeTypesComputed` |                                                                             |
+| `nodeCreateList.nodeFilterChanged`         | Called when someone makes any changes to the node panel filter.             |
+| `nodeCreateList.selectedTypeChanged`       |                                                                             |
+| `nodeCreateList.mounted`                   |                                                                             |
+| `nodeCreateList.destroyed`                 |                                                                             |
+| `nodeSettings.credentialSelected`          |                                                                             |
+| `nodeSettings.valueChanged`                |                                                                             |
+| `nodeView.createNodeActiveChanged`         |                                                                             |
+| `nodeView.addNodeButton`                   |                                                                             |
+| `nodeView.mount`                           |                                                                             |
+| `pushConnection.executionFinished`         |                                                                             |
+| `showMessage.showError`                    |                                                                             |
+| `runData.displayModeChanged`               |                                                                             |
+| `workflow.activeChange`                    |                                                                             |
+| `workflow.activeChangeCurrent`             |                                                                             |
+| `workflow.afterUpdate`                     | Called when someone updates an existing workflow.                           |
+| `workflow.open`                            |                                                                             |
+| `workflowRun.runError`                     |                                                                             |
+| `workflowRun.runWorkflow`                  | Called when a workflow executes.                                            |
+| `workflowSettings.dialogVisibleChanged`    |                                                                             |
+| `workflowSettings.saveSettings`            | Called when someone saves the settings of a workflow.                       |
+
+### Registering frontend hooks
+
+You can set hooks by loading the hooks script on the page. One way to do this is by creating a hooks file in the project and adding a script tag in your `editor-ui/public/index.html` file:
+
+```
+<script src="frontend-hooks.js"></script>
+```
+
+### Frontend hook files
+
+Frontend external hook files are regular JavaScript files which have the following format:
+
+```
+window.n8nExternalHooks = {
+  nodeView: {
+    mount: [
+      function (store, meta) {
+        // do something
+      },
+    ],
+    createNodeActiveChanged: [
+      function (store, meta) {
+        // do something
+      },
+      function (store, meta) {
+        // do something else
+      },
+    ],
+    addNodeButton: [
+      function (store, meta) {
+        // do something
+      },
+    ],
+  },
+};
+```
+
+### Frontend hook functions
+
+You can define multiple hook functions per hook. n8n calls each hook function with the following arguments:
+
+- `store`: The Vuex store object. You can use this to change or get data from the store.
+- `metadata`: The object that contains any data provided by the hook. To see what's passed, search for the hook in the `editor-ui` package.
+
 # Supported databases
 
 By default, n8n uses SQLite to save credentials, past executions, and workflows. n8n also supports PostgresDB (only [actively maintained versions](https://www.postgresql.org/support/versioning/)).
@@ -12915,7 +17723,7 @@ export DB_POSTGRESDB_PASSWORD=n8n
 export DB_POSTGRESDB_SCHEMA=n8n
 
 # optional:
-export DB_POSTGRESDB_SSL_CA=$(pwd)/ca.crt
+export DB_POSTGRESDB_SSL_CA_FILE=$(pwd)/ca.crt
 export DB_POSTGRESDB_SSL_REJECT_UNAUTHORIZED=false
 
 n8n start
@@ -12981,7 +17789,7 @@ In external mode, a [launcher application](https://github.com/n8n-io/task-runner
 
 When using [Queue mode](../../scaling/queue-mode/), each worker needs to have its own sidecar container for task runners.
 
-In addition, if you haven't enabled offloading manual executions to workers (if you aren't setting `OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=true` in your configuration), then your main instance will run manual executions and needs its own sidecar container for task runners as well. Please note that running n8n with offloading disabled isn't recommended for production.
+In addition, if [`OFFLOAD_MANUAL_EXECUTIONS_TO_WORKERS=false`](../environment-variables/queue-mode/#queue-mode-environment-variables), then your main instance will run manual executions and needs its own sidecar container for task runners as well. Please note that running n8n with offloading disabled isn't recommended for production.
 
 ## Setting up external mode
 
@@ -13144,9 +17952,12 @@ For LDAP setup information, refer to [LDAP](../../../user-management/ldap/).
 
 For SAML setup information, refer to [SAML](../../../user-management/saml/).
 
-Basic auth and JWT removed
+Unsupported user management methods
 
-n8n removed support for basic auth and JWT in version 1.0.
+In version 1.0, n8n:
+
+- Removed support for **basic auth** and **JWT**
+- Removed the `N8N_USER_MANAGEMENT_DISABLED` environment variable. No supported way to disable the login screen exists in recent versions of n8n, including for local or development use. If you need to simplify login for local development, consider using a password manager, setting a simple local password, or scripting the standard login flow.
 
 ## Setup
 
@@ -13182,7 +17993,7 @@ To set up SMTP with n8n, configure the SMTP environment variables for your n8n i
 | `N8N_SMTP_PASS`                             | string  | *your_SMTP_password*                                                                                                         | Optional  |
 | `N8N_SMTP_OAUTH_SERVICE_CLIENT`             | string  | *your_OAuth_service_client*                                                                                                  | Optional  |
 | `N8N_SMTP_OAUTH_PRIVATE_KEY`                | string  | *your_OAuth_private_key*                                                                                                     | Optional  |
-| `N8N_SMTP_SENDER`                           | string  | Sender email address. You can optionally include the sender name. Example with name: *N8N `<contact@n8n.com>`*               | Required  |
+| `N8N_SMTP_SENDER`                           | string  | Sender email address. You can optionally include the sender name. Example with name: *n8n `<contact@n8n.com>`*               | Required  |
 | `N8N_SMTP_SSL`                              | boolean | Whether to use SSL for SMTP (true) or not (false). Defaults to `true`.                                                       | Optional  |
 | `N8N_UM_EMAIL_TEMPLATES_INVITE`             | string  | Full path to your HTML email template. This overrides the default template for invite emails.                                | Optional  |
 | `N8N_UM_EMAIL_TEMPLATES_PWRESET`            | string  | Full path to your HTML email template. This overrides the default template for password reset emails.                        | Optional  |
@@ -13234,6 +18045,8 @@ This section contains examples for how to configure n8n to solve particular use 
 - [Specify user folder path](/hosting/configuration/configuration-examples/user-folder/)
 - [Configure webhook URLs with reverse proxy](/hosting/configuration/configuration-examples/webhook-url/)
 - [Enable Prometheus metrics](/hosting/configuration/configuration-examples/prometheus/)
+- [Pre-configure Microsoft OAuth credentials](/hosting/configuration/configuration-examples/microsoft-oauth-credential-overwrites/)
+- [Configure a custom workflow templates library](/hosting/configuration/configuration-examples/custom-templates/)
 
 # Configure the Base URL for n8n's front end access
 
@@ -13337,6 +18150,460 @@ export N8N_CUSTOM_EXTENSIONS="/home/jim/n8n/custom-nodes;/data/n8n/nodes"
 
 Refer to [Environment variables reference](../../environment-variables/nodes/) for more information on this variable.
 
+# Configure a custom workflow templates library
+
+n8n provides a library of workflow [templates](../../../../glossary/#template-n8n). When self-hosting n8n, you can:
+
+- Continue to use n8n's workflow templates library (this is the default behavior)
+- Disable workflow templates
+- Create your own workflow templates library
+
+## Disable workflow templates
+
+In your environment variables, set `N8N_TEMPLATES_ENABLED` to false.
+
+## Use your own workflow templates library
+
+In your environment variables, set `N8N_TEMPLATES_HOST` to the base URL of your API.
+
+### Endpoints
+
+Your API must provide the same endpoints and data structure as n8n's.
+
+The endpoints are:
+
+| Method | Path                          | Purpose                                      |
+| ------ | ----------------------------- | -------------------------------------------- |
+| GET    | `/templates/workflows/<id>`   | Fetch template metadata for preview/browsing |
+| GET    | `/workflows/templates/<id>`   | Fetch workflow data to import onto canvas    |
+| GET    | `/templates/search`           | Search for workflow templates                |
+| GET    | `/templates/collections/<id>` | Get a specific template collection           |
+| GET    | `/templates/collections`      | List all template collections                |
+| GET    | `/templates/categories`       | List all template categories                 |
+| GET    | `/health`                     | Health check endpoint                        |
+
+Critical: Two different response formats required
+
+The two workflow endpoints require **different response formats**:
+
+- **`/templates/workflows/{id}`**: Returns the template itself, which includes the workflow in the `workflow` key
+- **`/workflows/templates/{id}`**: Returns the workflow the template contains
+
+See Schemas below for details.
+
+### Query parameters
+
+The `/templates/search` endpoint accepts the following query parameters:
+
+| Parameter  | Type                                         | Description                                      |
+| ---------- | -------------------------------------------- | ------------------------------------------------ |
+| `page`     | integer                                      | The page of results to return                    |
+| `rows`     | integer                                      | The maximum number of results to return per page |
+| `category` | comma-separated list of strings (categories) | The categories to search within                  |
+| `search`   | string                                       | The search query                                 |
+
+The `/templates/collections` endpoint accepts the following query parameters:
+
+| Parameter  | Type                                         | Description                     |
+| ---------- | -------------------------------------------- | ------------------------------- |
+| `category` | comma-separated list of strings (categories) | The categories to search within |
+| `search`   | string                                       | The search query                |
+
+### Schemas
+
+The key difference between the two workflow endpoints:
+
+```
+// GET /templates/workflows/{id} returns (wrapped):
+{
+  "workflow": {
+    "id": 123,
+    "name": "...",
+    "totalViews": 1000,
+    // ... see full workflow item schema below
+    "workflow": {    // actual workflow definition
+      "nodes": [...],
+      "connections": {}
+    }
+  }
+}
+
+// GET /workflows/templates/{id} returns (flat):
+{
+  "id": 123,
+  "name": "...",
+  "workflow": {      // actual workflow definition
+    "nodes": [...],
+    "connections": {}
+  }
+}
+```
+
+Detailed schemas for response objects:
+
+Show `workflow` item data schema
+
+Used by `/templates/workflows/{id}` endpoint (wrapped in a `workflow` key).
+
+This schema describes the template metadata used for displaying templates in search/browse UI. It includes a nested `workflow` property that contains the actual importable workflow definition.
+
+```
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Generated schema for Root",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "number"
+    },
+    "name": {
+      "type": "string"
+    },
+    "totalViews": {
+      "type": "number"
+    },
+    "price": {},
+    "purchaseUrl": {},
+    "recentViews": {
+      "type": "number"
+    },
+    "createdAt": {
+      "type": "string"
+    },
+    "user": {
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string"
+        },
+        "verified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "username",
+        "verified"
+      ]
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "icon": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "codex": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "object",
+                "properties": {
+                  "details": {
+                    "type": "string"
+                  },
+                  "resources": {
+                    "type": "object",
+                    "properties": {
+                      "generic": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string"
+                            },
+                            "icon": {
+                              "type": "string"
+                            },
+                            "label": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "url",
+                            "label"
+                          ]
+                        }
+                      },
+                      "primaryDocumentation": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "url": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "url"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "primaryDocumentation"
+                    ]
+                  },
+                  "categories": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "nodeVersion": {
+                    "type": "string"
+                  },
+                  "codexVersion": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "categories"
+                ]
+              }
+            }
+          },
+          "group": {
+            "type": "string"
+          },
+          "defaults": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "color": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "iconData": {
+            "type": "object",
+            "properties": {
+              "icon": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "fileBuffer": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "type"
+            ]
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "typeVersion": {
+            "type": "number"
+          },
+          "nodeCategories": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "number"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "icon",
+          "name",
+          "codex",
+          "group",
+          "defaults",
+          "iconData",
+          "displayName",
+          "typeVersion"
+        ]
+      }
+    },
+    "description": {
+      "type": "string"
+    },
+    "image": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "workflowInfo": {
+      "type": "object",
+      "properties": {
+        "nodeCount": {
+          "type": "number"
+        },
+        "nodeTypes": {
+          "type": "object"
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array"
+        },
+        "connections": {
+          "type": "object"
+        },
+        "settings": {
+          "type": "object"
+        },
+        "pinData": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "nodes",
+        "connections"
+      ]
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "totalViews",
+    "createdAt",
+    "user",
+    "nodes",
+    "workflow"
+  ]
+}
+```
+
+Show `category` item data schema
+
+```
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "number"
+    },
+    "name": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "name"
+  ]
+}
+```
+
+Show `collection` item data schema
+
+```
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "number"
+    },
+    "rank": {
+      "type": "number"
+    },
+    "name": {
+      "type": "string"
+    },
+    "totalViews": {},
+    "createdAt": {
+      "type": "string"
+    },
+    "workflows": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {}
+    }
+  },
+  "required": [
+    "id",
+    "rank",
+    "name",
+    "totalViews",
+    "createdAt",
+    "workflows",
+    "nodes"
+  ]
+}
+```
+
+You can also interactively explore n8n's API endpoints:
+
+<https://api.n8n.io/templates/categories> <https://api.n8n.io/templates/collections> <https://api.n8n.io/templates/search> <https://api.n8n.io/health>
+
+You can [contact us](mailto:help@n8n.io) for more support.
+
+## Add your workflows to the n8n library
+
+You can submit your workflows to n8n's template library.
+
+n8n is working on a creator program, and developing a marketplace of templates. This is an ongoing project, and details are likely to change.
+
+Refer to [n8n Creator hub](https://www.notion.so/n8n/n8n-Creator-hub-7bd2cbe0fce0449198ecb23ff4a2f76f) for information on how to submit templates and become a creator.
+
 # Set a custom encryption key
 
 n8n creates a random encryption key automatically on the first launch and saves it in the `~/.n8n` folder. n8n uses that key to encrypt the credentials before they get saved to the database. If the key isn't yet in the settings file, you can set it using an environment variable, so that n8n uses your custom key instead of generating a new one.
@@ -13388,6 +18655,557 @@ N8N_DIAGNOSTICS_CONFIG_BACKEND=
 ```
 
 Refer to [Environment variables reference](../../environment-variables/deployment/) for more information on these variables.
+
+# Pre-configure Microsoft OAuth credentials
+
+After [setting up a Microsoft Entra ID app registration with delegated access](../../../../integrations/builtin/credentials/microsoftentra/#delegated-access-for-organisation-wide-microsoft-integrations), you can use [credential overwrites](../../credential-overwrites/) to inject the Client ID and Client Secret into n8n at startup. This means users in your organisation can connect to Microsoft services without completing their own OAuth app registration.
+
+n8n supports three environment variables for credential overwrites. This guide uses `CREDENTIALS_OVERWRITE_DATA_FILE`. Refer to [Credentials environment variables](../../environment-variables/credentials/) for the full variable reference.
+
+## Create the credentials file
+
+On the host running n8n, create a file named `credentials-overwrite.json` in the same directory as your `docker-compose.yaml`.
+
+The file contains a JSON object keyed by the n8n credential type name. For example, to pre-configure Microsoft Outlook:
+
+```
+{
+  "microsoftOutlookOAuth2Api": {
+    "clientId": "YOUR_CLIENT_ID",
+    "clientSecret": "YOUR_CLIENT_SECRET"
+  }
+}
+```
+
+To pre-configure multiple Microsoft services at once, add each credential type as a separate key:
+
+```
+{
+  "microsoftOutlookOAuth2Api": {
+    "clientId": "YOUR_CLIENT_ID",
+    "clientSecret": "YOUR_CLIENT_SECRET"
+  },
+  "microsoftOneDriveOAuth2Api": {
+    "clientId": "YOUR_CLIENT_ID",
+    "clientSecret": "YOUR_CLIENT_SECRET"
+  }
+}
+```
+
+Minified JSON
+
+n8n requires the JSON to be minified (no spaces or newlines). The examples above are formatted for readability. Make sure your actual file contains no extra whitespace:
+
+```
+{"microsoftOutlookOAuth2Api":{"clientId":"YOUR_CLIENT_ID","clientSecret":"YOUR_CLIENT_SECRET"}}
+```
+
+Refer to [Required scopes by integration](../../../../integrations/builtin/credentials/microsoftentra/#required-scopes-by-integration) for the credential type name of each Microsoft service.
+
+## Docker Compose
+
+Mount the credentials file as a read-only volume and set the environment variable in your `compose.yaml`:
+
+```
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:latest
+    container_name: n8n
+    restart: always
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=America/New_York
+      - TZ=America/New_York
+      - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
+      - N8N_LOG_LEVEL=debug
+      - N8N_LOG_OUTPUT=file,console
+      - N8N_LOG_FILE_COUNT_MAX=5
+      - CREDENTIALS_OVERWRITE_DATA_FILE=/run/secrets/credentials-overwrite.json
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./credentials-overwrite.json:/run/secrets/credentials-overwrite.json:ro
+    networks:
+      - default
+volumes:
+  n8n_data:
+    name: ${N8N_VOLUME:-n8n_data}
+    external: true
+```
+
+Apply the changes by restarting the container:
+
+```
+docker compose up -d
+```
+
+## Verify the overwrite is applied
+
+After n8n starts, have a user create a new credential for one of the pre-configured services (for example, Microsoft Outlook). They should see a **Managed OAuth2 (recommended)** option in the credential selection.
+
+The user can click **Connect to Microsoft Outlook**, with no auth required. An **Account connected** message should appear
+
+If the **Managed OAuth 2** option doesn't appear, the environment variable wasn't applied correctly. Check that the file path in the volume mount matches the value of `CREDENTIALS_OVERWRITE_DATA_FILE`.
+
+## Kubernetes
+
+For Kubernetes deployments, replace the Docker volume mount with Kubernetes-native primitives. The approach differs by cloud provider. Choose the section that matches your environment.
+
+### Plain Kubernetes Secret (EKS / AKS / GKE)
+
+This approach works across all three managed Kubernetes providers without additional dependencies.
+
+**1. Create the Secret:**
+
+```
+apiVersion: v1
+kind: Secret
+metadata:
+  name: n8n-credentials-overwrite
+  namespace: your-namespace
+type: Opaque
+stringData:
+  credentials-overwrite.json: '{"microsoftOutlookOAuth2Api":{"clientId":"YOUR_CLIENT_ID","clientSecret":"YOUR_CLIENT_SECRET"}}'
+```
+
+**2. Mount the Secret in your Deployment:**
+
+```
+spec:
+  containers:
+    - name: n8n
+      image: docker.n8n.io/n8nio/n8n:latest
+      env:
+        - name: CREDENTIALS_OVERWRITE_DATA_FILE
+          value: /run/secrets/credentials-overwrite.json
+        # ...your other env vars
+      volumeMounts:
+        - name: credentials-overwrite
+          mountPath: /run/secrets/credentials-overwrite.json
+          subPath: credentials-overwrite.json
+          readOnly: true
+  volumes:
+    - name: credentials-overwrite
+      secret:
+        secretName: n8n-credentials-overwrite
+```
+
+The `subPath` field is important. Without it, Kubernetes replaces the entire `/run/secrets/` directory rather than mounting just the single file.
+
+Alternative: inline environment variable
+
+To skip the volume mount entirely, reference the Secret directly as an environment variable:
+
+```
+env:
+  - name: CREDENTIALS_OVERWRITE_DATA
+    valueFrom:
+      secretKeyRef:
+        name: n8n-credentials-overwrite
+        key: credentials-overwrite.json
+```
+
+```
+stringData:
+  credentials-json: '{"microsoftOutlookOAuth2Api":{"clientId":"...","clientSecret":"..."}}'
+```
+
+This is cleaner for single-service setups, but note that some Kubernetes environments restrict environment variable size (for example, to 128KB per variable). The file-based approach is safer if you have many credential overwrites.
+
+### AWS Secrets Manager (EKS)
+
+This approach uses the [AWS Secrets Store CSI Driver](https://docs.aws.amazon.com/secretsmanager/latest/userguide/integrating_csi_driver.html) to mount a secret from AWS Secrets Manager directly into the pod. It adds rotation support, CloudTrail audit logging, and centralised secret management.
+
+**Prerequisites:**
+
+- Secrets Store CSI Driver and ASCP (AWS Secrets and Configuration Provider) installed on the cluster
+- IAM OIDC provider configured for the cluster (required for IRSA)
+- An IAM role with `secretsmanager:GetSecretValue` and `secretsmanager:DescribeSecret` permissions
+
+**1. Create the secret in AWS Secrets Manager:**
+
+```
+aws secretsmanager create-secret \
+  --name n8n/credentials-overwrite \
+  --description "n8n credential overwrites for Microsoft OAuth" \
+  --secret-string '{"microsoftOutlookOAuth2Api":{"clientId":"YOUR_CLIENT_ID","clientSecret":"YOUR_CLIENT_SECRET"}}'
+```
+
+**2. Create an IAM policy:**
+
+```
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": [
+        "secretsmanager:GetSecretValue",
+        "secretsmanager:DescribeSecret"
+      ],
+      "Resource": "arn:aws:secretsmanager:REGION:ACCOUNT_ID:secret:n8n/credentials-overwrite-*"
+    }
+  ]
+}
+```
+
+```
+aws iam create-policy \
+  --policy-name n8n-credentials-overwrite-read \
+  --policy-document file://policy.json
+```
+
+**3. Create a service account with IRSA:**
+
+```
+eksctl create iamserviceaccount \
+  --name n8n-sa \
+  --namespace your-namespace \
+  --cluster your-cluster \
+  --attach-policy-arn arn:aws:iam::ACCOUNT_ID:policy/n8n-credentials-overwrite-read \
+  --approve
+```
+
+**4. Create the SecretProviderClass:**
+
+```
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: n8n-credentials-overwrite
+  namespace: your-namespace
+spec:
+  provider: aws
+  parameters:
+    objects: |
+      - objectName: "n8n/credentials-overwrite"
+        objectType: "secretsmanager"
+        objectAlias: "credentials-overwrite.json"
+```
+
+**5. Update your n8n Deployment:**
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: your-namespace
+spec:
+  template:
+    spec:
+      serviceAccountName: n8n-sa
+      containers:
+        - name: n8n
+          image: docker.n8n.io/n8nio/n8n:latest
+          env:
+            - name: CREDENTIALS_OVERWRITE_DATA_FILE
+              value: /run/secrets/credentials-overwrite.json
+          volumeMounts:
+            - name: credentials-overwrite
+              mountPath: /run/secrets/credentials-overwrite.json
+              subPath: credentials-overwrite.json
+              readOnly: true
+      volumes:
+        - name: credentials-overwrite
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: n8n-credentials-overwrite
+```
+
+**Rotating the secret:**
+
+To update the credentials, update the value in Secrets Manager:
+
+```
+aws secretsmanager update-secret \
+  --secret-id n8n/credentials-overwrite \
+  --secret-string '{"microsoftOutlookOAuth2Api":{"clientId":"NEW_CLIENT_ID","clientSecret":"NEW_CLIENT_SECRET"}}'
+```
+
+The CSI driver syncs the updated value on its polling interval (default two minutes). Restart the n8n pod for n8n to read the updated file, as n8n reads the credentials file at startup.
+
+### Azure Key Vault (AKS)
+
+This approach uses the [Azure Key Vault Provider for the Secrets Store CSI Driver](https://learn.microsoft.com/en-us/azure/aks/csi-secrets-store-driver) to mount secrets from Azure Key Vault into the pod.
+
+**Prerequisites:**
+
+- Secrets Store CSI Driver and Azure Key Vault Provider addon enabled on the AKS cluster
+- An Azure Key Vault instance
+- A managed identity or service principal with access to the vault
+- Workload Identity enabled on the cluster (recommended over pod identity)
+
+**1. Create or use an existing Key Vault:**
+
+```
+az keyvault create \
+  --name n8n-credentials-vault \
+  --resource-group your-resource-group \
+  --location your-region
+```
+
+**2. Create the secret in Key Vault:**
+
+```
+az keyvault secret set \
+  --vault-name n8n-credentials-vault \
+  --name n8n-credentials-overwrite \
+  --value '{"microsoftOutlookOAuth2Api":{"clientId":"YOUR_CLIENT_ID","clientSecret":"YOUR_CLIENT_SECRET"}}'
+```
+
+**3. Set up Workload Identity:**
+
+Create a managed identity and establish the federated credential:
+
+```
+# Create a managed identity
+az identity create \
+  --name n8n-workload-identity \
+  --resource-group your-resource-group \
+  --location your-region
+
+# Get the identity client ID
+CLIENT_ID=$(az identity show \
+  --name n8n-workload-identity \
+  --resource-group your-resource-group \
+  --query clientId -o tsv)
+
+# Grant the identity access to the Key Vault
+az keyvault set-policy \
+  --name n8n-credentials-vault \
+  --secret-permissions get \
+  --spn "$CLIENT_ID"
+
+# Get the OIDC issuer URL for your cluster
+OIDC_ISSUER=$(az aks show \
+  --name your-cluster \
+  --resource-group your-resource-group \
+  --query "oidcIssuerProfile.issuerUrl" -o tsv)
+
+# Create the federated credential
+az identity credential create \
+  --name n8n-workload-identity \
+  --resource-group your-resource-group \
+  --issuer "$OIDC_ISSUER" \
+  --subject system:serviceaccount:your-namespace:n8n-sa \
+  --audience api://AzureADTokenExchange
+```
+
+**4. Create the Kubernetes ServiceAccount:**
+
+```
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: n8n-sa
+  namespace: your-namespace
+  annotations:
+    azure.workload.identity/client-id: "YOUR_MANAGED_IDENTITY_CLIENT_ID"
+  labels:
+    azure.workload.identity/use: "true"
+```
+
+**5. Create the SecretProviderClass:**
+
+```
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: n8n-credentials-overwrite
+  namespace: your-namespace
+spec:
+  provider: azure
+  parameters:
+    usePodIdentity: "false"
+    useWorkloadIdentity: "true"
+    clientID: "YOUR_MANAGED_IDENTITY_CLIENT_ID"
+    keyvaultName: "n8n-credentials-vault"
+    objects: |
+      array:
+        - |
+          objectName: n8n-credentials-overwrite
+          objectType: secret
+          objectAlias: credentials-overwrite.json
+    tenantId: "YOUR_TENANT_ID"
+```
+
+**6. Update your n8n Deployment:**
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: your-namespace
+spec:
+  template:
+    spec:
+      serviceAccountName: n8n-sa
+      containers:
+        - name: n8n
+          image: docker.n8n.io/n8nio/n8n:latest
+          env:
+            - name: CREDENTIALS_OVERWRITE_DATA_FILE
+              value: /run/secrets/credentials-overwrite.json
+          volumeMounts:
+            - name: credentials-overwrite
+              mountPath: /run/secrets/credentials-overwrite.json
+              subPath: credentials-overwrite.json
+              readOnly: true
+      volumes:
+        - name: credentials-overwrite
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: n8n-credentials-overwrite
+```
+
+**Rotating the secret:**
+
+```
+az keyvault secret set \
+  --vault-name n8n-credentials-vault \
+  --name n8n-credentials-overwrite \
+  --value '{"microsoftOutlookOAuth2Api":{"clientId":"NEW_CLIENT_ID","clientSecret":"NEW_CLIENT_SECRET"}}'
+```
+
+The CSI driver syncs on its polling interval (default two minutes). Restart the n8n pod afterward for n8n to pick up the updated file.
+
+### Google Secret Manager (GKE)
+
+This approach uses the [GCP provider for the Secrets Store CSI Driver](https://github.com/GoogleCloudPlatform/secrets-store-csi-driver-provider-gcp) to mount secrets from Google Secret Manager into the pod.
+
+**Prerequisites:**
+
+- A GKE cluster with Workload Identity Federation enabled
+- The Secret Manager API enabled on the project
+- A Google service account with the `secretmanager.secretAccessor` role
+
+**1. Enable the Secret Manager API:**
+
+```
+gcloud services enable secretmanager.googleapis.com \
+  --project your-project-id
+```
+
+**2. Create the secret:**
+
+```
+echo -n '{"microsoftOutlookOAuth2Api":{"clientId":"YOUR_CLIENT_ID","clientSecret":"YOUR_CLIENT_SECRET"}}' | \
+  gcloud secrets create n8n-credentials-overwrite \
+    --data-file=- \
+    --project your-project-id
+```
+
+**3. Set up Workload Identity Federation:**
+
+```
+# Create a Google service account
+gcloud iam service-accounts create n8n-secret-reader \
+  --display-name="n8n Secret Reader" \
+  --project your-project-id
+
+# Grant it access to the secret
+gcloud secrets add-iam-policy-binding n8n-credentials-overwrite \
+  --member="serviceAccount:n8n-secret-reader@your-project-id.iam.gserviceaccount.com" \
+  --role="roles/secretmanager.secretAccessor" \
+  --project your-project-id
+
+# Bind the Kubernetes service account to the Google service account
+gcloud iam service-accounts add-iam-policy-binding \
+  n8n-secret-reader@your-project-id.iam.gserviceaccount.com \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="serviceAccount:your-project-id.svc.id.goog[your-namespace/n8n-sa]"
+```
+
+**4. Create the Kubernetes ServiceAccount:**
+
+```
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: n8n-sa
+  namespace: your-namespace
+  annotations:
+    iam.gke.io/gcp-service-account: n8n-secret-reader@your-project-id.iam.gserviceaccount.com
+```
+
+**5. Install the CSI Driver and GCP provider:**
+
+```
+# Install the CSI driver
+helm repo add secrets-store-csi-driver https://kubernetes-sigs.github.io/secrets-store-csi-driver/charts
+helm install csi-secrets-store secrets-store-csi-driver/secrets-store-csi-driver \
+  --namespace kube-system
+
+# Install the GCP provider
+kubectl apply -f https://raw.githubusercontent.com/GoogleCloudPlatform/secrets-store-csi-driver-provider-gcp/main/deploy/provider-gcp-plugin.yaml
+```
+
+**6. Create the SecretProviderClass:**
+
+```
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: n8n-credentials-overwrite
+  namespace: your-namespace
+spec:
+  provider: gcp
+  parameters:
+    secrets: |
+      - resourceName: "projects/your-project-id/secrets/n8n-credentials-overwrite/versions/latest"
+        path: "credentials-overwrite.json"
+```
+
+**7. Update your n8n Deployment:**
+
+```
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: n8n
+  namespace: your-namespace
+spec:
+  template:
+    spec:
+      serviceAccountName: n8n-sa
+      containers:
+        - name: n8n
+          image: docker.n8n.io/n8nio/n8n:latest
+          env:
+            - name: CREDENTIALS_OVERWRITE_DATA_FILE
+              value: /run/secrets/credentials-overwrite.json
+          volumeMounts:
+            - name: credentials-overwrite
+              mountPath: /run/secrets/credentials-overwrite.json
+              subPath: credentials-overwrite.json
+              readOnly: true
+      volumes:
+        - name: credentials-overwrite
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: n8n-credentials-overwrite
+```
+
+**Rotating the secret:**
+
+Create a new version of the secret:
+
+```
+echo -n '{"microsoftOutlookOAuth2Api":{"clientId":"NEW_CLIENT_ID","clientSecret":"NEW_CLIENT_SECRET"}}' | \
+  gcloud secrets versions add n8n-credentials-overwrite \
+    --data-file=- \
+    --project your-project-id
+```
+
+Because the SecretProviderClass references `versions/latest`, the CSI driver picks up the new version on its next sync. Restart the n8n pod for n8n to read the updated file.
 
 # Enable modules in Code node
 
@@ -13522,6 +19340,7 @@ You can provide a [configuration file](../configuration-methods/) for n8n. You c
 - [Nodes](/hosting/configuration/environment-variables/nodes/)
 - [Queue mode](/hosting/configuration/environment-variables/queue-mode/)
 - [Security](/hosting/configuration/environment-variables/security/)
+- [SSRF protection](/hosting/configuration/environment-variables/ssrf-protection/)
 - [Source control](/hosting/configuration/environment-variables/source-control/)
 - [Task runners](/hosting/configuration/environment-variables/task-runners/)
 - [Timezone and localization](/hosting/configuration/environment-variables/timezone-localization/)
@@ -13555,14 +19374,14 @@ File-based configuration
 
 You can add `_FILE` to individual variables to provide their configuration in a separate file. Refer to [Keeping sensitive data in separate files](../../configuration-methods/#keeping-sensitive-data-in-separate-files) for more details.
 
-Enable credential overwrites using the following environment variables. Refer to [Credential overwrites](../../../../embed/configuration/#credential-overwrites) for details.
+Enable credential overwrites using the following environment variables. Refer to [Credential overwrites](../../credential-overwrites/) for details.
 
-| Variable                              | Type    | Default          | Description                                                                                                                                                              |
-| ------------------------------------- | ------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `CREDENTIALS_OVERWRITE_DATA` /`_FILE` | \*      | -                | Overwrites for credentials.                                                                                                                                              |
-| `CREDENTIALS_OVERWRITE_ENDPOINT`      | String  | -                | The API endpoint to fetch credentials.                                                                                                                                   |
-| `CREDENTIALS_OVERWRITE_PERSISTENCE`   | Boolean | `false`          | Enable database persistence for credential overwrites. Required for multiinstance or queue mode to propagate overwrites to workers through a publish/subscribe approach. |
-| `CREDENTIALS_DEFAULT_NAME`            | String  | `My credentials` | The default name for credentials.                                                                                                                                        |
+| Variable                              | Type    | Default          | Description                                                                                                                                                               |
+| ------------------------------------- | ------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CREDENTIALS_OVERWRITE_DATA` /`_FILE` | \*      | -                | Overwrites for credentials.                                                                                                                                               |
+| `CREDENTIALS_OVERWRITE_ENDPOINT`      | String  | -                | The API endpoint to fetch credentials.                                                                                                                                    |
+| `CREDENTIALS_OVERWRITE_PERSISTENCE`   | Boolean | `false`          | Enable database persistence for credential overwrites. Required for multi-instance or queue mode to propagate overwrites to workers through a publish/subscribe approach. |
+| `CREDENTIALS_DEFAULT_NAME`            | String  | `My credentials` | The default name for credentials.                                                                                                                                         |
 
 # Database environment variables
 
@@ -13689,6 +19508,7 @@ This page lists environment variables for customizing endpoints in n8n.
 | `N8N_ENDPOINT_WEBHOOK`                          | String  | `webhook`         | The path used for webhook endpoint.                                                                                                                       |
 | `N8N_ENDPOINT_WEBHOOK_TEST`                     | String  | `webhook-test`    | The path used for test-webhook endpoint.                                                                                                                  |
 | `N8N_ENDPOINT_WEBHOOK_WAIT`                     | String  | `webhook-waiting` | The path used for waiting-webhook endpoint.                                                                                                               |
+| `N8N_ENDPOINT_HEALTH`                           | String  | `healthz`         | The path used for health check endpoint.                                                                                                                  |
 | `WEBHOOK_URL`                                   | String  | -                 | Used to manually provide the Webhook URL when running n8n behind a reverse proxy. See [here](../../configuration-examples/webhook-url/) for more details. |
 | `N8N_DISABLE_PRODUCTION_MAIN_PROCESS`           | Boolean | `false`           | Disable production webhooks from main process. This helps ensure no HTTP traffic load to main process when using webhook-specific processes.              |
 
@@ -13743,12 +19563,13 @@ File-based configuration
 
 You can add `_FILE` to individual variables to provide their configuration in a separate file. Refer to [Keeping sensitive data in separate files](../../configuration-methods/#keeping-sensitive-data-in-separate-files) for more details.
 
-You can define external hooks that n8n executes whenever a specific operation runs. Refer to [Backend hooks](../../../../embed/configuration/#backend-hooks) for examples of available hooks and [Hook files](../../../../embed/configuration/#backend-hook-files) for information on file formatting.
+You can define external hooks that n8n executes whenever a specific operation runs. Refer to [External hooks](../../external-hooks/) for the full reference, including available hooks and file formatting.
 
-| Variable                       | Type   | Description                                                                                                |
-| ------------------------------ | ------ | ---------------------------------------------------------------------------------------------------------- |
-| `EXTERNAL_HOOK_FILES`          | String | Files containing backend external hooks. Provide multiple files as a colon-separated list ("`:`").         |
-| `EXTERNAL_FRONTEND_HOOKS_URLS` | String | URLs to files containing frontend external hooks. Provide multiple URLs as a colon-separated list ("`:`"). |
+| Variable                        | Type   | Default | Description                                                                                                                            |
+| ------------------------------- | ------ | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `EXTERNAL_HOOK_FILES`           | String | -       | Files containing backend external hooks. Provide multiple files separated by the character defined in `EXTERNAL_HOOK_FILES_SEPARATOR`. |
+| `EXTERNAL_HOOK_FILES_SEPARATOR` | String | `:`     | Separator character for `EXTERNAL_HOOK_FILES`. Use `;` on Windows to avoid conflicts with drive-letter paths like `C:\`.               |
+| `EXTERNAL_FRONTEND_HOOKS_URLS`  | String | -       | URLs to files containing frontend external hooks. Provide multiple URLs as a colon-separated list ("`:`").                             |
 
 # External secrets environment variables
 
@@ -13928,11 +19749,27 @@ n8n uses Git-based source control to support environments. Refer to [Source cont
 | ---------------------------------------- | ------ | --------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `N8N_SOURCECONTROL_DEFAULT_SSH_KEY_TYPE` | String | `ed25519` | Set to `rsa` to make RSA the default SSH key type for [Source control setup](../../../../source-control-environments/setup/). |
 
-# Task runner environment variables
+# SSRF protection environment variables
 
 File-based configuration
 
 You can add `_FILE` to individual variables to provide their configuration in a separate file. Refer to [Keeping sensitive data in separate files](../../configuration-methods/#keeping-sensitive-data-in-separate-files) for more details.
+
+These variables control [SSRF protection](../../../securing/ssrf-protection/) for nodes that make HTTP requests to user-controllable targets.
+
+| Variable                      | Type    | Default                          | Description                                                                                                                                                                                                                           |
+| ----------------------------- | ------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `N8N_SSRF_PROTECTION_ENABLED` | Boolean | `false`                          | Whether to enable SSRF protection for nodes making HTTP requests.                                                                                                                                                                     |
+| `N8N_SSRF_BLOCKED_IP_RANGES`  | String  | Standard private/reserved ranges | Comma-separated CIDR ranges to block. Use `default` to include the [standard blocked ranges](../../../securing/ssrf-protection/#default-blocked-ranges), optionally combined with custom ranges (for example: `default,100.0.0.0/8`). |
+| `N8N_SSRF_ALLOWED_IP_RANGES`  | String  | -                                | Comma-separated CIDR ranges to allow. Takes precedence over the blocked ranges.                                                                                                                                                       |
+| `N8N_SSRF_ALLOWED_HOSTNAMES`  | String  | -                                | Comma-separated hostname patterns to allow. Supports wildcards (for example: `*.n8n.internal`). Takes precedence over blocked IP ranges.                                                                                              |
+| `N8N_SSRF_DNS_CACHE_MAX_SIZE` | Number  | `1048576`                        | Maximum DNS cache size in bytes. Uses LRU eviction when the limit is reached. Default is 1 MB.                                                                                                                                        |
+
+# Task runner environment variables
+
+File-based configuration
+
+Unlike the main n8n image, you CANNOT use file-based configuration for secrets in the task runner image. This means that variables with a `_FILE` suffix added will not be recognized.
 
 [Task runners](../../task-runners/) execute code defined by the [Code node](../../../../integrations/builtin/core-nodes/n8n-nodes-base.code/).
 
@@ -14024,7 +19861,7 @@ Refer to [User management](../../user-management-self-hosted/) for more informat
 | `N8N_SMTP_PASS`                                 | String  | -       | *your_SMTP_password*                                                                                                                                                                                                                                                 |
 | `N8N_SMTP_OAUTH_SERVICE_CLIENT`                 | String  | -       | If using 2LO with a service account this is your client ID                                                                                                                                                                                                           |
 | `N8N_SMTP_OAUTH_PRIVATE_KEY`                    | String  | -       | If using 2LO with a service account this is your private key                                                                                                                                                                                                         |
-| `N8N_SMTP_SENDER`                               | String  | -       | Sender email address. You can optionally include the sender name. Example with name: *N8N `<contact@n8n.com>`*                                                                                                                                                       |
+| `N8N_SMTP_SENDER`                               | String  | -       | Sender email address. You can optionally include the sender name. Example with name: *n8n `<contact@n8n.com>`*                                                                                                                                                       |
 | `N8N_SMTP_SSL`                                  | Boolean | `true`  | Whether to use SSL for SMTP (true) or not (false).                                                                                                                                                                                                                   |
 | `N8N_SMTP_STARTTLS`                             | Boolean | `true`  | Whether to use STARTTLS for SMTP (true) or not (false).                                                                                                                                                                                                              |
 | `N8N_UM_EMAIL_TEMPLATES_INVITE`                 | String  | -       | Full path to your HTML email template. This overrides the default template for invite emails.                                                                                                                                                                        |
@@ -14088,7 +19925,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## Starting n8n
 
@@ -14210,23 +20047,45 @@ Danger
 
 Use this for local development and testing. It isn't safe to use it in production.
 
-To use webhooks for trigger nodes of external services like GitHub, n8n has to be reachable from the web. n8n runs a [tunnel service](https://github.com/localtunnel/localtunnel) that can redirect requests from n8n's servers to your local n8n instance.
+Development tooling
 
-Start n8n with `--tunnel` by running:
+The tunnel feature is a convenience tool for local development. The underlying implementation may change between n8n versions.
+
+To use webhooks for trigger nodes of external services like GitHub, n8n has to be reachable from the web. n8n provides a tunnel service using [cloudflared](https://github.com/cloudflare/cloudflared) that redirects requests from the web to your local n8n instance. Docker must be installed for the tunnel to work.
+
+There are two ways to use the tunnel, depending on how you run n8n:
+
+### Full stack
+
+This runs n8n and cloudflared together in containers. The tunnel URL prints on startup and everything is wired automatically:
 
 ```
-docker volume create n8n_data
+pnpm stack --tunnel
+```
 
-docker run -it --rm \
- --name n8n \
- -p 5678:5678 \
- -e GENERIC_TIMEZONE="<YOUR_TIMEZONE>" \
- -e TZ="<YOUR_TIMEZONE>" \
- -e N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true \
- -e N8N_RUNNERS_ENABLED=true \
- -v n8n_data:/home/node/.n8n \
- docker.n8n.io/n8nio/n8n \
- start --tunnel
+### Services only
+
+If you prefer to run n8n locally with `pnpm dev` or `pnpm start`, you can start cloudflared as a standalone service:
+
+```
+# Terminal 1: Start the cloudflared tunnel service
+pnpm --filter n8n-containers services --services cloudflared
+
+# Terminal 2: Start n8n locally
+pnpm dev
+```
+
+The `services` command:
+
+1. Starts cloudflared pointing at `host.docker.internal:5678` (your local n8n).
+1. Fetches the public tunnel URL from cloudflared's metrics endpoint.
+1. Writes a `.env` file to `packages/cli/bin/.env` with `WEBHOOK_URL` and `N8N_PROXY_HOPS=1`.
+1. `pnpm dev` and `pnpm start` pick up that `.env` automatically via dotenv.
+
+Clean up when done:
+
+```
+pnpm --filter n8n-containers services:clean
 ```
 
 ## Next steps
@@ -14243,7 +20102,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## Try n8n with npx
 
@@ -14309,13 +20168,37 @@ Danger
 
 Use this for local development and testing. It isn't safe to use it in production.
 
-To use webhooks for trigger nodes of external services like GitHub, n8n has to be reachable from the web. n8n runs a [tunnel service](https://github.com/localtunnel/localtunnel) that can redirect requests from n8n's servers to your local n8n instance.
+Development tooling
 
-Start n8n with `--tunnel` by running:
+The tunnel feature is a convenience tool for local development. The underlying implementation may change between n8n versions.
+
+To use webhooks for trigger nodes of external services like GitHub, n8n has to be reachable from the web. n8n provides a tunnel service using [cloudflared](https://github.com/cloudflare/cloudflared) that redirects requests from the web to your local n8n instance. Docker must be installed for the tunnel to work.
+
+There are two ways to use the tunnel, depending on how you run n8n:
+
+Docker required
+
+The tunnel uses cloudflared, which runs as a Docker container. Make sure [Docker](https://docs.docker.com/get-docker/) is installed on your machine, even when running n8n via npm.
+
+For npm installations, use the **services only** approach. Start cloudflared as a standalone service, then run n8n locally:
 
 ```
-n8n start --tunnel
+# Terminal 1: Start the cloudflared tunnel service
+pnpm --filter n8n-containers services --services cloudflared
+
+# Terminal 2: Start n8n locally
+pnpm dev
 ```
+
+The `services` command starts cloudflared, fetches the public tunnel URL, and writes a `.env` file to `packages/cli/bin/.env` with `WEBHOOK_URL` and `N8N_PROXY_HOPS=1`. n8n picks up this `.env` automatically on startup.
+
+Clean up when done:
+
+```
+pnpm --filter n8n-containers services:clean
+```
+
+For the full stack approach (n8n and cloudflared both in containers), refer to the [Docker tunnel setup](../docker/#n8n-with-tunnel).
 
 ## Reverting an upgrade
 
@@ -14398,7 +20281,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## Create a cluster
 
@@ -14581,7 +20464,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## Hosting options
 
@@ -14762,7 +20645,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## Create a Droplet
 
@@ -14984,7 +20867,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## 1. Install Docker and Docker Compose
 
@@ -15126,8 +21009,7 @@ services:
       - N8N_ENFORCE_SETTINGS_FILE_PERMISSIONS=true
       - N8N_HOST=${SUBDOMAIN}.${DOMAIN_NAME}
       - N8N_PORT=5678
-      - N8N_PROTOCOL=https
-      - N8N_RUNNERS_ENABLED=true
+      - N8N_PROTOCOL=https  
       - NODE_ENV=production
       - WEBHOOK_URL=https://${SUBDOMAIN}.${DOMAIN_NAME}/
       - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
@@ -15201,7 +21083,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## Before you begin: get a Google Cloud project
 
@@ -15227,6 +21109,10 @@ You can also explicitly enable the Cloud Run API (even if you don't do this, it 
 gcloud services enable run.googleapis.com
 ```
 
+Required: Custom health check endpoint
+
+Google Cloud Run reserves `/healthz` for its own health checks. Since n8n uses this path by default, it can conflict and cause connection issues in the workflow canvas. To fix this, set the `N8N_ENDPOINT_HEALTH` environment variable to a custom path (included in the deployment commands below).
+
 To deploy n8n:
 
 ```
@@ -15236,7 +21122,8 @@ gcloud run deploy n8n \
     --allow-unauthenticated \
     --port=5678 \
     --no-cpu-throttling \
-    --memory=2Gi
+    --memory=2Gi \
+    --set-env-vars="N8N_ENDPOINT_HEALTH=health"
 ```
 
 (you can specify whichever region you prefer, instead of "us-west1")
@@ -15253,7 +21140,8 @@ gcloud run deploy n8n \
     --port=5678 \
     --no-cpu-throttling \
     --memory=2Gi \
-    --scaling=1
+    --scaling=1 \
+    --set-env-vars="N8N_ENDPOINT_HEALTH=health"
 ```
 
 This does not prevent data loss completely, such as whenever the Cloud Run service is re-deployed/updated. If you want truly persistant data, you should refer to the instructions below for how to attach a database.
@@ -15379,7 +21267,7 @@ gcloud run deploy n8n \
     --port=5678 \
     --memory=2Gi \
     --no-cpu-throttling \
-    --set-env-vars="N8N_PORT=5678,N8N_PROTOCOL=https,DB_TYPE=postgresdb,DB_POSTGRESDB_DATABASE=n8n,DB_POSTGRESDB_USER=n8n-user,DB_POSTGRESDB_HOST=/cloudsql/$PROJECT_ID:$REGION:n8n-db,DB_POSTGRESDB_PORT=5432,DB_POSTGRESDB_SCHEMA=public,GENERIC_TIMEZONE=UTC,QUEUE_HEALTH_CHECK_ACTIVE=true" \
+    --set-env-vars="N8N_PORT=5678,N8N_PROTOCOL=https,N8N_ENDPOINT_HEALTH=health,DB_TYPE=postgresdb,DB_POSTGRESDB_DATABASE=n8n,DB_POSTGRESDB_USER=n8n-user,DB_POSTGRESDB_HOST=/cloudsql/$PROJECT_ID:$REGION:n8n-db,DB_POSTGRESDB_PORT=5432,DB_POSTGRESDB_SCHEMA=public,GENERIC_TIMEZONE=UTC,QUEUE_HEALTH_CHECK_ACTIVE=true" \
     --set-secrets="DB_POSTGRESDB_PASSWORD=n8n-db-password:latest,N8N_ENCRYPTION_KEY=n8n-encryption-key:latest" \
     --add-cloudsql-instances=$PROJECT_ID:$REGION:n8n-db \
     --service-account=n8n-service-account@$PROJECT_ID.iam.gserviceaccount.com
@@ -15457,7 +21345,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## Create project
 
@@ -15641,7 +21529,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## Use the deployment template to create a Heroku project
 
@@ -15718,7 +21606,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## Create a server
 
@@ -15891,6 +21779,1057 @@ docker compose up -d
 - Learn more about [configuring](../../../configuration/environment-variables/) and [scaling](../../../scaling/overview/) n8n.
 - Or explore using n8n: try the [Quickstarts](../../../../try-it-out/).
 
+# Hosting n8n on OpenShift Local (CRC)
+
+This guide walks you through deploying n8n on OpenShift Local (CRC), Red Hat's tool for running a local OpenShift cluster. It mirrors AWS/EKS deployment, but runs entirely on your local machine. It's designed for testing n8n in an OpenShift environment locally, without cloud costs.
+
+You will need a machine with significant resources available, given how many resources OpenShift itself consumes.
+
+## OpenShift concepts vs standard Kubernetes
+
+OpenShift is built on Kubernetes but uses different terminology and has stricter security defaults. If you are familiar with standard Kubernetes, or with a guide that targets a managed Kubernetes service such as EKS, the table below maps the equivalent concepts so you know what to expect.
+
+| Standard Kubernetes / EKS    | OpenShift Local (CRC)                                     |
+| ---------------------------- | --------------------------------------------------------- |
+| `kubectl`                    | `oc` (OpenShift CLI; also understands `kubectl` commands) |
+| Namespace                    | Project (same concept, different command)                 |
+| Ingress / LoadBalancer       | Route (built into OpenShift, no controller needed)        |
+| EBS StorageClass (gp3)       | CRC built-in storage provisioner (no setup needed)        |
+| RDS PostgreSQL               | In-cluster PostgreSQL via Helm (Bitnami)                  |
+| ElastiCache Redis            | In-cluster Redis via Helm (Bitnami)                       |
+| AWS S3                       | MinIO in-cluster (S3-compatible)                          |
+| Pod Identity / IRSA          | Access keys via Kubernetes Secret                         |
+| AWS Load Balancer Controller | Not needed (Routes are built-in)                          |
+| OIDC / IAM                   | Not needed                                                |
+| ~$135–400/month              | Free (runs on your machine)                               |
+
+## Prerequisites
+
+Before starting, confirm your machine has:
+
+- **CPU**: 4 or more physical cores (not just threads) with virtualization support
+- **RAM**: 32+ GB free minimum (CRC reserves 9 GB for its VM)
+- **Disk**: 100 GB free
+- **OS**: Ubuntu (22.04 LTS or newer)
+
+## Prepare Ubuntu
+
+### Open a terminal
+
+Press `Ctrl+Alt+T` or search for **Terminal** in the Applications menu.
+
+Every command in this guide is typed into the terminal and run by pressing **Enter**.
+
+### Update your system
+
+Start with a system update to avoid dependency issues:
+
+```
+sudo apt update && sudo apt upgrade -y
+```
+
+sudo
+
+`sudo` means “run as administrator”. You will be prompted for your password. Characters you type won't appear on screen, this is normal.
+
+### Check CPU virtualization support
+
+CRC runs a virtual machine. Your CPU must support hardware virtualization:
+
+```
+egrep -c '(vmx|svm)' /proc/cpuinfo
+```
+
+- **Output `0`**: Virtualization is disabled. Enter your BIOS/UEFI settings and enable VT-x (Intel) or AMD-V (AMD), then reboot and try again.
+- **Output `1` or higher**: You are good to continue.
+
+### Install KVM and libvirt
+
+KVM is Linux’s built-in hypervisor. CRC uses it to run the OpenShift cluster VM:
+
+```
+sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients bridge-utils
+```
+
+Install `virtiofsd`, which CRC requires to share the filesystem with the cluster VM:
+
+```
+sudo apt install -y virtiofsd
+```
+
+Start the libvirt service and configure it to start automatically on boot:
+
+```
+sudo systemctl start libvirtd
+sudo systemctl enable libvirtd
+```
+
+Verify it's running:
+
+```
+sudo systemctl status libvirtd
+```
+
+Look for `Active: active (running)` in green. Press `q` to exit.
+
+### Add user to required groups
+
+This allows you to use KVM and libvirt without typing `sudo` for every command:
+
+```
+sudo usermod -aG libvirt $USER
+sudo usermod -aG kvm $USER
+```
+
+Warning
+
+**You must log out and log back in (or reboot) for this to take effect.** If you skip this step, CRC will fail with a “permission denied” error.
+
+Reboot now:
+
+```
+sudo reboot
+```
+
+After logging back in, open a terminal and verify group membership:
+
+```
+groups
+```
+
+You should see `libvirt` and `kvm` listed.
+
+### Install NetworkManager
+
+CRC requires NetworkManager to manage DNS entries for the cluster’s internal domains (`*.apps-crc.testing`, `api.crc.testing`):
+
+```
+sudo apt install -y network-manager
+sudo systemctl start NetworkManager
+sudo systemctl enable NetworkManager
+```
+
+Verify it's connected:
+
+```
+nmcli general status
+```
+
+The `STATE` column should show `connected`.
+
+## Install tools
+
+### Get a Red Hat account and pull secret
+
+CRC requires a free Red Hat account to pull container images.
+
+1. [Create a free Red Hat account](https://console.redhat.com/), if you don't already have one.
+1. In [console.redhat.com/openshift/create/local](https://console.redhat.com/openshift/create/local), click **Download OpenShift Local**.
+1. Select **Linux**, and download the `.tar.xz` file to `~/Downloads`.
+1. On the same page of the Red Hat console, click **Copy pull secret**. Paste it into a text file and save it for later.
+
+### Install CRC
+
+Open a terminal in your Downloads folder.
+
+```
+cd ~/Downloads
+```
+
+Extract the archive.
+
+```
+tar xf crc-linux-amd64.tar.xz
+```
+
+Move the `crc` binary to a system-wide location, so it's available in any terminal:
+
+```
+sudo mv crc-*-linux-amd64/crc /usr/local/bin/
+```
+
+Verify the installation:
+
+```
+crc version
+```
+
+A version number should print to the terminal.
+
+### Install Helm
+
+Helm installs n8n and supporting services into the cluster:
+
+```
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
+
+Verify:
+
+```
+helm version
+```
+
+### Set environment variables
+
+```
+export NAMESPACE=n8n-$(date +%Y%m%d)
+echo "Namespace:$NAMESPACE"
+```
+
+Variable persistence
+
+These variables only last for the current terminal session. Re-run this line whenever you open a new terminal before continuing.
+
+## Start OpenShift Local
+
+### Run CRC setup
+
+You only need to run this once. It configures KVM networking, checks system requirements, and downloads the CRC bundle (~2.5 GB):
+
+```
+crc setup
+```
+
+This takes several minutes. If it reports any missing packages, install them with `sudo apt install -y <package-name>` and re-run.
+
+### Configure CRC memory and start the cluster
+
+CRC defaults to 9 GB of RAM for its VM. n8n and its supporting services need more headroom. Set the memory to 14 GB before starting:
+
+```
+crc config set memory 14336
+```
+
+You only need to run this once. The setting persists across `crc stop` / `crc start` cycles.
+
+**Recommended:** Save your pull secret to a file first so you don’t have to paste it every time:
+
+```
+# Open the file, paste your pull secret (from earlier), then Ctrl+O to save, Ctrl+X to exit
+nano ~/pull-secret.txt
+
+# Restrict permissions so only you can read it
+chmod 600 ~/pull-secret.txt
+```
+
+Start CRC using the file:
+
+```
+crc start --pull-secret-file ~/pull-secret.txt
+```
+
+Alternatively, run `crc start` without the flag and paste the secret when prompted.
+
+**This takes 10–15 minutes.** When complete you will see something like:
+
+```
+Started the OpenShift cluster.
+
+The server is accessible via web console at:
+  https://console-openshift-console.apps-crc.testing
+
+Log in as administrator:
+  Username: kubeadmin
+  Password: <generated-password>
+
+Log in as user:
+  Username: developer
+  Password: developer
+```
+
+**Save the `kubeadmin` password now.** You will need it in the next step. You can retrieve it later using `crc console --credentials`.
+
+### Verify DNS resolution
+
+On Ubuntu, CRC configures the system resolver automatically with NetworkManager and systemd-resolved. No manual `/etc/hosts` entries are needed.
+
+Verify the API is reachable:
+
+```
+sudo ss -tlnp | grep 6443
+```
+
+You should see a process bound to `127.0.0.1:6443`. If nothing appears, re-run `crc start`. If DNS doesn't resolve `*.apps-crc.testing`, see the troubleshooting section.
+
+### Configure your shell
+
+CRC bundles the `oc` CLI inside the VM. This command makes it available in your terminal:
+
+```
+eval $(crc oc-env)
+```
+
+To make this permanent so you don't have to run it every time you open a terminal:
+
+```
+echo 'eval $(crc oc-env)' >> ~/.bashrc
+source ~/.bashrc
+```
+
+Verify `oc` works:
+
+```
+oc version
+```
+
+### Log in to the cluster
+
+```
+oc login -u kubeadmin -p <your-kubeadmin-password> https://api.crc.testing:6443
+```
+
+Replace `<your-kubeadmin-password>` with the password printed when you [configured CRC memory and started the cluster](#configure-crc-memory-and-start-the-cluster).
+
+Verify you are logged in:
+
+```
+oc whoami
+```
+
+`kubeadmin` should print to the screen.
+
+## Standalone deployment
+
+Standalone mode runs n8n as a single pod with SQLite. No external database or Redis is required. This is ideal for exploring n8n and testing workflows locally.
+
+### Create the project
+
+In OpenShift, a **project** is the same as a Kubernetes namespace: an isolated space for your resources:
+
+```
+oc new-project $NAMESPACE
+```
+
+### Grant the required security permission
+
+OpenShift enforces strict security policies called **Security Context Constraints (SCCs)**. By default, pods can't run with a specific user ID. The n8n chart runs as user ID `1000`, so you must explicitly allow this.
+
+Use the full explicit form. The shorthand `-z` flag can silently fail in some OpenShift versions:
+
+```
+oc adm policy add-scc-to-user anyuid \
+  system:serviceaccount:$NAMESPACE:n8n
+```
+
+Verify the binding was created:
+
+```
+oc get rolebindings -n $NAMESPACE
+```
+
+You should see a binding referencing `system:openshift:scc:anyuid`.
+
+### Create the required secret
+
+```
+oc create secret generic n8n-secrets \
+  --namespace $NAMESPACE \
+  --from-literal=N8N_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+  --from-literal=N8N_HOST="localhost" \
+  --from-literal=N8N_PORT="5678" \
+  --from-literal=N8N_PROTOCOL="http"
+```
+
+**Back up the encryption key immediately:**
+
+```
+oc get secret n8n-secrets -n $NAMESPACE \
+  -o jsonpath='{.data.N8N_ENCRYPTION_KEY}' | base64 --decode
+```
+
+Copy that output and store it somewhere safe. Losing it means all stored credentials in your workflows become permanently unreadable.
+
+### Create your values file
+
+Create a file called `n8n-standalone-values.yaml`. You can use `nano` (a simple text editor):
+
+```
+nano n8n-standalone-values.yaml
+```
+
+Paste the following, then press `Ctrl+O` to save and `Ctrl+X` to exit:
+
+```
+# n8n-standalone-values.yaml
+# Single pod, SQLite database, no external dependencies.
+
+queueMode:
+  enabled: false
+
+database:
+  type: sqlite
+  useExternal: false
+
+redis:
+  enabled: false
+
+# PVC stores the SQLite database file.
+persistence:
+  enabled: true
+  size: 5Gi
+  # No storageClassName needed — CRC provides a default storage provisioner.
+
+secretRefs:
+  existingSecret: "n8n-secrets"
+
+service:
+  type: ClusterIP
+  port: 5678
+
+# OpenShift: securityContext must be enabled so the pod runs as UID 1000 (node user)
+# with fsGroup 1000 (so the PVC is writable). The anyuid SCC granted above
+# allows this. The seccompProfile line is removed from the chart template in
+# "Deploy n8n" because OpenShift 4.14+ rejects it even with anyuid.
+securityContext:
+  enabled: true
+
+resources:
+  main:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+config:
+  timezone: UTC
+```
+
+### Deploy n8n
+
+The n8n Helm chart hard codes `seccompProfile: RuntimeDefault` in the pod spec. OpenShift 4.14+ converts this to a deprecated alpha annotation that's rejected at admission, even when `anyuid` SCC is granted. The fix is to pull the chart locally, remove those two lines, and install from the patched copy.
+
+**Pull and patch the chart:**
+
+```
+helm pull oci://ghcr.io/n8n-io/n8n-helm-chart/n8n --version 1.0.3 --untar
+sed -i '/seccompProfile:/d; /type: RuntimeDefault/d' ~/n8n/templates/deployment-main.yaml
+
+# Confirm the lines are gone (should return no output)
+grep -n "seccomp\|RuntimeDefault" ~/n8n/templates/deployment-main.yaml
+```
+
+**Install from the patched chart:**
+
+```
+helm install n8n ~/n8n/ \
+  --namespace $NAMESPACE \
+  --values n8n-standalone-values.yaml \
+  --wait \
+  --timeout 10m
+```
+
+### Access n8n using port forward
+
+OpenShift Routes require a hostname, which adds complexity for standalone local access. Port-forward is simpler:
+
+```
+oc port-forward service/n8n-main --namespace $NAMESPACE 5678:5678
+```
+
+Leave this running, then open your browser to:
+
+```
+http://localhost:5678
+```
+
+n8n will prompt you to create an owner account.
+
+Stop tunnel
+
+Press `Ctrl+C` to stop the tunnel. Re-run the `port-forward` command to access n8n again later.
+
+### Check deployment status
+
+```
+oc get pods -n $NAMESPACE
+```
+
+Expected:
+
+```
+NAME                       READY   STATUS    RESTARTS   AGE
+n8n-main-7d9f8b-xxxx       1/1     Running   0          3m
+```
+
+**Standalone deployment complete.**
+
+## Multi-instance queue mode
+
+Multi-instance queue mode runs multiple n8n pods with a shared database, message queue, and object storage. It requires an [n8n Enterprise license](https://n8n.io/pricing/).
+
+Instead of AWS managed services, this guide uses in-cluster equivalents that mirror what you would find in an on-premises or customer OpenShift environment:
+
+| AWS Service       | Local Equivalent                          |
+| ----------------- | ----------------------------------------- |
+| RDS PostgreSQL    | PostgreSQL (Bitnami Helm chart)           |
+| ElastiCache Redis | Redis (Bitnami Helm chart)                |
+| S3                | MinIO (S3-compatible, Bitnami Helm chart) |
+
+### Install in-cluster services
+
+#### Create the Project and add Bitnami Helm repo
+
+```
+oc new-project $NAMESPACE
+```
+
+Add the Bitnami chart repository (only needed once):
+
+```
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+```
+
+#### Install PostgreSQL
+
+In the command below, replace `YourStrongPassword123` with a suitable complex password.
+
+```
+helm install postgresql bitnami/postgresql \
+  --namespace $NAMESPACE \
+  --set auth.username=n8n \
+  --set auth.password='YourStrongPassword123' \
+  --set auth.database=n8n_enterprise \
+  --set global.compatibility.openshift.adaptSecurityContext=auto \
+  --wait
+```
+
+Flag
+
+The `global.compatibility.openshift.adaptSecurityContext=auto` flag tells Bitnami to let OpenShift assign the correct user ID automatically (avoids SCC errors).
+
+Save the endpoint, as it's fixed for in-cluster services:
+
+```
+postgresql.YOUR_NAMESPACE.svc.cluster.local
+```
+
+Replace `YOUR_NAMESPACE` with your actual `$NAMESPACE` value (e.g. `n8n-20260306`).
+
+#### Install Redis
+
+```
+helm install redis bitnami/redis \
+  --namespace $NAMESPACE \
+  --set auth.enabled=false \
+  --set architecture=standalone \
+  --set global.compatibility.openshift.adaptSecurityContext=auto \
+  --wait
+```
+
+Redis endpoint: `redis-master.$NAMESPACE.svc.cluster.local`
+
+#### Install MinIO (S3-compatible storage)
+
+In the command below, replace `MinioStrongPassword123` with a suitable complex password.
+
+```
+helm install minio bitnami/minio \
+  --namespace $NAMESPACE \
+  --set auth.rootUser=minioadmin \
+  --set auth.rootPassword='MinioStrongPassword123' \
+  --set global.compatibility.openshift.adaptSecurityContext=auto \
+  --wait
+```
+
+MinIO endpoint: `http://minio:9000` (within the same namespace, just the service name works)
+
+#### Create the n8n storage bucket in MinIO
+
+MinIO needs a bucket created before n8n can use it. Use the MinIO web console:
+
+**Open the MinIO console:**
+
+```
+oc port-forward svc/minio 9001:9001 -n $NAMESPACE
+```
+
+Leave this running, then open your browser to `http://localhost:9001`.
+
+Log in with:
+
+- **Username:** `minioadmin`
+- **Password:** `MinioStrongPassword123`
+
+In the console:
+
+1. Click **Buckets** in the left sidebar → **Create Bucket**
+1. **Bucket Name:** `n8n-data`
+1. Click **Create Bucket**
+
+Go back to the terminal and press `Ctrl+C` to stop the port-forward.
+
+### Deploy n8n
+
+#### Grant SCC for n8n
+
+```
+oc adm policy add-scc-to-user anyuid \
+  system:serviceaccount:$NAMESPACE:n8n-enterprise
+```
+
+Verify that `oc get rolebindings -n $NAMESPACE` shows a binding for `system:openshift:scc:anyuid`.
+
+#### Create required secrets
+
+```
+# Core n8n secrets
+oc create secret generic n8n-enterprise-secrets \
+  --namespace $NAMESPACE \
+  --from-literal=N8N_ENCRYPTION_KEY="$(openssl rand -hex 32)" \
+  --from-literal=N8N_HOST="localhost" \
+  --from-literal=N8N_PORT="5678" \
+  --from-literal=N8N_PROTOCOL="http"
+```
+
+**Back up the encryption key immediately:**
+
+```
+oc get secret n8n-enterprise-secrets -n $NAMESPACE \
+  -o jsonpath='{.data.N8N_ENCRYPTION_KEY}' | base64 --decode
+```
+
+Store that value somewhere safe.
+
+In the commands below, replace `YourStrongPassword123` and `MinioStrongPassword123` with the passwords from the earlier steps.
+
+```
+# Database password (must match what you set when installing PostgreSQL)
+oc create secret generic n8n-enterprise-db-secret \
+  --namespace $NAMESPACE \
+  --from-literal=password='YourStrongPassword123'
+
+# MinIO credentials
+oc create secret generic n8n-minio-secret \
+  --namespace $NAMESPACE \
+  --from-literal=root-password='MinioStrongPassword123'
+```
+
+#### Create values file
+
+Create `n8n-multimain-ocp-values.yaml`. Replace the **3 placeholder values** marked `# <-- REPLACE`:
+
+```
+nano n8n-multimain-ocp-values.yaml
+```
+
+```
+# n8n-multimain-ocp-values.yaml
+# Multi-instance queue mode for OpenShift Local (CRC).
+# Uses in-cluster PostgreSQL, Redis, and MinIO instead of AWS services.
+# Requires Enterprise license.
+
+# --- Enterprise license ---
+license:
+  enabled: true
+  activationKey: "your-enterprise-license-key-here"  # <-- REPLACE
+
+# --- Multi-main: 2 replicas (reduced for local resources) ---
+multiMain:
+  enabled: true
+  replicas: 2
+
+# --- Queue mode: 2 worker pods ---
+queueMode:
+  enabled: true
+  workerReplicaCount: 2
+  workerConcurrency: 5
+
+# --- Webhook processors ---
+webhookProcessor:
+  enabled: true
+  replicaCount: 1
+  disableProductionWebhooksOnMainProcess: true
+
+# --- PostgreSQL (in-cluster) ---
+database:
+  type: postgresdb
+  useExternal: true
+  host: "postgresql.YOUR_NAMESPACE.svc.cluster.local"   # <-- REPLACE YOUR_NAMESPACE
+  port: 5432
+  database: n8n_enterprise
+  schema: "public"
+  user: n8n
+  passwordSecret:
+    name: "n8n-enterprise-db-secret"
+    key: "password"
+
+# --- Redis (in-cluster, no TLS) ---
+redis:
+  enabled: true
+  useExternal: true
+  host: "redis-master.YOUR_NAMESPACE.svc.cluster.local"  # <-- REPLACE YOUR_NAMESPACE
+  port: 6379
+  tls: false
+
+# --- MinIO (S3-compatible, in-cluster) ---
+s3:
+  enabled: true
+  bucket:
+    name: "n8n-data"
+    region: "us-east-1"
+  host: "http://minio:9000"
+  auth:
+    autoDetect: false
+    accessKeyId: "minioadmin"
+    secretAccessKeySecret:
+      name: "n8n-minio-secret"
+      key: "root-password"
+  storage:
+    mode: "s3"
+    availableModes: "filesystem,s3"
+  forcePathStyle: true
+
+# --- Service account ---
+serviceAccount:
+  create: true
+  name: n8n
+```
+
+Save and exit nano (`Ctrl+O`, `Ctrl+X`).
+
+**Before deploying**, replace the two `YOUR_NAMESPACE` placeholders with your actual namespace value:
+
+```
+# Check your namespace value
+echo $NAMESPACE
+
+# Replace in the file (this edits it automatically)
+sed -i "s/YOUR_NAMESPACE/$NAMESPACE/g" n8n-multimain-ocp-values.yaml
+```
+
+Verify the replacements:
+
+```
+grep "svc.cluster.local" n8n-multimain-ocp-values.yaml
+```
+
+Both lines should show your actual namespace name, not `YOUR_NAMESPACE`.
+
+#### Deploy n8n
+
+If you didn't patch the chart previously, pull and patch it now:
+
+```
+helm pull oci://ghcr.io/n8n-io/n8n-helm-chart/n8n --version 1.0.3 --untar
+sed -i '/seccompProfile:/d; /type: RuntimeDefault/d' ~/n8n/templates/deployment-main.yaml
+grep -n "seccomp\|RuntimeDefault" ~/n8n/templates/deployment-main.yaml  # should return nothing
+```
+
+Install from the patched chart:
+
+```
+helm install n8n ~/n8n/ \
+  --namespace $NAMESPACE \
+  --values n8n-multimain-ocp-values.yaml \
+  --wait \
+  --timeout 15m
+```
+
+#### Create a route for external access
+
+In OpenShift, a **Route** exposes a service to the outside world. It's the equivalent of a Kubernetes Ingress or LoadBalancer, and requires no extra controller:
+
+```
+oc expose svc/n8n-main -n $NAMESPACE
+```
+
+Get the URL:
+
+```
+export ROUTE=$(oc get route n8n-main -n $NAMESPACE -o jsonpath='{.spec.host}')
+echo "n8n URL: http://$ROUTE"
+```
+
+The URL will look like: `http://n8n-main-n8n-20260306.apps-crc.testing`
+
+#### Update the host secret
+
+n8n needs to know its public URL. Update the secret with the Route hostname, then restart the pods:
+
+```
+ENCRYPTION_KEY=$(oc get secret n8n-enterprise-secrets -n $NAMESPACE \
+  -o jsonpath='{.data.N8N_ENCRYPTION_KEY}' | base64 --decode)
+
+oc create secret generic n8n-enterprise-secrets \
+  --namespace $NAMESPACE \
+  --from-literal=N8N_ENCRYPTION_KEY="$ENCRYPTION_KEY" \
+  --from-literal=N8N_HOST="$ROUTE" \
+  --from-literal=N8N_PORT="5678" \
+  --from-literal=N8N_PROTOCOL="http" \
+  --dry-run=client -o yaml | oc apply -f -
+
+oc rollout restart deployment -n $NAMESPACE
+```
+
+Wait for the rollout to complete:
+
+```
+oc rollout status deployment/n8n-main -n $NAMESPACE
+```
+
+#### Verify all pods are running
+
+```
+oc get pods -n $NAMESPACE
+```
+
+Expected (all `Running`):
+
+```
+NAME                                    READY   STATUS    RESTARTS   AGE
+n8n-main-xxxx-aaaa                      1/1     Running   0          5m
+n8n-main-xxxx-bbbb                      1/1     Running   0          5m
+n8n-worker-xxxx-aaaa                    1/1     Running   0          5m
+n8n-worker-xxxx-bbbb                    1/1     Running   0          5m
+n8n-webhook-processor-xxxx-aaaa         1/1     Running   0          5m
+postgresql-0                            1/1     Running   0          15m
+redis-master-0                          1/1     Running   0          15m
+minio-xxxx-xxxx                         1/1     Running   0          15m
+```
+
+Open your browser to the URL printed above.
+
+**Multi-instance deployment complete.**
+
+## Updating n8n
+
+To change configuration or upgrade the chart version, pull and re-patch the new chart version, then upgrade:
+
+```
+# Remove the old local chart copy
+rm -rf ~/n8n/
+
+# Pull and patch the new version
+helm pull oci://ghcr.io/n8n-io/n8n-helm-chart/n8n --version <new-version> --untar
+sed -i '/seccompProfile:/d; /type: RuntimeDefault/d' ~/n8n/templates/deployment-main.yaml
+
+# Standalone
+helm upgrade n8n ~/n8n/ \
+  --namespace $NAMESPACE \
+  --values n8n-standalone-values.yaml
+
+# Multi-instance
+helm upgrade n8n ~/n8n/ \
+  --namespace $NAMESPACE \
+  --values n8n-multimain-ocp-values.yaml
+```
+
+## Stopping and resuming CRC
+
+CRC doesn't need to be deleted between sessions. You can stop and restart it:
+
+```
+# Stop the cluster (saves state)
+crc stop
+
+# Start it again later
+crc start
+```
+
+After restarting, re-run:
+
+```
+eval $(crc oc-env)
+export NAMESPACE=n8n-YYYYMMDD   # use your original date
+oc login -u kubeadmin -p <password> https://api.crc.testing:6443
+```
+
+## Troubleshooting
+
+### `crc setup` fails with “libvirt not found”
+
+```
+sudo apt install -y qemu-kvm libvirt-daemon-system libvirt-clients
+sudo systemctl start libvirtd
+```
+
+Then re-run `crc setup`.
+
+### `crc start` fails with “insufficient memory”
+
+CRC requires at least 9 GB of free RAM. Close other applications and try again. If you [followed instructions for configuring CRC memory](#configure-crc-memory-and-start-the-cluster), CRC is configured to use 14 GB.
+
+### n8n pod stuck in `Pending` or never created SCC error
+
+Check events for the error:
+
+```
+oc get events -n $NAMESPACE --sort-by='.lastTimestamp' | tail -20
+```
+
+If you see `unable to validate against any security context constraint` or `seccomp may not be set`, the chart’s hard coded `seccompProfile: RuntimeDefault` is being rejected. OpenShift 4.14+ converts this to a deprecated alpha annotation that admission rejects even when `anyuid` SCC is granted.
+
+**1. Grant anyuid using the explicit form** (the `-z` shorthand can silently fail):
+
+```
+# For standalone
+oc adm policy add-scc-to-user anyuid \
+  system:serviceaccount:$NAMESPACE:n8n
+
+# For multi-instance
+oc adm policy add-scc-to-user anyuid \
+  system:serviceaccount:$NAMESPACE:n8n-enterprise
+```
+
+Verify: run `oc get rolebindings -n $NAMESPACE`. You should see a binding for `system:openshift:scc:anyuid`.
+
+**2. Pull the chart locally and remove the `seccompProfile` lines:**
+
+```
+helm pull oci://ghcr.io/n8n-io/n8n-helm-chart/n8n --version 1.0.3 --untar
+sed -i '/seccompProfile:/d; /type: RuntimeDefault/d' ~/n8n/templates/deployment-main.yaml
+
+# Confirm they're gone (should return no output)
+grep -n "seccomp\|RuntimeDefault" ~/n8n/templates/deployment-main.yaml
+```
+
+**3. Uninstall and reinstall from the patched chart:**
+
+```
+helm uninstall n8n -n $NAMESPACE
+helm install n8n ~/n8n/ \
+  --namespace $NAMESPACE \
+  --values n8n-standalone-values.yaml \
+  --wait \
+  --timeout 10m
+```
+
+### Route URL returns “Application not available”
+
+The pods may still be starting. Check:
+
+```
+oc get pods -n $NAMESPACE
+oc rollout status deployment/n8n-main -n $NAMESPACE
+```
+
+Also confirm the Route exists:
+
+```
+oc get route -n $NAMESPACE
+```
+
+### n8n pod stuck in `Pending` with `Insufficient memory`
+
+The CRC node doesn’t have enough free memory to schedule the pod.
+
+**Fix:** Increase CRC’s VM memory and restart:
+
+```
+crc stop
+crc config set memory 14336
+crc start
+```
+
+After CRC restarts, the pod should schedule automatically. If the pod is still pending after a few minutes, delete it to force a reschedule:
+
+```
+oc delete pod -n $NAMESPACE -l app.kubernetes.io/component=main
+```
+
+If your machine can’t spare 14 GB, you can also lower the pod’s memory request in `n8n-standalone-values.yaml`:
+
+```
+resources:
+  main:
+    requests:
+      memory: 256Mi
+```
+
+Then upgrade: `helm upgrade n8n ~/n8n/ -n $NAMESPACE -f n8n-standalone-values.yaml`
+
+### DNS not resolving `.apps-crc.testing` or `api.crc.testing`
+
+On Ubuntu, CRC configures DNS automatically. If it fails, restart NetworkManager:
+
+```
+sudo systemctl restart NetworkManager
+```
+
+If still broken, add entries manually (CRC routes traffic through `127.0.0.1`):
+
+```
+sudo tee -a /etc/hosts <<EOF
+127.0.0.1 api.crc.testing
+127.0.0.1 console-openshift-console.apps-crc.testing
+127.0.0.1 oauth-openshift.apps-crc.testing
+127.0.0.1 default-route-openshift-image-registry.apps-crc.testing
+EOF
+```
+
+Subdomains
+
+When you expose Routes in the multi-instance section, new `*.apps-crc.testing` subdomains are created. Add them to `/etc/hosts` pointing to `127.0.0.1` if your browser can’t reach them.
+
+### n8n pod crashes with `EACCES: permission denied` writing to `/home/node/.n8n/`
+
+This means the pod is running as a random OpenShift-assigned UID instead of UID 1000 (the `node` user the n8n image expects). It happens when `securityContext.enabled: false` is set in values without `runAsUser: 1000` and `fsGroup: 1000`, OpenShift assigns a random UID that can’t write to the PVC.
+
+**Fix:** Ensure `securityContext.enabled: true` is set in your values file, and that the chart has been patched to remove `seccompProfile` (see the SCC error section above). Both are required together.
+
+### View pod logs
+
+```
+# Main process
+oc logs -n $NAMESPACE -l app.kubernetes.io/component=main --tail=50
+
+# Workers
+oc logs -n $NAMESPACE -l app.kubernetes.io/component=worker --tail=50
+
+# Webhook processors
+oc logs -n $NAMESPACE -l app.kubernetes.io/component=webhook-processor --tail=50
+```
+
+### All events in the namespace
+
+```
+oc get events -n $NAMESPACE --sort-by='.lastTimestamp'
+```
+
+## Quick Reference
+
+### Re-export variables after reopening terminal
+
+```
+eval $(crc oc-env)
+export NAMESPACE=n8n-YYYYMMDD   # use the date from your original deployment
+oc login -u kubeadmin -p <password> https://api.crc.testing:6443
+```
+
+### Check cluster status
+
+```
+crc status
+```
+
+### Open the OpenShift web console
+
+```
+crc console
+```
+
+Log in with `kubeadmin` / your password to see a graphical view of everything running.
+
+### Things to save
+
+| Item                            | Why it matters                                |
+| ------------------------------- | --------------------------------------------- |
+| `kubeadmin` password            | Log in to the cluster                         |
+| n8n encryption key              | Lose this = all stored credentials unreadable |
+| `n8n-standalone-values.yaml`    | Required for `helm upgrade`                   |
+| `n8n-multimain-ocp-values.yaml` | Required for `helm upgrade`                   |
+| MinIO root password             | Access the MinIO console                      |
+| PostgreSQL password             | Database access                               |
+
+## Next steps
+
+- Learn more about [configuring](../../../configuration/environment-variables/) and [scaling](../../../scaling/overview/) n8n.
+- Or explore using n8n: try the [Quickstarts](../../../../try-it-out/).
+
 # Logging in n8n
 
 Logging is an important feature for debugging. n8n uses the [winston](https://www.npmjs.com/package/winston) logging library.
@@ -16005,6 +22944,10 @@ Access the endpoint:
 <your-instance-url>/healthz/readiness
 ```
 
+Customizing health check endpoints
+
+You can customize the health check endpoint path using the [`N8N_ENDPOINT_HEALTH`](../../configuration/environment-variables/endpoints/) environment variable.
+
 ## metrics
 
 The `/metrics` endpoint provides more detailed information about the current status of the instance.
@@ -16019,9 +22962,11 @@ Feature availability
 
 The `/metrics` endpoint isn't available on n8n Cloud.
 
-## Enable metrics and healthz for self-hosted n8n
+## Enable metrics and health checks for self-hosted n8n
 
-The `/metrics` and `/healthz` endpoints are disabled by default. To enable them, configure your n8n instance:
+The `/metrics` endpoint is disabled by default. The health endpoint is always enabled on the main n8n server. For worker servers in [queue mode](../../scaling/queue-mode/), the health endpoint is disabled by default.
+
+To enable them, configure your n8n instance:
 
 ```
 # metrics
@@ -16031,6 +22976,475 @@ QUEUE_HEALTH_CHECK_ACTIVE=true
 ```
 
 Refer to [Configuration methods](../../configuration/configuration-methods/) for more information on how to configure your instance using environment variables.
+
+# OEM deployment
+
+OEM agreement required
+
+OEM deployment of n8n requires a separate commercial agreement with n8n. [Contact n8n](mailto:license@n8n.io) for more information.
+
+n8n's OEM deployment option lets you embed and surface n8n's interface inside your own product's UI. This allows your users to build workflows, configure connections, and run workflow automation without leaving your product. n8n branding is required as part of an OEM integration.
+
+This is distinct from [using n8n as a backend](../), where workflows execute behind the scenes and end users never see n8n. In that model, your product calls n8n using a webhook or the [API](../../api/) to trigger workflows, and n8n behaves like any other self-hosted service in your infrastructure - your users never see any n8n UI. This is available on all paid plans under the standard license, with no separate agreement needed. OEM deployment is only necessary when you want your users to interact with the n8n editor directly.
+
+## What's covered
+
+- [Prerequisites](prerequisites/): Guidance on CPU, memory, and database requirements for planning your deployment.
+- [Managing workflows](managing-workflows/): Patterns for managing workflows across multiple users or organizations within an embedded deployment.
+- [Workflow templates](../configuration/configuration-examples/custom-templates/): Configure a custom workflow template library for your users.
+- [Credential overwrites](../configuration/credential-overwrites/): Set OAuth credentials globally so your users can authenticate without seeing or entering client secrets.
+
+## Support
+
+Contact [n8n support](mailto:support@n8n.io) using the email provided when you signed your OEM agreement. The [community forum](https://community.n8n.io/) is also available for general questions.
+
+# Managing workflows
+
+OEM agreement required
+
+OEM deployment of n8n requires a separate commercial agreement with n8n. [Contact n8n](mailto:license@n8n.io) for more information.
+
+When managing an n8n OEM deployment spanning across teams or organizations, you will likely need to run the same (or similar) workflows for multiple users. There are two available options for doing so:
+
+| Solution                                                              | Pros                                                               | Cons                                           |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------------------------------------- |
+| Create a workflow for each user                                       | No limitation on how workflow starts (can use any trigger)         | Requires managing multiple workflows.          |
+| Create a single workflow, and pass it user credentials when executing | Simplified workflow management (only need to change one workflow). | To run the workflow, your product must call it |
+
+Warning
+
+The APIs referenced in this document are subject to change at any time. Be sure to check for continued functionality with each version upgrade.
+
+## Workflow per user
+
+There are three general steps to follow:
+
+- Obtain the credentials for each user, and any additional parameters that may be required based on the workflow.
+- Create the [n8n credentials](../../../glossary/#credential-n8n) for this user.
+- Create the workflow.
+
+### 1. Obtain user credentials
+
+Here you need to capture all credentials for any node/service this user must authenticate with, along with any additional parameters required for the particular workflow. The credentials and any parameters needed will depend on your workflow and what you are trying to do.
+
+### 2. Create user credentials
+
+After all relevant credential details have been obtained, you can proceed to create the relevant service credentials in n8n. This can be done using the Editor UI or API call.
+
+#### Using the Editor UI
+
+1. From the menu select **Credentials** > **New**.
+1. Use the drop-down to select the **Credential type** to create, for example *Airtable*.
+1. In the **Create New Credentials** modal, enter the corresponding credentials details for the user, and select the nodes that will have access to these credentials.
+1. Click **Create** to finish and save.
+
+#### Using the API
+
+The frontend API used by the Editor UI can also be called to achieve the same result. The API endpoint is in the format: `https://<n8n-domain>/rest/credentials`.
+
+For example, to create the credentials in the Editor UI example above, the request would be:
+
+```
+POST https://<n8n-domain>/rest/credentials
+```
+
+With the request body:
+
+```
+{
+   "name":"MyAirtable",
+   "type":"airtableApi",
+   "nodesAccess":[
+      {
+         "nodeType":"n8n-nodes-base.airtable"
+      }
+   ],
+   "data":{
+      "apiKey":"q12we34r5t67yu"
+   }
+}
+```
+
+The response will contain the ID of the new credentials, which you will use when creating the workflow for this user:
+
+```
+{
+   "data":{
+      "name":"MyAirtable",
+      "type":"airtableApi",
+      "data":{
+         "apiKey":"q12we34r5t67yu"
+      },
+      "nodesAccess":[
+         {
+            "nodeType":"n8n-nodes-base.airtable",
+            "date":"2021-09-10T07:41:27.770Z"
+         }
+      ],
+      "id":"29",
+      "createdAt":"2021-09-10T07:41:27.777Z",
+      "updatedAt":"2021-09-10T07:41:27.777Z"
+   }
+}
+```
+
+### 3. Create the workflow
+
+Best practice is to have a “base” workflow that you then duplicate and customize for each new user with their credentials (and any other details).
+
+You can duplicate and customize your template workflow using either the Editor UI or API call.
+
+#### Using the Editor UI
+
+1. From the menu select **Workflows** > **Open** to open the template workflow to be duplicated.
+1. Select **Workflows** > **Duplicate**, then enter a name for this new workflow and click **Save**.
+1. Update all relevant nodes to use the credentials for this user (created above).
+1. **Save** this workflow and set it to **Active** using the toggle in the top-right corner.
+
+#### Using the API
+
+1. Fetch the JSON of the template workflow using the endpoint: `https://<n8n-domain>/rest/workflows/<workflow_id>`
+
+   ```
+   GET https://<n8n-domain>/rest/workflows/1012
+   ```
+
+The response will contain the JSON data of the selected workflow:
+
+```
+{
+  "data": {
+    "id": "1012",
+    "name": "Nathan's Workflow",
+    "active": false,
+    "nodes": [
+      {
+        "parameters": {},
+        "name": "Start",
+        "type": "n8n-nodes-base.start",
+        "typeVersion": 1,
+        "position": [
+          130,
+          640
+        ]
+      },
+      {
+        "parameters": {
+          "authentication": "headerAuth",
+          "url": "https://internal.users.n8n.cloud/webhook/custom-erp",
+          "options": {
+            "splitIntoItems": true
+          },
+          "headerParametersUi": {
+            "parameter": [
+              {
+                "name": "unique_id",
+                "value": "recLhLYQbzNSFtHNq"
+              }
+            ]
+          }
+        },
+        "name": "HTTP Request",
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 1,
+        "position": [
+          430,
+          300
+        ],
+        "credentials": {
+          "httpHeaderAuth": "beginner_course"
+        }
+      },
+      {
+        "parameters": {
+          "operation": "append",
+          "application": "appKBGQfbm6NfW6bv",
+          "table": "processingOrders",
+          "options": {}
+        },
+        "name": "Airtable",
+        "type": "n8n-nodes-base.airtable",
+        "typeVersion": 1,
+        "position": [
+          990,
+          210
+        ],
+        "credentials": {
+          "airtableApi": "Airtable"
+        }
+      },
+      {
+        "parameters": {
+          "conditions": {
+            "string": [
+              {
+                "value1": "={{$json[\"orderStatus\"]}}",
+                "value2": "processing"
+              }
+            ]
+          }
+        },
+        "name": "IF",
+        "type": "n8n-nodes-base.if",
+        "typeVersion": 1,
+        "position": [
+          630,
+          300
+        ]
+      },
+      {
+        "parameters": {
+          "keepOnlySet": true,
+          "values": {
+            "number": [
+              {
+                "name": "=orderId",
+                "value": "={{$json[\"orderID\"]}}"
+              }
+            ],
+            "string": [
+              {
+                "name": "employeeName",
+                "value": "={{$json[\"employeeName\"]}}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "name": "Set",
+        "type": "n8n-nodes-base.set",
+        "typeVersion": 1,
+        "position": [
+          800,
+          210
+        ]
+      },
+      {
+        "parameters": {
+          "functionCode": "let totalBooked = items.length;\nlet bookedSum = 0;\n\nfor(let i=0; i < items.length; i++) {\n  bookedSum = bookedSum + items[i].json.orderPrice;\n}\nreturn [{json:{totalBooked, bookedSum}}]\n"
+        },
+        "name": "Function",
+        "type": "n8n-nodes-base.function",
+        "typeVersion": 1,
+        "position": [
+          800,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "webhookUri": "https://discord.com/api/webhooks/865213348202151968/oD5_WPDQwtr22Vjd_82QP3-_4b_lGhAeM7RynQ8Js5DzyXrQEnj0zeAQIA6fki1JLtXE",
+          "text": "=This week we have {{$json[\"totalBooked\"]}} booked orders with a total value of {{$json[\"bookedSum\"]}}. My Unique ID: {{ $(\"HTTP Request\").params.headerParameters.parameters[0].value }}"
+        },
+        "name": "Discord",
+        "type": "n8n-nodes-base.discord",
+        "typeVersion": 1,
+        "position": [
+          1000,
+          400
+        ]
+      },
+      {
+        "parameters": {
+          "triggerTimes": {
+            "item": [
+              {
+                "mode": "everyWeek",
+                "hour": 9
+              }
+            ]
+          }
+        },
+        "name": "Cron",
+        "type": "n8n-nodes-base.cron",
+        "typeVersion": 1,
+        "position": [
+          220,
+          300
+        ]
+      }
+    ],
+    "connections": {
+      "HTTP Request": {
+        "main": [
+          [
+            {
+              "node": "IF",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Start": {
+        "main": [
+          []
+        ]
+      },
+      "IF": {
+        "main": [
+          [
+            {
+              "node": "Set",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "Function",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Set": {
+        "main": [
+          [
+            {
+              "node": "Airtable",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Function": {
+        "main": [
+          [
+            {
+              "node": "Discord",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Cron": {
+        "main": [
+          [
+            {
+              "node": "HTTP Request",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "createdAt": "2021-07-16T11:15:46.066Z",
+    "updatedAt": "2021-07-16T12:05:44.045Z",
+    "settings": {},
+    "staticData": null,
+    "tags": []
+  }
+}
+```
+
+1. Save the returned JSON data and update any relevant credentials and fields for the new user.
+
+1. Create a new workflow using the updated JSON as the request body at endpoint: `https://<n8n-domain>/rest/workflows`
+
+   ```
+   POST https://<n8n-domain>/rest/workflows/
+   ```
+
+The response will contain the ID of the new workflow, which you will use in the next step.
+
+1. Lastly, publish the new workflow:
+
+   ```
+   PATCH https://<n8n-domain>/rest/workflows/1012
+   ```
+
+Passing the additional value `active` in your JSON payload:
+
+```
+// ...
+"active":true,
+"settings": {},
+"staticData": null,
+"tags": []
+```
+
+## Single workflow
+
+There are four steps to follow to implement this method:
+
+- Obtain the credentials for each user, and any additional parameters that may be required based on the workflow. See [Obtain user credentials](#1-obtain-user-credentials) above.
+- Create the n8n credentials for this user. See [Create user credentials](#2-create-user-credentials) above.
+- Create the workflow.
+- Call the workflow as needed.
+
+### Create the workflow
+
+The details and scope of this workflow will vary greatly according to the individual use case, however there are a few design implementations to keep in mind:
+
+- This workflow must be triggered by a [Webhook](../../../integrations/builtin/core-nodes/n8n-nodes-base.webhook/) node.
+- The incoming webhook call must contain the user’s credentials and any other workflow parameters required.
+- Each node where the user’s credentials are needed should use an [expression](../../../data/expressions/) so that the node’s credential field reads the credential provided in the webhook call.
+- Save and publish the workflow, ensuring the production URL is selected for the Webhook node. Refer to [webhook node](../../../integrations/builtin/core-nodes/n8n-nodes-base.webhook/) for more information.
+
+### Call the workflow
+
+For each new user, or for any existing user as may be needed, call the webhook defined as the workflow trigger and provide the necessary credentials (and any other workflow parameters).
+
+# Prerequisites
+
+The requirements provided here are an example based on n8n Cloud and are for illustrative purposes only. Your requirements may vary depending on the number of users, workflows, and executions. Contact n8n for more information.
+
+| Component | Sizing                                   | Supported                   |
+| --------- | ---------------------------------------- | --------------------------- |
+| CPU/vCPU  | Minimum 10 CPU cycles, scaling as needed | Any public or private cloud |
+| Database  | 512 MB - 4 GB SSD                        | SQLite or PostgreSQL        |
+| Memory    | 320 MB - 2 GB                            |                             |
+
+## CPU considerations
+
+n8n isn't CPU intensive so even small instances (of providers such as AWS and GCP) should be enough for most use cases. Usually, memory requirements supersede CPU requirements, so focus resources there when planning your infrastructure.
+
+## Database considerations
+
+n8n uses its database to store [credentials](../../../glossary/#credential-n8n), past executions, and workflows.
+
+A core feature of n8n is the flexibility to choose a database. All the supported databases have different advantages and disadvantages, which you have to consider individually and pick the one that best suits your needs. By default n8n creates an SQLite database if no database exists at the given location.
+
+n8n recommends that every n8n instance have a dedicated database. This helps to prevent dependencies and potential performance degradation. If it isn't possible to provide a dedicated database for every n8n instance, n8n recommends making use of Postgres's schema feature.
+
+For Postgres, the database must already exist on the DB-instance. The database user for the n8n process needs to have full permissions on all tables that they're using or creating. n8n creates and maintains the database schema.
+
+### Best practices
+
+- SSD storage.
+- In containerized cloud environments, ensure that the volume is persisted and mounted when stopping/starting a container. If not, all data is lost.
+- If using Postgres, don't use the `tablePrefix` configuration option. It will be deprecated in the near future.
+- Pay attention to the changelog of new versions and consider reverting migrations before downgrading.
+- Set up at least the basic database security and stability mechanisms such as IP allow lists and backups.
+
+## Memory considerations
+
+An n8n instance doesn't typically require large amounts of available memory. For example an n8n Cloud instance at idle requires ~100MB. It's the nature of your workflows and the data being processed that determines your memory requirements.
+
+For example, while most nodes just pass data to the next node in the workflow, the [Code node](../../../code/code-node/) creates a pre-processing and post-processing copy of the data. When dealing with large binary files, this can consume all available resources.
+
+## Deployment recommendations
+
+See the [hosting documentation](../../installation/server-setups/) for detailed setup options.
+
+### User data
+
+n8n recommends that you follow the same or similar practices used internally for n8n Cloud: Save user data using [Rook](https://rook.io/) and, if an n8n server goes down, a new instance starts on another machine using the same data.
+
+Due to this, you don't need to use backups except in case of a catastrophic failure, or when a user wants to reactivate their account within your prescribed retention period (two weeks for n8n Cloud).
+
+### Backups
+
+n8n recommends creating nightly backups by attaching another container, and copying all data to this second container. In this manner, RAM usage is negligible, and so doesn't impact the amount of users you can place on the server.
+
+### Restarting
+
+If your instance is down or restarting, missed executions (for example, Cron or Webhook nodes) during this time aren't recoverable. If it's important for you to maintain 100% uptime, you need to build another proxy in front of it which caches the data.
 
 # Binary data
 
@@ -16493,8 +23907,12 @@ Each worker process runs a server that exposes optional endpoints:
 
 - `/healthz`: returns whether the worker is up, if you enable the `QUEUE_HEALTH_CHECK_ACTIVE` environment variable
 - `/healthz/readiness`: returns whether worker's DB and Redis connections are ready, if you enable the `QUEUE_HEALTH_CHECK_ACTIVE` environment variable
-- [credentials overwrite endpoint](../../../embed/configuration/#credential-overwrites)
+- [credentials overwrite endpoint](../../configuration/credential-overwrites/)
 - [`/metrics`](../../configuration/configuration-examples/prometheus/)
+
+Customizing health check endpoints
+
+You can customize the health check endpoint path using the [`N8N_ENDPOINT_HEALTH`](../../configuration/environment-variables/endpoints/) environment variable.
 
 #### View running workers
 
@@ -16553,7 +23971,9 @@ You can also set this value in the configuration file.
 
 When using multiple webhook processes you will need a load balancer to route requests. If you are using the same domain name for your n8n instance and the webhooks, you can set up your load balancer to route requests as follows:
 
-- Redirect any request that matches `/webhook/*` to the webhook servers pool
+- Redirect webhook triggers to the webhook servers pool. Paths to consider:
+- `/webhook/*`: Webhook trigger node endpoints
+- `/webhook-waiting/*`: Human-in-the-loop webhook endpoints used by nodes that perform "send and wait" operations (for example, the Slack node).
 - All other paths (the n8n internal API, the static files for the editor, etc.) should get routed to the main process
 
 **Note:** The default URL for manual workflow executions is `/webhook-test/*`. Make sure that these URLs route to your main process.
@@ -16724,11 +24144,16 @@ At a high level, you can:
 - [Set up Single Sign-On](../set-up-sso/) for user account management.
 - Use [two-factor authentication (2FA)](../../../user-management/two-factor-auth/) for your users.
 
+You can also protect sensitive data processed by your workflows:
+
+- [Redact execution data](../../../workflows/executions/execution-data-redaction/) to hide input and output data from workflow executions.
+
 More granularly, consider blocking or opting out of features or data collection you don't want:
 
 - [Disable the public API](../disable-public-api/) if you aren't using it.
 - [Opt out of data collection](../telemetry-opt-out/) of the anonymous data n8n collects automatically.
 - [Block certain nodes](../blocking-nodes/) from being available to your users.
+- [Protect against SSRF attacks](../ssrf-protection/) to control which hosts and IP ranges workflow nodes can connect to.
 - [Restrict account registration](../restrict-by-email-verification/) to email-verified users.
 
 # Restrict account registration to email-verified users
@@ -16827,13 +24252,71 @@ Refer to [Deployment environment variables](../../configuration/environment-vari
 
 Feature availability
 
-- Available on Enterprise plans.
+- Available on Business and Enterprise plans.
 - You need to be an instance owner or admin to enable and configure SAML or OIDC.
 
 n8n supports the SAML and OIDC authentication protocols for single sign-on (SSO). See [OIDC vs SAML](https://www.onelogin.com/learn/oidc-vs-saml) for more general information on the two protocols, the differences between them, and their respective benefits.
 
 - [Set up SAML](../../../user-management/saml/setup/): a general guide to setting up SAML in n8n, and links to resources for common identity providers (IdPs).
 - [Set up OIDC](../../../user-management/oidc/setup/): a general guide to setting up OpenID Connect (OIDC) SSO in n8n.
+
+# SSRF protection
+
+Available since 2.12.0
+
+Server-Side Request Forgery (SSRF) attacks abuse workflow nodes to make requests to internal network resources, cloud metadata endpoints, or localhost services that shouldn't be accessible.
+
+Warning
+
+SSRF protection is an additional application-level defense. You should always configure network-level protections (firewalls, security groups, network policies) on your infrastructure as your primary line of defense. n8n's SSRF protection adds defense-in-depth on top of those controls.
+
+## Enable SSRF protection
+
+```
+N8N_SSRF_PROTECTION_ENABLED=true
+```
+
+When enabled, n8n validates all outbound HTTP requests from user-controllable nodes (such as the HTTP Request node) against the configured blocked and allowed ranges. This includes redirect targets and DNS resolution to prevent bypass techniques like DNS rebinding.
+
+## Default blocked ranges
+
+When SSRF protection is enabled, the following IP ranges are blocked by default:
+
+| Range                                                                                             | Description                |
+| ------------------------------------------------------------------------------------------------- | -------------------------- |
+| `10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`                                                   | RFC 1918 private addresses |
+| `127.0.0.0/8`, `::1/128`                                                                          | Loopback                   |
+| `169.254.0.0/16`, `fe80::/10`                                                                     | Link-local                 |
+| `fc00::/7`, `fd00::/8`                                                                            | IPv6 unique local          |
+| `0.0.0.0/8`, `192.0.0.0/24`, `192.0.2.0/24`, `198.18.0.0/15`, `198.51.100.0/24`, `203.0.113.0/24` | Reserved/special purpose   |
+
+You can extend this list with `N8N_SSRF_BLOCKED_IP_RANGES=default,100.0.0.0/8`.
+
+## Allow access to internal services
+
+If your workflows need to reach legitimate internal services, use allowlists. Allowlists take precedence over blocklists, following this order: hostname allowlist > IP allowlist > IP blocklist.
+
+Allow by hostname pattern (supports wildcards like `*.n8n.internal`):
+
+```
+N8N_SSRF_ALLOWED_HOSTNAMES=*.n8n.internal,*.company.local
+```
+
+Allow by IP range:
+
+```
+N8N_SSRF_ALLOWED_IP_RANGES=10.0.1.0/24,10.0.2.50/32
+```
+
+Warning
+
+Only allowlist hostnames within your control (internal DNS zones). Hostname allowlists bypass IP blocklist checks.
+
+## Related resources
+
+Refer to [SSRF protection environment variables](../../configuration/environment-variables/ssrf-protection/) for the full list of configuration options.
+
+Refer to [Configuration methods](../../configuration/configuration-methods/) for more information on setting environment variables.
 
 # Data collection
 
@@ -17841,10 +25324,10 @@ Refer to [AWS credentials](../../credentials/aws/) for guidance on setting up au
 ## Operations
 
 - Item
-- Create a new record, or update the current one if it already exists (upsert/put)
-- Delete an item
-- Get an item
-- Get all items
+  - Create a new record, or update the current one if it already exists (upsert/put)
+  - Delete an item
+  - Get an item
+  - Get all items
 
 ## Templates and examples
 
@@ -18286,6 +25769,24 @@ This node can be used to enhance the capabilities of an AI agent. When used in t
 
 ## Templates and examples
 
+**Extract and store text from chat images using AWS S3**
+
+by Lorena
+
+[View template details](https://n8n.io/workflows/1393-extract-and-store-text-from-chat-images-using-aws-s3/)
+
+**Send a file from S3 to AWS Textract**
+
+by Tom
+
+[View template details](https://n8n.io/workflows/1282-send-a-file-from-s3-to-aws-textract/)
+
+**Summarize invoices with AWS Textract, Google Gemini, and send to Slack**
+
+by Pixcels Themes
+
+[View template details](https://n8n.io/workflows/13803-summarize-invoices-with-aws-textract-google-gemini-and-send-to-slack/)
+
 [Browse AWS Textract integration templates](https://n8n.io/integrations/aws-textract/), or [search all templates](https://n8n.io/workflows/)
 
 ## What to do if your operation isn't supported
@@ -18593,10 +26094,13 @@ This node can be used to enhance the capabilities of an AI agent. When used in t
 ## Operations
 
 - Row
+  - Create multiple rows
+  - Delete multiple rows
+  - Update multiple rows
   - Create a row
   - Delete a row
-  - Retrieve a row
-  - Retrieve all rows
+  - Get a row
+  - Get many rows
   - Update a row
 
 ## Templates and examples
@@ -18687,7 +26191,7 @@ by sshaligr
 
 [View template details](https://n8n.io/workflows/442-create-a-url-on-bitly/)
 
-**Automate URL Shortening with Bitly Using Llama3 Chat Interface**
+**Automate URL shortening with Bitly using Llama3 chat interface**
 
 by Ghufran Ridhawi
 
@@ -19818,6 +27322,83 @@ You can use the credential you created for this service in the HTTP Request node
 
 Refer to [Custom API operations](../../../custom-operations/) for more information.
 
+# Databricks node
+
+Use the Databricks node to automate work in Databricks, and integrate Databricks with other applications. n8n has built-in support for a wide range of Databricks features, including executing SQL queries, managing Unity Catalog objects, querying ML model serving endpoints, and working with vector search indexes.
+
+On this page, you'll find a list of operations the Databricks node supports and links to more resources.
+
+Credentials
+
+Refer to [Databricks credentials](../../credentials/databricks/) for guidance on setting up authentication.
+
+This node can be used as an AI tool
+
+This node can be used to enhance the capabilities of an AI agent. When used in this way, many parameters can be set automatically, or with information directed by AI - find out more in the [AI tool parameters documentation](../../../../advanced-ai/examples/using-the-fromai-function/).
+
+## Operations
+
+- Databricks SQL
+  - Execute Query
+- File
+  - Create Directory
+  - Delete Directory
+  - Delete File
+  - Download File
+  - Get File Metadata
+  - List Directory
+  - Upload File
+- Genie
+  - Create Conversation Message
+  - Execute Message SQL Query
+  - Get Conversation Message
+  - Get Genie Space
+  - Get Query Results
+  - Start Conversation
+- Model Serving
+  - Query Endpoint
+- Unity Catalog
+  - Create Catalog
+  - Create Function
+  - Create Volume
+  - Delete Catalog
+  - Delete Function
+  - Delete Volume
+  - Get Catalog
+  - Get Function
+  - Get Table
+  - Get Volume
+  - List Catalogs
+  - List Functions
+  - List Tables
+  - List Volumes
+  - Update Catalog
+- Vector Search
+  - Create Index
+  - Get Index
+  - List Indexes
+  - Query Index
+
+## Templates and examples
+
+[Browse Databricks integration templates](https://n8n.io/integrations/databricks/), or [search all templates](https://n8n.io/workflows/)
+
+## Related resources
+
+Refer to [Databricks' REST API documentation](https://docs.databricks.com/api/) for details about their API.
+
+## What to do if your operation isn't supported
+
+If this node doesn't support the operation you want to do, you can use the [HTTP Request node](../../core-nodes/n8n-nodes-base.httprequest/) to call the service's API.
+
+You can use the credential you created for this service in the HTTP Request node:
+
+1. In the HTTP Request node, select **Authentication** > **Predefined Credential Type**.
+1. Select the service you want to connect to.
+1. Select your credential.
+
+Refer to [Custom API operations](../../../custom-operations/) for more information.
+
 # DeepL node
 
 Use the DeepL node to automate work in DeepL, and integrate DeepL with other applications. n8n has built-in support for a wide range of DeepL features, including translating languages.
@@ -19851,7 +27432,7 @@ by Harshil Agrawal
 
 [View template details](https://n8n.io/workflows/998-translate-cocktail-instructions-using-deepl/)
 
-**Real-time Chat Translation with DeepL**
+**Real-time chat translation with DeepL**
 
 by Ghufran Ridhawi
 
@@ -20058,11 +27639,11 @@ by David Ashby
 
 [View template details](https://n8n.io/workflows/5277-drift-tool-mcp-server-5-operations/)
 
-**Track SDK Documentation Drift with GitHub, Notion, Google Sheets, and Slack**
+**Maintain RAG embeddings with OpenAI, Postgres and auto drift rollback**
 
-by Rahul Joshi
+by ResilNext
 
-[View template details](https://n8n.io/workflows/10337-track-sdk-documentation-drift-with-github-notion-google-sheets-and-slack/)
+[View template details](https://n8n.io/workflows/14036-maintain-rag-embeddings-with-openai-postgres-and-auto-drift-rollback/)
 
 [Browse Drift integration templates](https://n8n.io/integrations/drift/), or [search all templates](https://n8n.io/workflows/)
 
@@ -20752,24 +28333,6 @@ Refer to [Freshworks CRM credentials](../../credentials/freshworkscrm/) for guid
 
 ## Templates and examples
 
-**Search LinkedIn companies, Score with AI and add them to Google Sheet CRM**
-
-by Matthieu
-
-[View template details](https://n8n.io/workflows/3904-search-linkedin-companies-score-with-ai-and-add-them-to-google-sheet-crm/)
-
-**Real Estate Lead Generation with BatchData Skip Tracing & CRM Integration**
-
-by Preston Zeller
-
-[View template details](https://n8n.io/workflows/3666-real-estate-lead-generation-with-batchdata-skip-tracing-and-crm-integration/)
-
-**📄🌐PDF2Blog - Create Blog Post on Ghost CRM from PDF Document**
-
-by Joseph LePage
-
-[View template details](https://n8n.io/workflows/2522-pdf2blog-create-blog-post-on-ghost-crm-from-pdf-document/)
-
 [Browse Freshworks CRM integration templates](https://n8n.io/integrations/freshworks-crm/), or [search all templates](https://n8n.io/workflows/)
 
 ## What to do if your operation isn't supported
@@ -21146,8 +28709,8 @@ Refer to [Google Ads credentials](../../credentials/google/) for guidance on set
 ## Operations
 
 - Campaign
-- Get all campaigns
-- Get a campaign
+  - Get all campaigns
+  - Get a campaign
 
 ## Templates and examples
 
@@ -21388,6 +28951,12 @@ You can find authentication information for this node [here](../../credentials/g
 
 ## Templates and examples
 
+**Automate Google My Business responses with Gemini AI and Google Sheets tracking**
+
+by Malik Hashir
+
+[View template details](https://n8n.io/workflows/11503-automate-google-my-business-responses-with-gemini-ai-and-google-sheets-tracking/)
+
 **🛠️ Google Business Profile Tool MCP Server 💪 all 9 operations**
 
 by David Ashby
@@ -21399,12 +28968,6 @@ by David Ashby
 by Peyton Leveillee
 
 [View template details](https://n8n.io/workflows/9290-automated-google-business-reports-with-gpt-insights-to-slack-and-email/)
-
-**Automate Google Business Profile Posts with GPT-4 & Google Sheets**
-
-by Muhammad Qaisar Mehmood
-
-[View template details](https://n8n.io/workflows/6165-automate-google-business-profile-posts-with-gpt-4-and-google-sheets/)
 
 [Browse Google Business Profile integration templates](https://n8n.io/integrations/google-business-profile/), or [search all templates](https://n8n.io/workflows/)
 
@@ -21946,17 +29509,17 @@ by Jimleuk
 
 [View template details](https://n8n.io/workflows/2420-automate-image-validation-tasks-using-ai-vision/)
 
+**Add Project Tasks to Google Sheets with GPT-4.1-mini Chat Assistant**
+
+by Robert Breen
+
+[View template details](https://n8n.io/workflows/10230-add-project-tasks-to-google-sheets-with-gpt-41-mini-chat-assistant/)
+
 **Sync Google Calendar tasks to Trello every day**
 
 by Angel Menendez
 
 [View template details](https://n8n.io/workflows/1118-sync-google-calendar-tasks-to-trello-every-day/)
-
-**Add a task to Google Tasks**
-
-by sshaligr
-
-[View template details](https://n8n.io/workflows/428-add-a-task-to-google-tasks/)
 
 [Browse Google Tasks integration templates](https://n8n.io/integrations/google-tasks/), or [search all templates](https://n8n.io/workflows/)
 
@@ -22287,11 +29850,11 @@ by David Ashby
 
 [View template details](https://n8n.io/workflows/5251-google-workspace-admin-tool-mcp-server-all-16-operations/)
 
-**Provision new employee accounts to Google Workspace, Slack, Jira, and Salesforce**
+**Automate employee onboarding and Google Workspace account creation with Gmail, Google Sheets, PDFBro and Google Gemini**
 
-by yuta tokumitsu
+by iamvaar
 
-[View template details](https://n8n.io/workflows/12090-provision-new-employee-accounts-to-google-workspace-slack-jira-and-salesforce/)
+[View template details](https://n8n.io/workflows/13145-automate-employee-onboarding-and-google-workspace-account-creation-with-gmail-google-sheets-pdfbro-and-google-gemini/)
 
 [Browse Google Workspace Admin integration templates](https://n8n.io/integrations/google-workspace-admin/), or [search all templates](https://n8n.io/workflows/)
 
@@ -22967,7 +30530,7 @@ by amudhan
 
 **Automate Invoice Creation and Delivery with Google Sheets, Invoice Ninja and Gmail**
 
-by Marth
+by Marth - Business Automation
 
 [View template details](https://n8n.io/workflows/6447-automate-invoice-creation-and-delivery-with-google-sheets-invoice-ninja-and-gmail/)
 
@@ -25426,7 +32989,7 @@ by N8ner
 
 **Build a PDF Document RAG System with Mistral OCR, Qdrant and Gemini AI**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/4400-build-a-pdf-document-rag-system-with-mistral-ocr-qdrant-and-gemini-ai/)
 
@@ -25596,7 +33159,7 @@ by NovaNode
 
 [View template details](https://n8n.io/workflows/4827-ai-powered-whatsapp-chatbot-for-text-voice-images-and-pdf-with-rag/)
 
-**Content Farming - : AI-Powered Blog Automation for WordPress**
+**Content farming - : AI-powered blog automation for WordPress**
 
 by Jay Emp0
 
@@ -25825,7 +33388,7 @@ by Harshil Agrawal
 
 [View template details](https://n8n.io/workflows/828-send-the-astronomy-picture-of-the-day-daily-to-a-telegram-channel/)
 
-**Retrieve NASA Space Weather & Asteroid Data with GPT-4o-mini and Telegram**
+**Retrieve NASA space weather & asteroid data with GPT-4o-mini and Telegram**
 
 by Ghufran Ridhawi
 
@@ -26070,6 +33633,24 @@ Refer to [npm credentials](../../credentials/npm/) for guidance on setting up au
   - Update a Tag
 
 ## Templates and examples
+
+**Automate NPM Package Installation and Updates for Self-Hosted Environments**
+
+by Joachim Brindeau
+
+[View template details](https://n8n.io/workflows/3293-automate-npm-package-installation-and-updates-for-self-hosted-environments/)
+
+**🛠️ Npm Tool MCP Server 💪 all 5 operations**
+
+by David Ashby
+
+[View template details](https://n8n.io/workflows/5341-npm-tool-mcp-server-all-5-operations/)
+
+**Track npm package downloads with Telegram commands and reports**
+
+by Monfort N. Brian | 宁俊
+
+[View template details](https://n8n.io/workflows/13945-track-npm-package-downloads-with-telegram-commands-and-reports/)
 
 [Browse npm integration templates](https://n8n.io/integrations/npm/), or [search all templates](https://n8n.io/workflows/)
 
@@ -27138,11 +34719,11 @@ by Artur
 
 [View template details](https://n8n.io/workflows/2807-create-quickbooks-online-customers-with-sales-receipts-for-new-stripe-payments/)
 
-**Create a QuickBooks invoice on a new Onfleet Task creation**
+**Full-cycle invoice automation: Airtable, QuickBooks & Stripe**
 
-by James Li
+by Intuz
 
-[View template details](https://n8n.io/workflows/1546-create-a-quickbooks-invoice-on-a-new-onfleet-task-creation/)
+[View template details](https://n8n.io/workflows/7291-full-cycle-invoice-automation-airtable-quickbooks-and-stripe/)
 
 [Browse QuickBooks Online integration templates](https://n8n.io/integrations/quickbooks-online/), or [search all templates](https://n8n.io/workflows/)
 
@@ -30540,7 +38121,7 @@ by Jan Oberhauser
 
 **Personal Shopper Chatbot for WooCommerce with RAG using Google Drive and openAI**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2784-personal-shopper-chatbot-for-woocommerce-with-rag-using-google-drive-and-openai/)
 
@@ -30612,7 +38193,7 @@ by Joseph LePage
 
 **Automate Content Generator for WordPress with DeepSeek R1**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2813-automate-content-generator-for-wordpress-with-deepseek-r1/)
 
@@ -30764,7 +38345,7 @@ by Dr. Firas
 
 **Generate AI Videos with Google Veo3, Save to Google Drive and Upload to YouTube**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/4846-generate-ai-videos-with-google-veo3-save-to-google-drive-and-upload-to-youtube/)
 
@@ -30817,6 +38398,7 @@ Refer to [Zammad credentials](../../credentials/zammad/) for guidance on setting
   - Delete
   - Get
   - Get many
+  - Update
 - User
   - Create
   - Delete
@@ -31039,11 +38621,11 @@ by amudhan
 
 [View template details](https://n8n.io/workflows/552-get-all-leads-from-zoho-crm/)
 
-**Jotform Automated Commerce Sync: Telegram Confirmation & Zoho Invoice**
+**Sync contacts two-way between Zoho CRM and KlickTipp**
 
-by Abdullah Alshiekh
+by KlickTipp
 
-[View template details](https://n8n.io/workflows/9526-jotform-automated-commerce-sync-telegram-confirmation-and-zoho-invoice/)
+[View template details](https://n8n.io/workflows/12679-sync-contacts-two-way-between-zoho-crm-and-klicktipp/)
 
 [Browse Zoho CRM integration templates](https://n8n.io/integrations/zoho-crm/), or [search all templates](https://n8n.io/workflows/)
 
@@ -32630,7 +40212,7 @@ by Juan Carlos Cavero Gracia
 
 **Generate AI Videos with Google Veo3, Save to Google Drive and Upload to YouTube**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/4846-generate-ai-videos-with-google-veo3-save-to-google-drive-and-upload-to-youtube/)
 
@@ -33225,7 +40807,7 @@ by Juan Carlos Cavero Gracia
 
 **Generate AI Videos with Google Veo3, Save to Google Drive and Upload to YouTube**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/4846-generate-ai-videos-with-google-veo3-save-to-google-drive-and-upload-to-youtube/)
 
@@ -33524,14 +41106,14 @@ Enter these parameters:
 
 - **Data Location on Sheet**: Use this option to specify a data range. By default, n8n will detect the range automatically until the last row in the sheet.
 - **Output Formatting**: Use this option to choose how n8n formats the data returned by Google Sheets.
-- **General Formatting**:
-  - **Values (unformatted)** (default): n8n removes currency signs and other special formatting. Data type remains as number.
-  - **Values (formatted)**: n8n displays the values as they appear in Google Sheets (for example, retaining commas or currency signs) by converting the data type from number to string.
-  - **Formulas**: n8n returns the formula. It doesn't calculate the formula output. For example, if a cell B2 has the formula `=A2`, n8n returns B2's value as `=A2` (in text). Refer to [About date & time values | Google Sheets](https://developers.google.com/sheets/api/guides/formats#about_date_time_values) for more information.
-- **Date Formatting**: Refer to [DateTimeRenderOption | Google Sheets](https://developers.google.com/sheets/api/reference/rest/v4/DateTimeRenderOption) for more information.
-  - **Formatted Text** (default): As displayed in Google Sheets, which depends on the spreadsheet locale. For example `01/01/2024`.
-  - **Serial Number**: Number of days since December 30th 1899.
-- **When Filter Has Multiple Matches**: Set to **Return All Matches** to get multiple matches. By default only the first result gets returned.
+  - **General Formatting**:
+    - **Values (unformatted)** (default): n8n removes currency signs and other special formatting. Data type remains as number.
+    - **Values (formatted)**: n8n displays the values as they appear in Google Sheets (for example, retaining commas or currency signs) by converting the data type from number to string.
+    - **Formulas**: n8n returns the formula. It doesn't calculate the formula output. For example, if a cell B2 has the formula `=A2`, n8n returns B2's value as `=A2` (in text). Refer to [About date & time values | Google Sheets](https://developers.google.com/sheets/api/guides/formats#about_date_time_values) for more information.
+  - **Date Formatting**: Refer to [DateTimeRenderOption | Google Sheets](https://developers.google.com/sheets/api/reference/rest/v4/DateTimeRenderOption) for more information.
+    - **Formatted Text** (default): As displayed in Google Sheets, which depends on the spreadsheet locale. For example `01/01/2024`.
+    - **Serial Number**: Number of days since December 30th 1899.
+  - **When Filter Has Multiple Matches**: Set to **Return All Matches** to get multiple matches. By default only the first result gets returned.
 
 First row
 
@@ -33725,7 +41307,7 @@ By default, the MySQL node returns [`DECIMAL` values](https://dev.mysql.com/doc/
 
 To output decimal values as numbers instead of strings and ignore the risks in loss of precision, enable the **Output Decimals as Numbers** option. This will output the values as numbers instead of strings.
 
-As an alternative, you can manually convert from the string to a decimal using the [`toFloat()` function](../../../../../code/builtin/data-transformation-functions/strings/#string-toFloat) with [`toFixed()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/toFixed) or with the [Edit Fields (Set) node](../../../core-nodes/n8n-nodes-base.set/) after the MySQL node. Be aware that you may still need to account for a potential loss of precision.
+As an alternative, you can manually convert from the string to a decimal using the `toFloat()` function with [`toFixed()`](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Number/toFixed) or with the [Edit Fields (Set) node](../../../core-nodes/n8n-nodes-base.set/) after the MySQL node. Be aware that you may still need to account for a potential loss of precision.
 
 # Notion node
 
@@ -33872,7 +41454,7 @@ To work around this, check for the existence of the field data before sending it
 
 To check for the data before executing the Notion node, use an [If](../../../core-nodes/n8n-nodes-base.if/) node to check whether the field is unset. This allows you to use the [Edit Fields (Set)](../../../core-nodes/n8n-nodes-base.set/) node to conditionally remove the field when it doesn't have a valid value.
 
-As an alternative, you can set a [default value](../../../../../code/cookbook/expressions/check-incoming-data/) if the incoming data doesn't provide one.
+As an alternative, you can set a default value if the incoming data doesn't provide one.
 
 # Oracle Database node
 
@@ -33930,7 +41512,7 @@ Enter these parameters:
 
 - **Operation**: Execute SQL **Execute SQL**.
 
-- **Statement**: The SQL statement to execute. You can use n8n [expressions](../../../../code/expressions/) and positional parameters like `:1`, `:2`, or named parameters like `:name`, `:id` to use with [Use bind parameters](#use-bind-parameters). To run a PL/SQL procedure, for example `demo`, you can use:
+- **Statement**: The SQL statement to execute. You can use n8n [expressions](../../../../data/expressions/) and positional parameters like `:1`, `:2`, or named parameters like `:name`, `:id` to use with [Use bind parameters](#use-bind-parameters). To run a PL/SQL procedure, for example `demo`, you can use:
 
   ```
   BEGIN
@@ -33963,7 +41545,7 @@ Enter these parameters:
 #### Insert options
 
 - **Auto Commit**: When this property is set to true, the transaction in the current connection is automatically committed at the end of statement execution.
-- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../code/expressions/).
+- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../data/expressions/).
 - **Statement Batching**: The way to send statements to the database:
   - **Single Statement**: A single statement for all incoming items.
   - **Independently**: Execute one statement per incoming item of the execution.
@@ -33986,7 +41568,7 @@ Enter these parameters:
 #### Insert or Update options
 
 - **Auto Commit**: When this property is set to true, the transaction in the current connection is automatically committed at the end of statement execution.
-- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../code/expressions/).
+- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../data/expressions/).
 - **Statement Batching**: The way to send statements to the database:
   - **Single Statement**: A single statement for all incoming items.
   - **Independently**: Execute one statement per incoming item of the execution.
@@ -34038,7 +41620,7 @@ Enter these parameters:
 #### Update options
 
 - **Auto Commit**: When this property is set to true, the transaction in the current connection is automatically committed at the end of statement execution.
-- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../code/expressions/).
+- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../data/expressions/).
 - **Statement Batching**: The way to send statements to the database:
   - **Single Statement**: A single statement for all incoming items.
   - **Independently**: Execute one statement per incoming item of the execution.
@@ -34187,7 +41769,7 @@ Enter these parameters:
 
 - **Credential to connect with**: Create or select an existing [Postgres credential](../../credentials/postgres/).
 - **Operation**: Select **Execute Query**.
-- **Query**: The SQL query to execute. You can use n8n [expressions](../../../../code/expressions/) and tokens like `$1`, `$2`, and `$3` to build [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) to use with [query parameters](#use-query-parameters).
+- **Query**: The SQL query to execute. You can use n8n [expressions](../../../../data/expressions/) and tokens like `$1`, `$2`, and `$3` to build [prepared statements](https://www.postgresql.org/docs/current/sql-prepare.html) to use with [query parameters](#use-query-parameters).
 
 #### Execute Query options
 
@@ -34225,7 +41807,7 @@ Enter these parameters:
   - **Single Query**: A single query for all incoming items.
   - **Independently**: Execute one query per incoming item of the execution.
   - **Transaction**: Execute all queries in a transaction. If a failure occurs, Postgres rolls back all changes.
-- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../code/expressions/).
+- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../data/expressions/).
 - **Output Large-Format Numbers As**: The format to output `NUMERIC` and `BIGINT` columns as:
   - **Numbers**: Use this for standard numbers.
   - **Text**: Use this if you expect numbers longer than 16 digits. Without this, numbers may be incorrect.
@@ -34254,7 +41836,7 @@ Enter these parameters:
   - **Single Query**: A single query for all incoming items.
   - **Independently**: Execute one query per incoming item of the execution.
   - **Transaction**: Execute all queries in a transaction. If a failure occurs, Postgres rolls back all changes.
-- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../code/expressions/).
+- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../data/expressions/).
 - **Output Large-Format Numbers As**: The format to output `NUMERIC` and `BIGINT` columns as:
   - **Numbers**: Use this for standard numbers.
   - **Text**: Use this if you expect numbers longer than 16 digits. Without this, numbers may be incorrect.
@@ -34284,7 +41866,7 @@ Enter these parameters:
   - **Single Query**: A single query for all incoming items.
   - **Independently**: Execute one query per incoming item of the execution.
   - **Transaction**: Execute all queries in a transaction. If a failure occurs, Postgres rolls back all changes.
-- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../code/expressions/).
+- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../data/expressions/).
 - **Output Large-Format Numbers As**: The format to output `NUMERIC` and `BIGINT` columns as:
   - **Numbers**: Use this for standard numbers.
   - **Text**: Use this if you expect numbers longer than 16 digits. Without this, numbers may be incorrect.
@@ -34311,7 +41893,7 @@ Enter these parameters:
   - **Single Query**: A single query for all incoming items.
   - **Independently**: Execute one query per incoming item of the execution.
   - **Transaction**: Execute all queries in a transaction. If a failure occurs, Postgres rolls back all changes.
-- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../code/expressions/).
+- **Output Columns**: Choose which columns to output. You can select from a list of available columns or specify IDs using [expressions](../../../../data/expressions/).
 - **Output Large-Format Numbers As**: The format to output `NUMERIC` and `BIGINT` columns as:
   - **Numbers**: Use this for standard numbers.
   - **Text**: Use this if you expect numbers longer than 16 digits. Without this, numbers may be incorrect.
@@ -34393,7 +41975,7 @@ In Postgres, you can use the SQL [`IN` comparison construct](https://www.postgre
 SELECT color, shirt_size FROM shirts WHERE shirt_size IN ('small', 'medium', 'large');
 ```
 
-While you can use n8n [expressions](../../../../../code/expressions/) in your query to dynamically populate the values in an `IN` group, combining this with [query parameters](../#use-query-parameters) provides extra protection by automatically sanitizing input.
+While you can use n8n [expressions](../../../../../data/expressions/) in your query to dynamically populate the values in an `IN` group, combining this with [query parameters](../#use-query-parameters) provides extra protection by automatically sanitizing input.
 
 To construct an `IN` group query with query parameters:
 
@@ -34423,7 +42005,7 @@ To avoid complications with how n8n and Postgres interpret timestamp and time zo
 
 - **Use UTC when storing and passing dates**: Using UTC helps avoid confusion over timezone conversions when converting dates between different representations and systems.
 - **Set the execution timezone**: Set the global timezone in n8n using either [environment variables](../../../../../hosting/configuration/configuration-examples/time-zone/) (for self-hosted) or in the [settings](../../../../../manage-cloud/set-cloud-timezone/) (for n8n Cloud). You can set a workflow-specific timezone in the [workflow settings](../../../../../workflows/settings/).
-- **Use ISO 8601 format**: The [ISO 8601 format](https://en.wikipedia.org/wiki/ISO_8601) encodes the day of the month, month, year, hour, minutes, and seconds in a standardized string. n8n passes dates between nodes as strings and uses [Luxon](../../../../../code/cookbook/luxon/) to parse dates. If you need to cast to ISO 8601 explicitly, you can use the [Date & Time node](../../../core-nodes/n8n-nodes-base.datetime/) and a custom format set to the string `yyyy-MM-dd'T'HH:mm:ss`.
+- **Use ISO 8601 format**: The [ISO 8601 format](https://en.wikipedia.org/wiki/ISO_8601) encodes the day of the month, month, year, hour, minutes, and seconds in a standardized string. n8n passes dates between nodes as strings and uses [Luxon](../../../../../data/specific-data-types/luxon/) to parse dates. If you need to cast to ISO 8601 explicitly, you can use the [Date & Time node](../../../core-nodes/n8n-nodes-base.datetime/) and a custom format set to the string `yyyy-MM-dd'T'HH:mm:ss`.
 
 ## Outputting Date columns as date strings instead of ISO datetime strings
 
@@ -34482,11 +42064,11 @@ by Oskar
 
 [View template details](https://n8n.io/workflows/2315-autonomous-ai-crawler/)
 
-**🤖 Create a Documentation Expert Bot with RAG, Gemini, and Supabase**
+**Automate sales cold calling pipeline with Apify, GPT-4o, and WhatsApp**
 
-by Lucas Peyrin
+by Khairul Muhtadin
 
-[View template details](https://n8n.io/workflows/5993-create-a-documentation-expert-bot-with-rag-gemini-and-supabase/)
+[View template details](https://n8n.io/workflows/5449-automate-sales-cold-calling-pipeline-with-apify-gpt-4o-and-whatsapp/)
 
 [Browse Supabase integration templates](https://n8n.io/integrations/supabase/), or [search all templates](https://n8n.io/workflows/)
 
@@ -35418,7 +43000,7 @@ by Jimleuk
 
 **AI-Powered WhatsApp Chatbot 🤖📲 for Text, Voice, Images & PDFs with memory 🧠**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/3586-ai-powered-whatsapp-chatbot-for-text-voice-images-and-pdfs-with-memory/)
 
@@ -35454,7 +43036,7 @@ This error occurs when WhatsApp Business Cloud rejects your request because of a
 
 To resolve this issue, review the parameters in your [message template](https://www.facebook.com/business/help/2055875911147364?id=2129163877102343). Pay attention to each parameter's data type and the order they're defined in the template.
 
-Check the data that n8n is mapping to the template parameters. If you're using expressions to set parameter values, check the input data to make sure each item resolves to a valid value. You may want to use the [Edit Fields (Set) node](../../../core-nodes/n8n-nodes-base.set/) or [set a fallback value](../../../../../code/cookbook/expressions/check-incoming-data/) to ensure you send a value with the correct format.
+Check the data that n8n is mapping to the template parameters. If you're using expressions to set parameter values, check the input data to make sure each item resolves to a valid value. You may want to use the [Edit Fields (Set) node](../../../core-nodes/n8n-nodes-base.set/) or set a fallback value to ensure you send a value with the correct format.
 
 ## Working with non-text media
 
@@ -35604,7 +43186,7 @@ Enter these parameters:
 
 - **Knowledge Retrieval**: Turn on to enable knowledge retrieval for the assistant, allowing it to access external sources or a connected knowledge base. Refer to [File Search | OpenAI Platform](https://platform.openai.com/docs/assistants/tools/file-search) for more information.
 
-- **Files**: Select a file to upload for your external knowledge source. Use **Upload a File** operation to add more files.
+  - **Files**: Select a file to upload for your external knowledge source. Use **Upload a File** operation to add more files.
 
 ### Options
 
@@ -36446,7 +44028,7 @@ by Joseph LePage
 
 **AI Automated HR Workflow for CV Analysis and Candidate Evaluation**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2860-ai-automated-hr-workflow-for-cv-analysis-and-candidate-evaluation/)
 
@@ -36843,10 +44425,10 @@ The built-in semantic reranker uses machine learning models to improve relevance
 
 - **Filter**: [OData filter expression](https://learn.microsoft.com/azure/search/search-query-odata-filter) to filter results by document fields or metadata. See filter examples below.
 - **Query Mode**: Search strategy to use:
-- **Vector**: Similarity search using embeddings only
-- **Keyword**: Full-text search using BM25 ranking
-- **Hybrid** (default): Combines vector and keyword search with Reciprocal Rank Fusion (RRF)
-- **Semantic Hybrid**: Hybrid search with [semantic reranking](https://learn.microsoft.com/azure/search/semantic-search-overview) for improved relevance
+  - **Vector**: Similarity search using embeddings only
+  - **Keyword**: Full-text search using BM25 ranking
+  - **Hybrid** (default): Combines vector and keyword search with Reciprocal Rank Fusion (RRF)
+  - **Semantic Hybrid**: Hybrid search with [semantic reranking](https://learn.microsoft.com/azure/search/semantic-search-overview) for improved relevance
 - **Semantic Configuration**: Name of the semantic configuration to use for [semantic ranking](https://learn.microsoft.com/azure/search/semantic-search-overview). Defaults to `semantic-search-config` if not specified. Only required if you pre-created an index with a custom semantic configuration name.
 
 Query mode selection
@@ -36967,6 +44549,24 @@ For authentication troubleshooting including API key errors, refer to the [crede
 
 ## Templates and examples
 
+**Build an AI IT Support Agent with Azure Search, Entra ID & Jira**
+
+by Adam Bertram
+
+[View template details](https://n8n.io/workflows/4560-build-an-ai-it-support-agent-with-azure-search-entra-id-and-jira/)
+
+**💾 Generate Blog Posts on Autopilot with GPT‑5, Tavily and WordPress**
+
+by N8ner
+
+[View template details](https://n8n.io/workflows/12858-generate-blog-posts-on-autopilot-with-gpt5-tavily-and-wordpress/)
+
+**Find Valid Vouchers and Promo Codes with SerpAPI, Decodo, and GPT-5 Mini**
+
+by Khaisa Studio
+
+[View template details](https://n8n.io/workflows/8075-find-valid-vouchers-and-promo-codes-with-serpapi-decodo-and-gpt-5-mini/)
+
 [Browse Azure AI Search Vector Store integration templates](https://n8n.io/integrations/azure-ai-search-vector-store/), or [search all templates](https://n8n.io/workflows/)
 
 ## Related resources
@@ -36981,6 +44581,110 @@ View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
 ## Self-hosted AI Starter Kit
 
 New to working with AI and using self-hosted n8n? Try n8n's [self-hosted AI Starter Kit](../../../../../hosting/starter-kits/ai-starter-kit/) to get started with a proof-of-concept or demo playground using Ollama, Qdrant, and PostgreSQL.
+
+# Chroma Vector Store node
+
+Use the Chroma node to interact with your Chroma database as [vector store](../../../../../glossary/#ai-vector-store). You can insert documents into a vector database, get documents from a vector database, retrieve documents to provide them to a retriever connected to a [chain](../../../../../glossary/#ai-chain), or connect directly to an [agent](../../../../../glossary/#ai-agent) as a [tool](../../../../../glossary/#ai-tool).
+
+On this page, you'll find the node parameters for the Chroma node, and links to more resources.
+
+Credentials
+
+You can find authentication information for this node [here](../../../credentials/chroma/).
+
+## Node usage patterns
+
+You can use the Chroma Vector Store node in the following patterns.
+
+### Use as a regular node to insert and retrieve documents
+
+You can use the Chroma Vector Store as a regular node to insert or get documents. This pattern places the Chroma Vector Store in the regular connection flow without using an agent.
+
+### Connect directly to an AI agent as a tool
+
+You can connect the Chroma Vector Store node directly to the tool connector of an [AI agent](../n8n-nodes-langchain.agent/) to use a vector store as a resource when answering queries.
+
+Here, the connection would be: AI agent (tools connector) -> Chroma Vector Store node.
+
+### Use a retriever to fetch documents
+
+You can use the [Vector Store Retriever](../../sub-nodes/n8n-nodes-langchain.retrievervectorstore/) node with the Chroma Vector Store node to fetch documents from the Chroma Vector Store node. This is often used with the [Question and Answer Chain](../n8n-nodes-langchain.chainretrievalqa/) node to fetch documents from the vector store that match the given chat input.
+
+An example of the connection flow would be as follows:
+
+Question and Answer Chain (Retriever connector) -> Vector Store Retriever (Vector Store connector) -> Chroma Vector Store.
+
+### Use the Vector Store Question Answer Tool to answer questions
+
+Another pattern uses the [Vector Store Question Answer Tool](../../sub-nodes/n8n-nodes-langchain.toolvectorstore/) to summarize results and answer questions from the Chroma Vector Store node. Rather than connecting the Chroma Vector Store directly as a tool, this pattern uses a tool specifically designed to summarize data in the vector store.
+
+The connections flow in this case would look like this: AI agent (tools connector) -> Vector Store Question Answer Tool (Vector Store connector) -> Chroma Vector store.
+
+## Node parameters
+
+### Operation Mode
+
+This Vector Store node has four modes: **Get Many**, **Insert Documents**, **Retrieve Documents (As Vector Store for Chain/Tool)**, and **Retrieve Documents (As Tool for AI Agent)**. The mode you select determines the operations you can perform with the node and what inputs and outputs are available.
+
+#### Get Many
+
+In this mode, you can retrieve multiple documents from your vector database by providing a prompt. The prompt is embedded and used for similarity search. The node returns the documents that are most similar to the prompt with their similarity score. This is useful if you want to retrieve a list of similar documents and pass them to an agent as additional context.
+
+#### Insert Documents
+
+Use insert documents mode to insert new documents into your vector database.
+
+#### Retrieve Documents (as Vector Store for Chain/Tool)
+
+Use Retrieve Documents (As Vector Store for Chain/Tool) mode with a vector-store retriever to retrieve documents from a vector database and provide them to the retriever connected to a chain. In this mode you must connect the node to a retriever node or root node.
+
+#### Retrieve Documents (as Tool for AI Agent)
+
+Use Retrieve Documents (As Tool for AI Agent) mode to use the vector store as a tool resource when answering queries. When formulating responses, the agent uses the vector store when the vector store name and description match the question details.
+
+### Rerank Results
+
+Enables [reranking](../../../../../glossary/#ai-reranking). If you enable this option, you must connect a reranking node to the vector store. That node will then rerank the results for queries. You can use this option with the `Get Many`, `Retrieve Documents (As Vector Store for Chain/Tool)` and `Retrieve Documents (As Tool for AI Agent)` modes.
+
+### Get Many parameters
+
+- **Chroma collection name**: Select your collection from the fetched collections list.
+- **Prompt**: Enter the search query.
+- **Limit**: Enter how many results to retrieve from the vector store. For example, set this to `5` to get the five best results.
+
+This Operation Mode includes one **Node option**, the Metadata Filter
+
+### Insert Documents parameters
+
+- **Chroma collection name**: Select your collection from the fetched collections list.
+
+### Retrieve Documents (As Vector Store for Chain/Tool) parameters
+
+- **Chroma collection name**: Select your collection from the fetched collections list.
+
+This Operation Mode includes one **Node option**, the Metadata Filter
+
+### Retrieve Documents (As Tool for AI Agent) parameters
+
+- **Description**: Explain to the LLM what this tool does. A good, specific description allows LLMs to produce expected results more often.
+- **Chroma collection name**: Select your collection from the fetched collections list.
+- **Limit**: Enter how many results to retrieve from the vector store. For example, set this to `5` to get the five best results.
+
+## Node options
+
+### Metadata Filter
+
+Available in **Get Many** mode. When searching for data, use this to match with metadata associated with the document.
+
+This is an `AND` query. If you specify more than one metadata filter field, all of them must match.
+
+When inserting data, the metadata is set using the document loader. Refer to [Default Data Loader](../../sub-nodes/n8n-nodes-langchain.documentdefaultdataloader/) for more information on loading documents.
+
+## Related resources
+
+Refer to [LangChain's Chroma documentation](https://js.langchain.com/oss/javascript/integrations/vectorstores/chroma) for more information about the service.
+
+View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
 
 # Simple Vector Store node
 
@@ -37863,13 +45567,13 @@ by Joseph LePage
 
 **AI Voice Chatbot with ElevenLabs & OpenAI for Customer Service and Restaurants**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2846-ai-voice-chatbot-with-elevenlabs-and-openai-for-customer-service-and-restaurants/)
 
 **Complete business WhatsApp AI-Powered RAG Chatbot using OpenAI**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2845-complete-business-whatsapp-ai-powered-rag-chatbot-using-openai/)
 
@@ -38190,17 +45894,17 @@ by Mark Shcherbakov
 
 [View template details](https://n8n.io/workflows/2621-ai-agent-to-chat-with-files-in-supabase-storage/)
 
+**Automate sales cold calling pipeline with Apify, GPT-4o, and WhatsApp**
+
+by Khairul Muhtadin
+
+[View template details](https://n8n.io/workflows/5449-automate-sales-cold-calling-pipeline-with-apify-gpt-4o-and-whatsapp/)
+
 **🤖 Create a Documentation Expert Bot with RAG, Gemini, and Supabase**
 
 by Lucas Peyrin
 
 [View template details](https://n8n.io/workflows/5993-create-a-documentation-expert-bot-with-rag-gemini-and-supabase/)
-
-**Supabase Insertion & Upsertion & Retrieval**
-
-by Ria
-
-[View template details](https://n8n.io/workflows/2395-supabase-insertion-and-upsertion-and-retrieval/)
 
 [Browse Supabase Vector Store integration templates](https://n8n.io/integrations/supabase-vector-store/), or [search all templates](https://n8n.io/workflows/)
 
@@ -38312,7 +46016,7 @@ Enables [reranking](../../../../../glossary/#ai-reranking). If you enable this o
 
 Available for the [Get Many](#get-many), [Retrieve Documents (As Vector Store for Chain/Tool)](#retrieve-documents-as-vector-store-for-chaintool), and [Retrieve Documents (As Tool for AI Agent)](#retrieve-documents-as-tool-for-ai-agent) operation modes.
 
-When searching for data, use this to match metadata associated with documents. You can learn more about the operators and query structure in [Weaviate's conditional filters documentation](https://docs.weaviate.io/weaviate/api/graphql/filters#filter-structure).
+When searching for data, use this to match metadata associated with documents. You can learn more about the operators and query structure in [Weaviate's conditional filters documentation](https://docs.weaviate.io/weaviate/api/graphql/filters).
 
 You can use both `AND` and `OR` with different operators. Operators are case insensitive:
 
@@ -38354,9 +46058,42 @@ You can define which metadata keys you want Weaviate to return on your queries. 
 
 Available for the [Get Many](#get-many), [Retrieve Documents (As Vector Store for Chain/Tool)](#retrieve-documents-as-vector-store-for-chaintool), and [Retrieve Documents (As Tool for AI Agent)](#retrieve-documents-as-tool-for-ai-agent) operation modes.
 
+### Hybrid: Query Text
+
+Provide a query text to combine vector search with a keyword/text search.
+
+### Hybrid: Explain Score
+
+Whether to show the score fused between hybrid and vector search explanation.
+
+### Hybrid: Fusion Type
+
+Select the fusion type for combining vector and keyword search results. [Learn more about fusion algorithms](https://weaviate.io/learn/knowledgecards/fusion-algorithm).
+
+Options:
+
+- **Relative Score**: Uses relative score fusion
+- **Ranked**: Uses ranked fusion
+
+### Hybrid: Auto Cut Limit
+
+Limit result groups by detecting sudden jumps in score. [Learn more about autocut](https://docs.weaviate.io/weaviate/api/graphql/additional-operators#autocut).
+
+### Hybrid: Alpha
+
+Change the relative weights of the keyword and vector components. 1.0 = pure vector, 0.0 = pure keyword. Default is 0.5. [Learn more about the alpha parameter](https://weaviate.io/learn/knowledgecards/alpha-parameter).
+
+### Hybrid: Query Properties
+
+Comma-separated list of properties to include in the query with optionally weighted values, e.g., "question^2,answer". [Learn more about setting weights on property values](https://docs.weaviate.io/weaviate/search/hybrid#set-weights-on-property-values).
+
+### Hybrid: Max Vector Distance
+
+Set the maximum allowable distance for the vector search component.
+
 ### Tenant Name
 
-The specific tenant to store or retrieve documents for.
+The specific tenant to store or retrieve documents for. [Learn more about multi-tenancy](https://weaviate.io/learn/knowledgecards/multi-tenancy).
 
 Must enable at creation
 
@@ -38400,17 +46137,17 @@ by Mary Newhauser
 
 [View template details](https://n8n.io/workflows/5817-build-a-weekly-ai-trend-alerter-with-arxiv-and-weaviate/)
 
-**Build a PDF Search System with Mistral OCR and Weaviate DB**
+**Build person OSINT profiles using Humantic AI, Hunter, CourtListener and GPT-5**
 
-by Dietmar
+by Open Paws
 
-[View template details](https://n8n.io/workflows/7339-build-a-pdf-search-system-with-mistral-ocr-and-weaviate-db/)
+[View template details](https://n8n.io/workflows/12507-build-person-osint-profiles-using-humantic-ai-hunter-courtlistener-and-gpt-5/)
 
-**Document Q&A with RAG: Query PDF Content using Weaviate and OpenAI**
+**Research organizations with GPT‑5, Gemini, CourtListener, LegiScan and OSINT web sources**
 
-by Mary Newhauser
+by Open Paws
 
-[View template details](https://n8n.io/workflows/7170-document-qanda-with-rag-query-pdf-content-using-weaviate-and-openai/)
+[View template details](https://n8n.io/workflows/12506-research-organizations-with-gpt5-gemini-courtlistener-legiscan-and-osint-web-sources/)
 
 [Browse Weaviate Vector Store integration templates](https://n8n.io/integrations/weaviate-vector-store/), or [search all templates](https://n8n.io/workflows/)
 
@@ -38731,6 +46468,12 @@ Select whether to include intermediate steps the agent took in the final output 
 
 This could be useful for further refining the agent's behavior based on the steps it took.
 
+### Tracing Metadata
+
+Add custom key-value metadata to tracing events for this agent. This is useful for filtering and debugging runs in tracing tools like [LangSmith](../../../../../../advanced-ai/langchain/langsmith/).
+
+Entries with empty keys or values are ignored.
+
 ## Templates and examples
 
 Refer to the main AI Agent node's [Templates and examples](../#templates-and-examples) section.
@@ -38794,6 +46537,12 @@ Select whether to include intermediate steps the agent took in the final output 
 
 This could be useful for further refining the agent's behavior based on the steps it took.
 
+### Tracing Metadata
+
+Add custom key-value metadata to tracing events for this agent. This is useful for filtering and debugging runs in tracing tools like [LangSmith](../../../../../../advanced-ai/langchain/langsmith/).
+
+Entries with empty keys or values are ignored.
+
 ## Templates and examples
 
 Refer to the main AI Agent node's [Templates and examples](../#templates-and-examples) section.
@@ -38842,6 +46591,12 @@ Available LangChain expressions:
 - `{previous_steps}`: Contains information about the previous steps the agent's already completed.
 - `{current_step}`: Contains information about the current step.
 - `{agent_scratchpad}`: Information to remember for the next iteration.
+
+### Tracing Metadata
+
+Add custom key-value metadata to tracing events for this agent. This is useful for filtering and debugging runs in tracing tools like [LangSmith](../../../../../../advanced-ai/langchain/langsmith/).
+
+Entries with empty keys or values are ignored.
 
 ## Templates and examples
 
@@ -38921,6 +46676,12 @@ Add text to append after the tools list at the start of the conversation when th
 Select whether to include intermediate steps the agent took in the final output (turned on) or not (turned off).
 
 This could be useful for further refining the agent's behavior based on the steps it took.
+
+### Tracing Metadata
+
+Add custom key-value metadata to tracing events for this agent. This is useful for filtering and debugging runs in tracing tools like [LangSmith](../../../../../../advanced-ai/langchain/langsmith/).
+
+Entries with empty keys or values are ignored.
 
 ## Related resources
 
@@ -39018,6 +46779,12 @@ n8n fills this field with an example.
 Enter the maximum number of results to return.
 
 Default is `10`.
+
+### Tracing Metadata
+
+Add custom key-value metadata to tracing events for this agent. This is useful for filtering and debugging runs in tracing tools like [LangSmith](../../../../../../advanced-ai/langchain/langsmith/).
+
+Entries with empty keys or values are ignored.
 
 ## Templates and examples
 
@@ -39212,6 +46979,12 @@ Select whether to include intermediate steps the agent took in the final output 
 
 This could be useful for further refining the agent's behavior based on the steps it took.
 
+### Tracing Metadata
+
+Add custom key-value metadata to tracing events for this agent. This is useful for filtering and debugging runs in tracing tools like [LangSmith](../../../../../../advanced-ai/langchain/langsmith/).
+
+Entries with empty keys or values are ignored.
+
 ### Automatically Passthrough Binary Images
 
 Use this option to control whether binary images should be automatically passed through to the agent as image type messages (turned on) or not (turned off).
@@ -39326,6 +47099,62 @@ If you need to generate longer responses than the Question and Answer Chain node
 - **Increase the maximum number of tokens**: Many model nodes (for example the [OpenAI Chat Model](../../../sub-nodes/n8n-nodes-langchain.lmchatopenai/#maximum-number-of-tokens)) include a **Maximum Number of Tokens** option. You can set this to increase the maximum number of tokens the model can use to produce a response.
 - **Build larger responses in stages**: For more detailed answers, you may want to construct replies in stages using a variety of AI nodes. You can use AI split up a single question into multiple prompts and create responses for each. You can then compose a final reply by combining the responses again. Though the details are different, you can find a good example of the general idea in this [template for writing a WordPress post with AI](https://n8n.io/workflows/2187-write-a-wordpress-post-with-ai-starting-from-a-few-keywords/).
 
+# Microsoft Agent 365 Trigger node
+
+Early preview
+
+This is an early preview for building agents with Microsoft Agent 365 and n8n. You need to be part of the [Frontier preview program](https://adoption.microsoft.com/copilot/frontier-program/) to get early access to Microsoft Agent 365.
+
+Use the Microsoft Agent 365 Trigger node to receive messages from Microsoft Agent 365 and respond with AI-powered agent capabilities. This node allows n8n to act as the backend for your Agent 365 agents.
+
+Credentials
+
+You can find authentication information for this node [here](../../../credentials/microsoftagent365/).
+
+## Node connectors
+
+The Microsoft Agent 365 Trigger node can connect to the following sub-nodes:
+
+- **Model**: Connect a language model (Chat model sub-node) to process incoming messages
+- **Memory**: Connect a memory sub-node to maintain conversation context
+- **Tool**: Connect tool sub-nodes to give your agent additional capabilities
+
+## Node options
+
+### Enable Microsoft MCP Tools
+
+Toggle this option to give your agent access to Microsoft 365 tools through the Model Context Protocol (MCP). Default: Off.
+
+When enabled, select one of:
+
+- **All**: Enable all available Microsoft MCP tools
+- **Selected**: Choose specific tools from the list:
+  - Calendar
+  - Mail
+  - SharePoint
+  - Teams
+  - Word
+  - and more
+
+## Getting started
+
+We recommend following these resources to set up your Agent 365 integration:
+
+1. [n8n Sample Agent Documentation](https://github.com/microsoft/Agent365-Samples/tree/main/nodejs/n8n/sample-agent): Example n8n agent implementation with Microsoft Agent 365
+1. [Agent 365 CLI Documentation](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/agent-365-cli): Cross-platform command-line tool for deploying and managing Agent 365 applications on Azure
+
+## Known limitations
+
+### No conversation context in metadata
+
+Currently, incoming messages don't include metadata to link memory to a specific user or conversation context. This functionality is coming soon.
+
+## Related resources
+
+Refer to [Microsoft Agent 365 developer documentation](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/) for more information about the service.
+
+View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
+
 # Sub nodes
 
 Sub nodes attach to root nodes within a group of cluster nodes. They configure the overall functionality of the cluster.
@@ -39354,7 +47183,7 @@ In sub-nodes, the expression always resolves to the first item. For example, giv
 - **Type of Data**: Select **Binary** or **JSON**.
 - **Mode**: Choose from:
   - **Load All Input Data**: Use all the node's input data.
-  - **Load Specific Data**: Use [expressions](../../../../../code/expressions/) to define the data you want to load. You can add text as well as expressions. This means you can create a custom document from a mix of text and expressions.
+  - **Load Specific Data**: Use [expressions](../../../../../data/expressions/) to define the data you want to load. You can add text as well as expressions. This means you can create a custom document from a mix of text and expressions.
 - **Data Format**: Displays when you set **Type of Data** to **Binary**. Select the file MIME type for your binary data. Set to **Automatically Detect by MIME Type** if you want n8n to set the data format for you. If you set a specific data format and the incoming file MIME type doesn't match it, the node errors. If you use **Automatically Detect by MIME Type**, the node falls back to text format if it can't match the file MIME type to a supported data format.
 
 ## Node options
@@ -39501,17 +47330,17 @@ by Khairul Muhtadin
 
 [View template details](https://n8n.io/workflows/9174-auto-update-knowledge-base-with-drive-llamaindex-and-azure-openai-embeddings/)
 
+**Ask questions about past meetings using voice with OpenAI and Pinecone**
+
+by Rahul Joshi
+
+[View template details](https://n8n.io/workflows/12757-ask-questions-about-past-meetings-using-voice-with-openai-and-pinecone/)
+
 **PDF RAG Agent with Telegram Chat & Auto-Ingestion from Google Drive**
 
 by Meelioo
 
 [View template details](https://n8n.io/workflows/8860-pdf-rag-agent-with-telegram-chat-and-auto-ingestion-from-google-drive/)
-
-**Generate Contextual Recommendations from Slack using Pinecone**
-
-by Rahul Joshi
-
-[View template details](https://n8n.io/workflows/6018-generate-contextual-recommendations-from-slack-using-pinecone/)
 
 [Browse Embeddings Azure OpenAI integration templates](https://n8n.io/integrations/embeddings-azure-openai/), or [search all templates](https://n8n.io/workflows/)
 
@@ -39550,7 +47379,7 @@ Learn more about available models in [Cohere's models documentation](https://doc
 
 ## Templates and examples
 
-**Automate Sales Cold Calling Pipeline with Apify, GPT-4o, and WhatsApp**
+**Automate sales cold calling pipeline with Apify, GPT-4o, and WhatsApp**
 
 by Khairul Muhtadin
 
@@ -39769,6 +47598,60 @@ Refer to [HuggingFace's guide to inference](https://huggingface.co/inference-end
 ## Related resources
 
 Refer to [Langchain's HuggingFace Inference embeddings documentation](https://js.langchain.com/docs/integrations/text_embedding/hugging_face_inference/) for more information about the service.
+
+View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
+
+# Embeddings Lemonade node
+
+Use the Embeddings Lemonade node to generate vector embeddings using models hosted and managed by a Lemonade server. This node is useful for workflows that perform semantic search, clustering, similarity matching, or any task that requires numerical vector representations of text.
+
+On this page, you'll find a list of operations the Embeddings Lemonade node supports, and links to more resources.
+
+Credentials
+
+You can find authentication information for this node [here](../../../credentials/lemonade/).
+
+Parameter resolution in sub-nodes
+
+Sub-nodes behave differently to other nodes when processing multiple items using an expression.
+
+Most nodes, including root nodes, take any number of items as input, process these items, and output the results. You can use expressions to refer to input items, and the node resolves the expression for each item in turn. For example, given an input of five `name` values, the expression `{{ $json.name }}` resolves to each name in turn.
+
+In sub-nodes, the expression always resolves to the first item. For example, given an input of five `name` values, the expression `{{ $json.name }}` always resolves to the first name.
+
+## Node parameters
+
+Configure the node with the following parameters.
+
+### Model
+
+The model which will generate the embeddings. Models are loaded and managed through the Lemonade server configured for this node. Select the desired model from the list of available options served by your Lemonade instance.
+
+## Templates and examples
+
+**Building Your First WhatsApp Chatbot**
+
+by Jimleuk
+
+[View template details](https://n8n.io/workflows/2465-building-your-first-whatsapp-chatbot/)
+
+**Ask questions about a PDF using AI**
+
+by David Roberts
+
+[View template details](https://n8n.io/workflows/1960-ask-questions-about-a-pdf-using-ai/)
+
+**Chat with PDF docs using AI (quoting sources)**
+
+by David Roberts
+
+[View template details](https://n8n.io/workflows/2165-chat-with-pdf-docs-using-ai-quoting-sources/)
+
+[Browse Embeddings Lemonade integration templates](https://n8n.io/integrations/embeddings-lemonade/), or [search all templates](https://n8n.io/workflows/)
+
+## Related resources
+
+Refer to [Lemonade Server's documentation](https://lemonade-server.ai/docs/) for more information about the service.
 
 View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
 
@@ -40033,6 +47916,24 @@ This node doesn't support the [`NO_PROXY` environment variable](../../../../../h
 
 ## Templates and examples
 
+**💅 AI Agents Generate Content & Automate Posting for Beauty Salon Social Media 📲**
+
+by N8ner
+
+[View template details](https://n8n.io/workflows/12834-ai-agents-generate-content-and-automate-posting-for-beauty-salon-social-media/)
+
+**💾 Generate Blog Posts on Autopilot with GPT‑5, Tavily and WordPress**
+
+by N8ner
+
+[View template details](https://n8n.io/workflows/12858-generate-blog-posts-on-autopilot-with-gpt5-tavily-and-wordpress/)
+
+**Create a Business Model Canvas and infographic image with Gemini**
+
+by Ryosuke Mori
+
+[View template details](https://n8n.io/workflows/12833-create-a-business-model-canvas-and-infographic-image-with-gemini/)
+
 [Browse AWS Bedrock Chat Model integration templates](https://n8n.io/integrations/aws-bedrock-chat-model/), or [search all templates](https://n8n.io/workflows/)
 
 ## Related resources
@@ -40135,7 +48036,7 @@ In sub-nodes, the expression always resolves to the first item. For example, giv
 
 ## Templates and examples
 
-**Automate Sales Cold Calling Pipeline with Apify, GPT-4o, and WhatsApp**
+**Automate sales cold calling pipeline with Apify, GPT-4o, and WhatsApp**
 
 by Khairul Muhtadin
 
@@ -40438,6 +48339,124 @@ Refer to [Groq's API documentation](https://console.groq.com/docs/quickstart) fo
 
 View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
 
+# Lemonade Chat Model node
+
+Use the Lemonade Chat Model node to run chat-capable language models managed by a Lemonade server from within n8n. This node functions as a LangChain-compatible chat model root node and is suitable for chat-style workloads. It lets you select a model hosted on your Lemonade server, and control generation behavior using common sampling and decoding options.
+
+On this page, you'll find a list of the node parameters, and available options to refine generation.
+
+Credentials
+
+You can find authentication information for this node [here](../../../credentials/lemonade/).
+
+Parameter resolution in sub-nodes
+
+Sub-nodes behave differently to other nodes when processing multiple items using an expression.
+
+Most nodes, including root nodes, take any number of items as input, process these items, and output the results. You can use expressions to refer to input items, and the node resolves the expression for each item in turn. For example, given an input of five `name` values, the expression `{{ $json.name }}` resolves to each name in turn.
+
+In sub-nodes, the expression always resolves to the first item. For example, given an input of five `name` values, the expression `{{ $json.name }}` always resolves to the first name.
+
+## Node parameters
+
+### Model
+
+The model which will generate the completion. Models are loaded and managed through the Lemonade server. This parameter is required. Select the model name made available by your Lemonade server (for example, a model alias like "gpt-4", or any custom model name exposed by Lemonade).
+
+Models are provided by the Lemonade server; if you don't see the model you expect, verify your Lemonade server configuration and credentials.
+
+## Node options
+
+Use these options to further refine the node's behavior.
+
+### Sampling Temperature
+
+Controls the randomness of the generated text. Lower values make the output more focused and deterministic, while higher values make it more diverse and random.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | 0.7    |
+
+### Top P
+
+Controls which words the model can choose from when generating text. Lower values progressively remove the least likely options, so the model can only pick from a smaller, higher-confidence pool.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | 1      |
+
+### Frequency Penalty
+
+Adjusts the penalty for tokens that have already appeared in the generated text. Positive values discourage repetition, negative values encourage it.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | 0      |
+
+### Presence Penalty
+
+Adjusts the penalty for tokens based on their presence in the generated text so far. Positive values penalize tokens that have already appeared, encouraging diversity.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | 0      |
+
+### Max Tokens to Generate
+
+The maximum number of tokens to generate. Set to -1 for no limit. Be cautious when setting this to a large value, as it can lead to long outputs.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | -1     |
+
+### Stop Sequences
+
+Comma-separated list of sequences where the model will stop generating text. Use this to define explicit termination strings for responses.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | string |
+| Required | no     |
+| Default  | ""     |
+
+## Templates and examples
+
+**AI agent chat**
+
+by n8n Team
+
+[View template details](https://n8n.io/workflows/1954-ai-agent-chat/)
+
+**Building Your First WhatsApp Chatbot**
+
+by Jimleuk
+
+[View template details](https://n8n.io/workflows/2465-building-your-first-whatsapp-chatbot/)
+
+**Scrape and summarize webpages with AI**
+
+by n8n Team
+
+[View template details](https://n8n.io/workflows/1951-scrape-and-summarize-webpages-with-ai/)
+
+[Browse Lemonade Chat Model integration templates](https://n8n.io/integrations/lemonade-chat-model/), or [search all templates](https://n8n.io/workflows/)
+
+## Related resources
+
+Refer to [Lemonade Server's documentation](https://lemonade-server.ai/docs/) for more information about the service.
+
+View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
+
 # Mistral Cloud Chat Model node
 
 Use the Mistral Cloud Chat Model node to combine Mistral Cloud's chat models with conversational [agents](../../../../../glossary/#ai-agent).
@@ -40564,7 +48583,7 @@ Use this option to set the probability the completion should use. Use a lower va
 
 **Automate SEO-Optimized WordPress Posts with AI & Google Sheets**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/3085-automate-seo-optimized-wordpress-posts-with-ai-and-google-sheets/)
 
@@ -40576,7 +48595,7 @@ by Derek Cheung
 
 **Publish WordPress Posts to Social Media X, Facebook, LinkedIn, Instagram with AI**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/3086-publish-wordpress-posts-to-social-media-x-facebook-linkedin-instagram-with-ai/)
 
@@ -40748,7 +48767,7 @@ In sub-nodes, the expression always resolves to the first item. For example, giv
 
 ## Templates and examples
 
-**Automate Sales Cold Calling Pipeline with Apify, GPT-4o, and WhatsApp**
+**Automate sales cold calling pipeline with Apify, GPT-4o, and WhatsApp**
 
 by Khairul Muhtadin
 
@@ -40771,6 +48790,124 @@ by Aitor | 1Node
 ## Related resources
 
 Refer to [LangChains's Cohere documentation](https://js.langchain.com/docs/integrations/llms/cohere/) for more information about the service.
+
+View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
+
+# Lemonade Model node
+
+Use the Lemonade Model node to generate text completions using language models hosted and managed by a Lemonade server. This node is a simple LangChain-compatible language model root node suitable for text completion tasks within n8n workflows.
+
+On this page, you'll find a list of operations the Lemonade Model node supports, and links to more resources.
+
+Credentials
+
+You can find authentication information for this node [here](../../../credentials/lemonade/).
+
+Parameter resolution in sub-nodes
+
+Sub-nodes behave differently to other nodes when processing multiple items using an expression.
+
+Most nodes, including root nodes, take any number of items as input, process these items, and output the results. You can use expressions to refer to input items, and the node resolves the expression for each item in turn. For example, given an input of five `name` values, the expression `{{ $json.name }}` resolves to each name in turn.
+
+In sub-nodes, the expression always resolves to the first item. For example, given an input of five `name` values, the expression `{{ $json.name }}` always resolves to the first name.
+
+## Node parameters
+
+Configure the node with the following parameters.
+
+### Model
+
+The model which will generate the completion. Models are loaded and managed through the Lemonade server; select the model you want to use from the list provided by the node.
+
+## Node options
+
+Use these options to further refine the node's behavior.
+
+### Sampling Temperature
+
+Controls the randomness of the generated text. Lower values make the output more focused and deterministic, while higher values make it more diverse and random.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | 0.7    |
+
+### Top P
+
+Controls which words the model can choose from when generating text. Lower values progressively remove the least likely options, so the model can only pick from a smaller, higher-confidence pool.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | 1      |
+
+### Frequency Penalty
+
+Adjusts the penalty for tokens that have already appeared in the generated text. Positive values discourage repetition, negative values encourage it.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | 0      |
+
+### Presence Penalty
+
+Adjusts the penalty for tokens based on their presence in the generated text so far. Positive values penalize tokens that have already appeared, encouraging diversity.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | 0      |
+
+### Max Tokens to Generate
+
+The maximum number of tokens to generate. Set to -1 for no limit. Be cautious when setting this to a large value, as it can lead to very long outputs.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | number |
+| Required | no     |
+| Default  | -1     |
+
+### Stop Sequences
+
+Comma-separated list of sequences where the model will stop generating text.
+
+| Property | Value  |
+| -------- | ------ |
+| Type     | string |
+| Required | no     |
+| Default  | ""     |
+
+## Templates and examples
+
+**AI agent chat**
+
+by n8n Team
+
+[View template details](https://n8n.io/workflows/1954-ai-agent-chat/)
+
+**Building Your First WhatsApp Chatbot**
+
+by Jimleuk
+
+[View template details](https://n8n.io/workflows/2465-building-your-first-whatsapp-chatbot/)
+
+**Scrape and summarize webpages with AI**
+
+by n8n Team
+
+[View template details](https://n8n.io/workflows/1951-scrape-and-summarize-webpages-with-ai/)
+
+[Browse Lemonade Model integration templates](https://n8n.io/integrations/lemonade-model/), or [search all templates](https://n8n.io/workflows/)
+
+## Related resources
+
+Refer to [Lemonade Server's documentation](https://lemonade-server.ai/docs/) for more information about the service.
 
 View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
 
@@ -40939,6 +49076,10 @@ View n8n's [Advanced AI](../../../../../advanced-ai/) documentation.
 If you add more than one MongoDB Chat Memory node to your workflow, all nodes access the same memory instance by default. Be careful when doing destructive actions that override existing memory contents, such as the override all messages operation in the [Chat Memory Manager](../n8n-nodes-langchain.memorymanager/) node. If you want more than one memory instance in your workflow, set different session IDs in different memory nodes.
 
 # Motorhead node
+
+Deprecated
+
+The Motorhead project is no longer maintained. This node is deprecated, and will be removed in a future version.
 
 Use the Motorhead node to use Motorhead as a [memory](../../../../../glossary/#ai-memory) server.
 
@@ -41189,21 +49330,21 @@ The Model Selector node evaluates rules sequentially, starting from the first in
 
 **AI Orchestrator: dynamically Selects Models Based on Input Type**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/7004-ai-orchestrator-dynamically-selects-models-based-on-input-type/)
+
+**Analyze Google Ads search terms with AI and send wastage alerts**
+
+by SpaGreen Creative
+
+[View template details](https://n8n.io/workflows/14449-analyze-google-ads-search-terms-with-ai-and-send-wastage-alerts/)
 
 **Dynamic AI Model Selector with GDPR Compliance via Requesty and Google Sheets**
 
 by Stefan
 
 [View template details](https://n8n.io/workflows/5862-dynamic-ai-model-selector-with-gdpr-compliance-via-requesty-and-google-sheets/)
-
-**Hotel Receptionist with WhatsApp, Gemini Model-Switching, Redis & Google Sheets**
-
-by Akshay
-
-[View template details](https://n8n.io/workflows/10214-hotel-receptionist-with-whatsapp-gemini-model-switching-redis-and-google-sheets/)
 
 [Browse Model Selector integration templates](https://n8n.io/integrations/model-selector/), or [search all templates](https://n8n.io/workflows/)
 
@@ -41324,7 +49465,7 @@ Choose the reranking model to use. You can find out more about the available mod
 
 ## Templates and examples
 
-**Automate Sales Cold Calling Pipeline with Apify, GPT-4o, and WhatsApp**
+**Automate sales cold calling pipeline with Apify, GPT-4o, and WhatsApp**
 
 by Khairul Muhtadin
 
@@ -41336,11 +49477,11 @@ by Ezema Kingsley Chibuzo
 
 [View template details](https://n8n.io/workflows/5589-create-a-multi-modal-telegram-support-bot-with-gpt-4-and-supabase-rag/)
 
-**Build an All-Source Knowledge Assistant with Claude, RAG, Perplexity, and Drive**
+**Chat with Google Drive documents using OpenAI and Pinecone RAG search**
 
-by Paul
+by Pinecone
 
-[View template details](https://n8n.io/workflows/6542-build-an-all-source-knowledge-assistant-with-claude-rag-perplexity-and-drive/)
+[View template details](https://n8n.io/workflows/11870-chat-with-google-drive-documents-using-openai-and-pinecone-rag-search/)
 
 [Browse Reranker Cohere integration templates](https://n8n.io/integrations/reranker-cohere/), or [search all templates](https://n8n.io/workflows/)
 
@@ -41506,7 +49647,7 @@ by Derek Cheung
 
 **Build a PDF Document RAG System with Mistral OCR, Qdrant and Gemini AI**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/4400-build-a-pdf-document-rag-system-with-mistral-ocr-qdrant-and-gemini-ai/)
 
@@ -41648,13 +49789,13 @@ by Joseph LePage
 
 **AI Voice Chatbot with ElevenLabs & OpenAI for Customer Service and Restaurants**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2846-ai-voice-chatbot-with-elevenlabs-and-openai-for-customer-service-and-restaurants/)
 
 **Complete business WhatsApp AI-Powered RAG Chatbot using OpenAI**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2845-complete-business-whatsapp-ai-powered-rag-chatbot-using-openai/)
 
@@ -42923,24 +51064,6 @@ Configure these parameters to configure the node:
 
 ## Templates and examples
 
-**🤖 Create a Documentation Expert Bot with RAG, Gemini, and Supabase**
-
-by Lucas Peyrin
-
-[View template details](https://n8n.io/workflows/5993-create-a-documentation-expert-bot-with-rag-gemini-and-supabase/)
-
-**Chat with GitHub API Documentation: RAG-Powered Chatbot with Pinecone & OpenAI**
-
-by Mihai Farcas
-
-[View template details](https://n8n.io/workflows/2705-chat-with-github-api-documentation-rag-powered-chatbot-with-pinecone-and-openai/)
-
-**🤖 Build a Documentation Expert Chatbot with Gemini RAG Pipeline**
-
-by Lucas Peyrin
-
-[View template details](https://n8n.io/workflows/6137-build-a-documentation-expert-chatbot-with-gemini-rag-pipeline/)
-
 [Browse Simple Memory node documentation integration templates](https://n8n.io/integrations/window-buffer-memory/), or [search all templates](https://n8n.io/workflows/)
 
 ## Related resources
@@ -43672,7 +51795,7 @@ Node parameters depend on the action you select.
 
 - **Value**: Enter the value you want to sign.
 - **Property Name**: Enter the name of the property you want to write the signed value to.
-- **Algorithm Name or ID**: Choose an algorithm name from the list or specify an ID using an [expression](../../../../code/expressions/).
+- **Algorithm Name or ID**: Choose an algorithm name from the list or specify an ID using an [expression](../../../../data/expressions/).
 - **Encoding**: Select the encoding type to use. Choose from:
   - **BASE64**
   - **HEX**
@@ -43713,7 +51836,7 @@ The node relies on the timezone setting. n8n uses either:
 
 Date and time in other nodes
 
-You can work with data and time in the Code node, and in expressions in any node. n8n supports Luxon to help work with date and time in JavaScript. Refer to [Date and time with Luxon](../../../../code/cookbook/luxon/) for more information.
+You can work with data and time in the Code node, and in expressions in any node. n8n supports Luxon to help work with date and time in JavaScript. Refer to [Date and time with Luxon](../../../../data/specific-data-types/luxon/) for more information.
 
 ## Operations
 
@@ -43900,7 +52023,7 @@ by Tharwat Mohamed
 
 ## Related resources
 
-The Date & Time node uses [Luxon](https://moment.github.io/luxon). You can also use Luxon in the [Code](../../../../code/code-node/) node and [expressions](../../../../code/expressions/). Refer to [Date and time with Luxon](../../../../code/cookbook/luxon/) for more information.
+The Date & Time node uses [Luxon](https://moment.github.io/luxon). You can also use Luxon in the [Code](../../../../code/code-node/) node and [expressions](../../../../data/expressions/). Refer to [Date and time with Luxon](../../../../data/specific-data-types/luxon/) for more information.
 
 ### Supported date formats
 
@@ -44165,7 +52288,7 @@ Refer to [Node options](#node-options) for optional configuration options.
   - **tiff**
   - **WebP**
 
-The **Text** operation also includes the option for **Font Name or ID**. Select the text font from the dropdown or specify an ID using an [expression](../../../../code/expressions/).
+The **Text** operation also includes the option for **Font Name or ID**. Select the text font from the dropdown or specify an ID using an [expression](../../../../data/expressions/).
 
 ## Templates and examples
 
@@ -44183,7 +52306,7 @@ by mustafa kendigüzel
 
 **AI-Powered WhatsApp Chatbot 🤖📲 for Text, Voice, Images & PDFs with memory 🧠**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/3586-ai-powered-whatsapp-chatbot-for-text-voice-images-and-pdfs-with-memory/)
 
@@ -44247,19 +52370,19 @@ Set an interval in minutes to force reconnection.
 
 **Effortless Email Management with AI-Powered Summarization & Review**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2862-effortless-email-management-with-ai-powered-summarization-and-review/)
 
 **AI Email Analyzer: Process PDFs, Images & Save to Google Drive + Telegram**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/3169-ai-email-analyzer-process-pdfs-images-and-save-to-google-drive-telegram/)
 
 **A Very Simple "Human in the Loop" Email Response System Using AI and IMAP**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2907-a-very-simple-human-in-the-loop-email-response-system-using-ai-and-imap/)
 
@@ -44421,7 +52544,7 @@ The **Check If Evaluating** operation doesn't have any parameters. This operatio
 
 **AI Automated HR Workflow for CV Analysis and Candidate Evaluation**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2860-ai-automated-hr-workflow-for-cv-analysis-and-candidate-evaluation/)
 
@@ -44479,14 +52602,14 @@ The Evaluation Trigger node uses data tables or Google Sheets to store the test 
     - **Limit Rows**: Whether to limit the number of rows in the sheet to process.
       - **Max Rows to Process**: When **Limit Rows** is enabled, the maximum number of rows to read and process during the evaluation.
     - **Filters:** Filter the evaluation dataset based on column values.
-      - **Column**: Choose a sheet column you want to filter by. Select **From list** to choose the column name from the dropdown list, or **By ID** to specify an ID using an [expression](../../../../code/expressions/).
+      - **Column**: Choose a sheet column you want to filter by. Select **From list** to choose the column name from the dropdown list, or **By ID** to specify an ID using an [expression](../../../../data/expressions/).
       - **Value**: The column value you want to filter by. The evaluation will only process rows with the given value for the selected column.
 
 ## Templates and examples
 
 **AI Automated HR Workflow for CV Analysis and Candidate Evaluation**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/2860-ai-automated-hr-workflow-for-cv-analysis-and-candidate-evaluation/)
 
@@ -45075,7 +53198,7 @@ Use **Define Form** > **Using JSON** to define the fields of your form with a [J
 - `fieldLabel`: The label that appears above the input field on the rendered form.
 - `fieldName`: The field name that is used in the output of the Form node and to reference the field in expressions.
 - `fieldType`: Choose from `checkbox`, `date`, `dropdown`, `email`, `file`, `hiddenField`, `html`, `number`, `password`, `radio`, `text`, or `textarea`.
-  - Use `date` to include a date picker in the form. Refer to [Date and time with Luxon](../../../../code/cookbook/luxon/) for more information on formatting dates.
+  - Use `date` to include a date picker in the form. Refer to [Date and time with Luxon](../../../../data/specific-data-types/luxon/) for more information on formatting dates.
   - When using `dropdown`, set the choices with `fieldOptions` (reference the example below). By default, the dropdown is single-choice. To make it multiple-choice, set `multiselect` to `true`. As an alternative, you can use `checkbox` or `radio` together with `fieldOptions` too.
   - When using `file`, set `multipleFiles` to `true` to allow users to select more than one file. To define the file types to allow, set `acceptFileTypes` to a string containing a comma-separated list of file extensions (reference the example below).
   - Use `hiddenField` to add a hidden field to your form. Refer to [Including hidden fields](#including-hidden-fields) for more information.
@@ -45372,6 +53495,8 @@ Enter the title for your form. n8n displays the **Form Title** as the webpage ti
 
 Enter the description for your form. n8n displays the **Form Description** as a subtitle below the main `h1` title on the form. Use `\n` or `<br>` to add a line break.
 
+For information on allowed and restricted HTML tags, see [HTML security and allowed tags](#html-security-and-allowed-tags).
+
 ### Form Elements
 
 Create the question fields for your form. Select **Add Form Element** to add a new field.
@@ -45383,9 +53508,9 @@ Every field has the following settings:
 - **Element Type**: Choose from **Checkboxes**, **Custom HTML**, **Date**, **Dropdown**, **Email**, **File**, **Hidden Field**, **Number**, **Password**, **Radio Buttons**, **Text**, or **Textarea**.
   - Select **Checkboxes** to include checkbox elements in the form. By default, there is no limit on how many checkboxes a form user can select. You can set the limit by specifying a value for the **Limit Selection** option as **Exact Number**, **Range**, or **Unlimited**.
   - Select **Custom HTML** to insert arbitrary HTML.
-    - You can include elements like links, images, video, and more. You can't include `<script>`, `<style>`, or `<input>` elements.
+    - You can include elements like links, images, video, and more. You can't include `<script>`, `<style>`, or `<input>` elements. For more information, see [HTML security and allowed tags](#html-security-and-allowed-tags).
     - By default, Custom HTML fields aren't included in the node output. To include the Custom HTML content in the output, fill out the associated **Element Name** field.
-  - Select **Date** to include a date picker in the form. Refer to [Date and time with Luxon](../../../../code/cookbook/luxon/) for more information on formatting dates.
+  - Select **Date** to include a date picker in the form. Refer to [Date and time with Luxon](../../../../data/specific-data-types/luxon/) for more information on formatting dates.
   - Select **Dropdown List** > **Add Field Option** to add multiple options. By default, the dropdown is single-choice. To make it multiple-choice, turn on **Multiple Choice**.
   - Select **Radio Buttons** to include radio button elements in the form.
   - Select **Hidden Field** to include a form element without displaying it on the form. You can set a default value using the **Field Value** parameter or pass values for the field using [query parameters](#set-default-selections-with-query-parameters).
@@ -45424,6 +53549,26 @@ You can use one of the following methods to add line breaks to form response tex
 You can use one of the following options to add authentication to your form:
 
 • Use the OTP (One-Time Password) field with TOTP node validation for token-based authentication • Add a Wait node with form authentication as a secondary form page • Store hashed passwords in a database and compare against form submissions for validation • Use external authentication providers like Google Forms if you need advanced authentication
+
+## HTML security and allowed tags
+
+The n8n Form Trigger automatically sanitizes HTML content in the **Form Description** field and **Custom HTML** form elements to prevent security vulnerabilities. While HTML is supported for formatting, certain tags and attributes are restricted.
+
+### Allowed HTML Tags
+
+You can use the following tags for formatting: `<a>`, `<b>`, `<br>`, `<code>`, `<div>`, `<em>`, `<h1>` through `<h6>`, `<i>`, `<iframe>`, `<img>`, `<li>`, `<ol>`, `<p>`, `<pre>`, `<span>`, `<strong>`, `<sub>`, `<sup>`, `<table>`, `<tbody>`, `<td>`, `<tfoot>`, `<th>`, `<thead>`, `<tr>`, `<u>`, `<ul>`, `<video>`, and `<source>`.
+
+### Restricted Tags
+
+The following tags are automatically removed for security: `<script>`, `<style>`, `<input>`, `<form>`, `<button>`, and other potentially dangerous elements that could enable XSS attacks or interfere with form functionality.
+
+### Attribute Restrictions
+
+Only specific attributes are allowed on certain tags:
+
+- Links (): `href`, `target`, `rel`
+
+All other attributes are removed during sanitization. Only `http://` and `https://` URL schemes are permitted.
 
 ## Templates and examples
 
@@ -45564,6 +53709,7 @@ You can find authentication information for this node [here](../../credentials/g
 - **Push** to remote repository: Performs a [git push](https://git-scm.com/docs/git-push).
 - **Push Tags** to remote repository: Performs a [git push --tags](https://git-scm.com/docs/git-push#Documentation/git-push.txt---tags).
 - Return **Status** of current repository: Performs a [git status](https://git-scm.com/docs/git-status).
+- **Switch Branch:** Performs a [git switch](https://git-scm.com/docs/git-switch).
 - Create a new **Tag**: Performs a [git tag](https://git-scm.com/docs/git-tag).
 - **User Setup**: Set the user.
 
@@ -45587,6 +53733,115 @@ Configure this operation with these parameters:
 ### Add Config options
 
 The add config operation adds the **Mode** option. Choose whether to **Set** or **Append** the setting in the local config.
+
+## Clone
+
+Configure this operation with these parameters:
+
+- **Repository Path**: Enter the local path of the git repository.
+- **Authentication**: Select **Authenticate** to pass credentials in. Select **None** to not use authentication.
+  - **Credential for Git**: If you select **Authenticate**, you must select or create credentials for the node to use. Refer to [Git credential](../../credentials/git/) for more information.
+- **New Repository Path**: Enter the local path where you'd like to locate the cloned repository.
+- **Source Repository**: Enter the URL or path of the repository you want to clone.
+
+## Commit
+
+Configure this operation with these parameters:
+
+- **Repository Path**: Enter the local path of the git repository.
+- **Message**: Enter the commit message to use in this field.
+
+### Commit options
+
+The commit operation adds the **Paths to Add** option. To commit all "added" files and folders, leave this field blank. To commit specific "added" files and folders, enter a comma-separated list of paths of files or folders in this field.
+
+You can use absolute paths or relative paths from the **Repository Path**.
+
+## Fetch
+
+This operation only prompts you to enter the local path of the git repository in the **Repository Path** parameter.
+
+## List Config
+
+This operation only prompts you to enter the local path of the git repository in the **Repository Path** parameter.
+
+## Log
+
+Configure this operation with these parameters:
+
+- **Repository Path**: Enter the local path of the git repository.
+- **Return All**: When turned on, the node will return all results. When turned off, the node will return results up to the set **Limit**.
+- **Limit**: Only available when you turn off **Return All**. Enter the maximum number of results to return.
+
+### Log options
+
+The log operation adds the **File** option. Enter the path of a file or folder to get the history of in this field.
+
+You can use absolute paths or relative paths from the **Repository Path**.
+
+## Pull
+
+This operation only prompts you to enter the local path of the git repository in the **Repository Path** parameter.
+
+## Push
+
+Configure this operation with these parameters:
+
+- **Repository Path**: Enter the local path of the git repository.
+- **Authentication**: Select **Authenticate** to pass credentials in or **None** to not use authentication.
+  - If you select **Authenticate**, you must select or create **Credential for Git** for the node to use. Refer to [Git credential](../../credentials/git/) for more information.
+
+### Push options
+
+The push operation adds the **Target Repository** option. Enter the URL or path of the repository to push to in this field.
+
+## Push Tags
+
+This operation only prompts you to enter the local path of the git repository in the **Repository Path** parameter.
+
+## Status
+
+This operation only prompts you to enter the local path of the git repository in the **Repository Path** parameter.
+
+## Switch Branch
+
+Configure this operation with these parameters:
+
+- **Repository Path**: Enter the local path of the git repository.
+- **Branch Name**: Enter the name of the branch to which you want to switch.
+
+## Tag
+
+Configure this operation with these parameters:
+
+- **Repository Path**: Enter the local path of the git repository.
+- **Name**: Enter the name of the tag to create in this field.
+
+## User Setup
+
+This operation only prompts you to enter the local path of the git repository in the **Repository Path** parameter.
+
+## Templates and examples
+
+**Back Up Your n8n Workflows To Github**
+
+by Jonathan
+
+[View template details](https://n8n.io/workflows/1534-back-up-your-n8n-workflows-to-github/)
+
+**Building RAG Chatbot for Movie Recommendations with Qdrant and Open AI**
+
+by Jenny
+
+[View template details](https://n8n.io/workflows/2440-building-rag-chatbot-for-movie-recommendations-with-qdrant-and-open-ai/)
+
+**ChatGPT Automatic Code Review in Gitlab MR**
+
+by assert
+
+[View template details](https://n8n.io/workflows/2167-chatgpt-automatic-code-review-in-gitlab-mr/)
+
+[Browse Git integration templates](https://n8n.io/integrations/git/), or [search all templates](https://n8n.io/workflows/)
 
 # GraphQL
 
@@ -45695,7 +53950,7 @@ You can include:
 - JavaScript in `<script>` tags. n8n doesn't execute the JavaScript.
 - Expressions, wrapped in `{{}}`.
 
-You can use [Expressions](../../../../code/expressions/) in the template, including n8n's [Built-in methods and variables](../../../../code/builtin/overview/).
+You can use [Expressions](../../../../data/expressions/) in the template, including n8n's [Built-in methods and variables](../../../../code/builtin/overview/).
 
 ## Extract HTML Content
 
@@ -46844,15 +55099,15 @@ by Joseph LePage
 
 # n8n Trigger node
 
-The n8n Trigger node triggers when the current workflow updates or activates, or when the n8n instance starts or restarts. You can use the n8n Trigger node to notify when these events occur.
+The n8n Trigger node triggers when the workflow containing this node updates or gets published, or when the n8n instance starts or restarts. This node only responds to events in its own workflow; changes to other workflows won't trigger it.
 
 ## Node parameters
 
 The node includes a single parameter to identify the **Events** that should trigger it. Choose from these events:
 
-- **Active Workflow Updated**: If you select this event, the node triggers when this workflow is updated.
+- **Published Workflow Updated**: If you select this event, the node triggers when the workflow containing this node is updated. Changes to other workflows won't trigger this node.
 - **Instance started**: If you select this event, the node triggers when the n8n instance starts or restarts.
-- **Workflow Activated**: If you select this event, the node triggers when this workflow is activated.
+- **Workflow Published**: If you select this event, the node triggers when the workflow containing this node is published. Publishing other workflows won't trigger this node.
 
 You can select one or more of these events.
 
@@ -46870,11 +55125,11 @@ by Guillaume Duvernay
 
 [View template details](https://n8n.io/workflows/7784-unify-multiple-triggers-into-a-single-workflow/)
 
-**Backup and Delete Workflows to Google Drive with n8n API and Form Trigger**
+**Monitor scheduled workflow health in n8n with automatic trigger checks**
 
-by Arlin Perez
+by Julian Kaiser
 
-[View template details](https://n8n.io/workflows/6751-backup-and-delete-workflows-to-google-drive-with-n8n-api-and-form-trigger/)
+[View template details](https://n8n.io/workflows/13290-monitor-scheduled-workflow-health-in-n8n-with-automatic-trigger-checks/)
 
 [Browse n8n Trigger integration templates](https://n8n.io/integrations/n8n-trigger/), or [search all templates](https://n8n.io/workflows/)
 
@@ -47132,7 +55387,7 @@ Deprecated in 1.22.0
 
 n8n 1.22.0 added support for returning all data items using the **All Incoming Items** option. n8n recommends upgrading to the latest version of n8n, instead of using the workarounds described in this section.
 
-The Respond to Webhook node runs once, using the first incoming data item. This includes when using [expressions](../../../../code/expressions/). You can't force looping using the Loop node: the workflow will run, but the webhook response will still only contain the results of the first execution.
+The Respond to Webhook node runs once, using the first incoming data item. This includes when using [expressions](../../../../data/expressions/). You can't force looping using the Loop node: the workflow will run, but the webhook response will still only contain the results of the first execution.
 
 If you need to return more than one data item, choose one of these options:
 
@@ -47159,7 +55414,7 @@ by Miha
 
 [View template details](https://n8n.io/workflows/3986-personalized-ai-tech-newsletter-using-rss-openai-and-gmail/)
 
-**Content Farming - : AI-Powered Blog Automation for WordPress**
+**Content farming - : AI-powered blog automation for WordPress**
 
 by Jay Emp0
 
@@ -47412,6 +55667,12 @@ The following options are also available:
 - **Response Form Button Label**: The label for the button on the form to submit their response. The default choice is `Submit`.
 - **Limit Wait Time**: Whether the workflow will automatically resume execution after a specified time limit. This can be an interval or a specific wall time.
 - **Append n8n Attribution**: Set whether to include the phrase `This email was sent automatically with n8n` at the end of the email (turned on) or not (turned off).
+
+## Limitations
+
+The Send Email (SMTP) node does not support setting headers like `In-Reply-To` and `References`, which are required for email threading. As a result, each email is treated as a new conversation instead of appearing in the same thread.
+
+- **Workaround**: Use the Gmail node’s **Reply to a message** operation, or a custom node that supports custom headers.
 
 ## Templates and examples
 
@@ -48511,7 +56772,7 @@ by Juan Carlos Cavero Gracia
 
 **Generate AI Videos with Google Veo3, Save to Google Drive and Upload to YouTube**
 
-by Davide
+by Davide Boizza
 
 [View template details](https://n8n.io/workflows/4846-generate-ai-videos-with-google-veo3-save-to-google-drive-and-upload-to-youtube/)
 
@@ -48641,11 +56902,13 @@ by Miko
 
 Use the Chat node with the [Chat Trigger](../n8n-nodes-langchain.chattrigger/) node to send messages into the chat and optionally wait for responses from users. This enables human-in-the-loop (HITL) use cases in chat workflows, allowing you to have multiple chat interactions within a single execution. The Chat node also works as a tool for AI Agents.
 
-All features work with both embedded and hosted chat interfaces.
-
 Chat Trigger node
 
 The Chat node requires a [Chat Trigger](../n8n-nodes-langchain.chattrigger/) node to be present in the workflow, with the [Response Mode](../n8n-nodes-langchain.chattrigger/#response-mode) set to 'Using Response Nodes'.
+
+Embedded mode not supported
+
+The Chat node isn't supported when the Chat Trigger node is set to **Embedded** mode. In Embedded mode, use the [Respond to Webhook](../n8n-nodes-base.respondtowebhook/) node instead.
 
 Previous version
 
@@ -48722,13 +56985,18 @@ When using the Approval response type, the message displays inline buttons that 
 When using the Approval response type, the following parameters are available:
 
 - **Type of Approval**: Whether to present only an approval button or both approval and disapproval buttons.
-- **Approve Only**: Displays a single approval button
-- **Approve and Disapprove**: Displays both buttons (default)
+
+  - **Approve Only**: Displays a single approval button
+  - **Approve and Disapprove**: Displays both buttons (default)
+
 - **Approve Button Label**: The text to display on the approval button. Default: `Approve`
+
 - **Disapprove Button Label**: The text to display on the disapproval button (only shown when Type of Approval is "Approve and Disapprove"). Default: `Disapprove`
+
 - **Block User Input**: Whether to prevent users from typing custom messages (enabled) or allow them to type responses (disabled, default).
-- When **disabled** (default): Users can click buttons or type a custom message. Typed messages are treated as disapproval with a custom message.
-- When **enabled**: Users can only interact using the buttons.
+
+  - When **disabled** (default): Users can click buttons or type a custom message. Typed messages are treated as disapproval with a custom message.
+  - When **enabled**: Users can only interact using the buttons.
 
 The Approval response type also offers the following option:
 
@@ -48764,6 +57032,7 @@ by n8n Team
 
 ## Common issues
 
+- The Chat node isn't supported when the Chat Trigger node's **Mode** is set to **Embedded**. In Embedded mode, the Chat Trigger node only offers **Respond to Webhook** as a response mode. Use the [Respond to Webhook](../n8n-nodes-base.respondtowebhook/) node instead.
 - The Chat node doesn't work when used as a tool of a subagent.
 - The Chat node doesn't work when used in a subworkflow. This includes usage in a subworkflow that's being used as a tool for an AI Agent.
 - Make sure the Chat Trigger node's Response Mode is set to "Using Response Nodes" for the Chat node to function properly.
@@ -49049,7 +57318,7 @@ Coding in n8n
 This page gives usage information about the Code node. For more guidance on coding in n8n, refer to the [Code](../../../../code/) section. It includes:
 
 - Reference documentation on [Built-in methods and variables](../../../../code/builtin/overview/)
-- Guidance on [Handling dates](../../../../code/cookbook/luxon/) and [Querying JSON](../../../../code/cookbook/jmespath/)
+- Guidance on [Handling dates](../../../../data/specific-data-types/luxon/) and [Querying JSON](../../../../data/specific-data-types/jmespath/)
 - A growing collection of examples in the [Cookbook](../../../../code/cookbook/code-node/)
 
 Examples and templates
@@ -49135,10 +57404,10 @@ n8n added native Python support using task runners in version 1.111.0. This feat
 Main differences from Pyodide:
 
 - Native Python supports only `_items` in all-items mode and `_item` in per-item mode. It doesn't support other n8n built-in methods and variables.
-- Native Python supports importing native Python modules from the standard library and from third-parties, if the `n8nio/runners` image includes them and explicitly allowlists them. See [adding extra dependencies for task runners](../../../../hosting/configuration/task-runners/#adding-extra-dependencies) for more details.
+- On self-hosted, native Python supports importing native Python modules from the standard library and from third-parties, if the `n8nio/runners` image includes them and explicitly allowlists them. See [adding extra dependencies for task runners](../../../../hosting/configuration/task-runners/#adding-extra-dependencies) for more details.
 - Native Python denies insecure built-ins by default. See [task runners environment variables](../../../../hosting/configuration/environment-variables/task-runners/) for more details.
 - Unlike Pyodide, which accepts dot access notation, for example, `item.json.myNewField`, native Python only accepts bracket access notation, for example, `item["json"]["my_new_field"]`. There may be other minor syntax differences where Pyodide accepts constructs that aren't legal in native Python.
-- On n8n cloud, the Python option for the Code node doesn't allow users to import any third-party Python libraries. Self-hosting users can find setup instructions to include external libraries [here](https://docs.n8n.io/hosting/configuration/task-runners/#adding-extra-dependencies). In the long term, the n8n team is committed to allowing users to securely execute arbitrary Python code with any first- and third-party libraries using task runners.
+- On n8n cloud, the Python option for the Code node doesn't allow users to import any Python libraries — whether from the standard library or third-party packages. Self-hosting users can find setup instructions to include external libraries [here](https://docs.n8n.io/hosting/configuration/task-runners/#adding-extra-dependencies). In the long term, the n8n team is committed to allowing users to securely execute arbitrary Python code with any first- and third-party libraries using task runners.
 
 Upgrading to native Python is a breaking change, so you may need to adjust your Python scripts to use the native Python runner.
 
@@ -49292,6 +57561,20 @@ To set, update, and retrieve data directly to a workflow, use the [static data](
 Use Remove Duplicates when possible
 
 If you're interested in using variables to avoid processing the same data items more than once, consider using the [Remove Duplicates node](../../n8n-nodes-base.removeduplicates/) instead. The Remove Duplicates node can save information across executions to avoid processing the same items multiple times.
+
+## Can't access credentials in a code node
+
+By design, Code nodes can't access credentials. They don't have access to n8n’s internal credential management system. This prevents exposure of sensitive authentication data.
+
+Attempts to reference credentials in a Code node using expressions or methods like `this.getCredentials()` or `$getCredentials()` will result in errors, such as `this.getCredentials is not a function` and `$getCredentials is not defined`.
+
+If you need to make authenticated API calls, use the [HTTP Request node](../../n8n-nodes-base.httprequest/) which provides credential support.
+
+To work with credentials dynamically, handle the credential selection logic outside of the Code node:
+
+- Use a [Switch](../../n8n-nodes-base.switch/) node to route to different nodes with different credentials.
+- Use expressions directly in credential fields to select credentials dynamically based on previous node data.
+- Use an HTTP Request node with Custom Auth to dynamically set headers, query parameters, or body values using expressions.
 
 # Keyboard shortcuts when using the Code editor
 
@@ -49606,35 +57889,273 @@ The Code node editing environment supports a range of keyboard shortcuts to spee
 
 # Data table
 
-Use the Data Table node to permanently save data across workflow executions in a table format. It provides functionality to perform various data operations on stored data. See [Data tables](../../../../data/data-tables/).
+Use the Data Table node to create and manage internal data tables. Data tables allow you to store structured data directly inside n8n and use it across workflows.
 
-## Node parameters
+You can use the Data Table node to:
 
-### Resource
+- Create, list, and manage data tables
+- Insert, update, delete, and upsert rows in data tables
+- Query and retrieve rows using matching conditions
 
-Select the resource on which you want to operate.
+Working with data tables
 
-- Rows
+As well as using the Data Tables node in a workflow, you can view and manage data tables manually from the **Data Tables** tab in your project **Overview**.
+
+For information about working with data tables in this tab, and guidance on when to use data tables and their limitations, see [Data tables](../../../../data/data-tables/).
+
+## Resources
+
+The Data Table node supports the following resources:
+
+- **Data Table:** Create, list, update, and delete tables.
+- **Row:** Insert, retrieve, update, delete, and upsert rows within a table.
 
 ### Operations
 
-Select the operation you want to run on the resource:
+See available operations below. For detailed information on parameters for different operation types, refer to the [Table operations](tables/) and [Row operations](rows/) pages.
 
-- **Delete:** Delete one or more rows.
-- **Dry Run:** Simulate a deletion before finalizing it. If you switch on this option, n8n returns the rows that will be deleted by the operation. Default state is `off`.
-- **Get:** Get one or more rows from your table based on defined filters.
-- **Limit**: The number of rows you want to return, specified as a number. Default value is 50.
-- **Return all:** Switch on to return all data. Default value is `off`.
-- **If Row Exists:** Specify a set of conditions to match input items that exist in the data table.
-- **If Row Does Not Exist:** Specify a set of conditions to match input items that don't exist in the data table.
-- **Insert:** Insert rows into an existing table.
-- **Optimize Bulk**: Optimize the speed of insertions when working with many rows. If you switch on this option, n8n won't return the data that was inserted. Default state is `off`.
-- **Update:** Update one or more rows.
-- **Upsert:** Upsert one or more rows. If the row exists, it's updated; otherwise, a new row is created.
+- **Rows**
+
+  - [**Delete:**](rows/#delete-row) Delete one or more rows.
+  - [**Get:**](rows/#get-row) Get one or more rows from your table based on defined filters.
+  - [**If Row Exists:**](rows/#if-row-exists) Specify a set of conditions to match input items that exist in the data table.
+  - [**If Row Does Not Exist:**](rows/#if-row-does-not-exist) Specify a set of conditions to match input items that don't exist in the data table.
+  - [**Insert:**](rows/#insert-row) Insert rows into an existing table.
+  - [**Update:**](rows/#update-row) Update one or more rows.
+  - [**Upsert:**](rows/#upsert-row) Upsert one or more rows. If the row exists, it's updated; otherwise, a new row is created.
+
+- **Tables**
+
+  - [**Create:**](tables/#create-a-data-table) Create a new data table.
+  - [**Delete:**](tables/#delete-a-data-table) Delete an existing data table.
+  - [**List:**](tables/#list-data-tables) List existing data tables.
+  - [**Update:**](tables/#update-a-data-table) Update an existing data table.
 
 ## Related resources
 
 [Data tables](../../../../data/data-tables/) explains how to create and manage data tables.
+
+Use row operations to delete, get, insert, update, upsert, or filter rows in a data table. Refer to the [Data Table node](../) documentation for more information on the node itself.
+
+## Delete row
+
+Use this operation to delete one or more rows from a data table, based on a defined condition(s).
+
+Enter these parameters:
+
+- **Resource:** Select **Row**.
+- **Operation:** Select **Delete**.
+- **Data table:** Select how to identify the data table to operate on:
+  - **From list:** Select the table from a drop-down list of all your data tables.
+  - **By Name:** Enter the name of your data table.
+  - **By ID:** Enter the ID of your data table
+- **Must Match:** Select whether to delete rows that match **Any Condition** or **All Conditions** defined in the next step.
+- **Conditions:** Click **Add Condition** to define which rows from the data table to operate on. You can add multiple conditions. For each one:
+  - **Column:** Select the column you want to compare.
+  - **Condition:** Choose how to compare the column value: **Equals**, **Not Equals**, **Greater Than**, **Greater Than or Equal**, **Less Than**, **Less Than or Equal**, **Is Empty**, or **Is Not Empty**.
+  - **Value:** Enter the value to compare the column against. You can use a fixed value or an expression that references data from previous nodes. This field doesn't exist for **Is Empty** and **Is Not Empty** conditions.
+
+### Delete row options
+
+Use these options to further refine the action's behavior:
+
+- **Dry Run:** Enable to simulate deletion without modifying the table. The node returns rows that would be deleted, including their state before and after the operation.
+
+## Get row
+
+Use this operation to retrieve one or more rows from a data table, based on a defined condition(s).
+
+Enter these parameters:
+
+- **Resource:** Select **Row**.
+- **Operation:** Select **Get**.
+- **Data table:** Select how to identify the data table to operate on:
+  - **From list:** Select the table from a drop-down list of all your data tables.
+  - **By Name:** Enter the name of your data table.
+  - **By ID:** Enter the ID of your data table
+- **Must Match:** Select whether to get rows that match **Any Condition** or **All Conditions** defined in the next step.
+- **Conditions:** Click **Add Condition** to define which rows from the data table to operate on. You can add multiple conditions. For each one:
+  - **Column:** Select the column you want to compare.
+  - **Condition:** Choose how to compare the column value: **Equals**, **Not Equals**, **Greater Than**, **Greater Than or Equal**, **Less Than**, **Less Than or Equal**, **Is Empty**, or **Is Not Empty**.
+  - **Value:** Enter the value to compare the column against. You can use a fixed value or an expression that references data from previous nodes. This field doesn't exist for **Is Empty** and **Is Not Empty** conditions.
+- **Return All:** Enable to return all matching rows. Or, disable and enter a **Limit** for the number of rows to return, for example `50`.
+- **Order By:** Enable to define the column to order results on, and the direction (ascending or descending). Or, disable for no ordering of results.
+
+## If row exists
+
+Use this operation to check whether a row matching the defined condition(s) exists in a data table. If a matching row is found, the node outputs the same input item it received, unchanged. If no matching rows exist, it outputs nothing.
+
+Enter these parameters:
+
+- **Resource:** Select **Row**.
+- **Operation:** Select **If Row Exists**.
+- **Data table:** Select how to identify the data table to operate on:
+  - **From list:** Select the table from a drop-down list of all your data tables.
+  - **By Name:** Enter the name of your data table.
+  - **By ID:** Enter the ID of your data table
+- **Must Match:** Select whether rows must match **Any Condition** or **All Conditions** defined in the next step.
+- **Conditions:** Click **Add Condition** to define the data table rows to operate on. You can add multiple conditions. For each one:
+  - **Column:** Select the column you want to compare.
+  - **Condition:** Choose how to compare the column value: **Equals**, **Not Equals**, **Greater Than**, **Greater Than or Equal**, **Less Than**, **Less Than or Equal**, **Is Empty**, or **Is Not Empty**.
+  - **Value:** Enter the value to compare the column against. You can use a fixed value or an expression that references data from previous nodes. This field doesn't exist for **Is Empty** and **Is Not Empty** conditions.
+
+## If row does not exist
+
+Use this operation to check that no rows matching the defined condition(s) exists in a data table. If no matching row is found, the node outputs the same input item it received, unchanged. If a matching row exists, it outputs nothing.
+
+Enter these parameters:
+
+- **Resource:** Select **Row**.
+- **Operation:** Select **If Row Does Not Exist**.
+- **Data table:** Select how to identify the data table to operate on:
+  - **From list:** Select the table from a drop-down list of all your data tables.
+  - **By Name:** Enter the name of your data table.
+  - **By ID:** Enter the ID of your data table.
+- **Must Match:** Select whether rows must match **Any Condition** or **All Conditions** defined in the next step.
+- **Conditions:** Click **Add Condition** to define the data table rows to operate on. You can add multiple conditions. For each one:
+  - **Column:** Select the column you want to compare.
+  - **Condition:** Choose how to compare the column value: **Equals**, **Not Equals**, **Greater Than**, **Greater Than or Equal**, **Less Than**, **Less Than or Equal**, **Is Empty**, or **Is Not Empty**.
+  - **Value:** Enter the value to compare the column against. You can use a fixed value or an expression that references data from previous nodes. This field doesn't exist for **Is Empty** and **Is Not Empty** conditions.
+
+## Insert row
+
+Use this operation to insert a new row into a data table.
+
+Enter these parameters:
+
+- **Resource:** Select **Row**.
+- **Operation:** Select **Insert**.
+- **Data table:** Select how to identify the data table to operate on:
+  - **From list:** Select the table from a drop-down list of all your data tables.
+  - **By Name:** Enter the name of your data table.
+  - **By ID:** Enter the ID of your data table.
+- **Mapping Column Mode:** Select whether to:
+  - **Map Each Column Manually:** Explicitly select which incoming data fields to map to which column. This allows you to map even when the incoming data field names don't match the data table column names. You can choose to delete certain values from the mapping.
+  - **Map Automatically:** Allow the node to automatically match data fields to columns by name. For successful mapping, the field names in your incoming data must exactly match the column names in the data table. All fields will be mapped.
+
+### Insert row options
+
+Use these options to further refine the action's behavior:
+
+- **Optimize Bulk:** Enable to prevent inserted data from being returned. This improves bulk insert performance by up to 5x.
+
+## Update row
+
+Use this operation to update one or more rows in a data table, based on a defined condition(s).
+
+Enter these parameters:
+
+- **Resource:** Select **Row**.
+- **Operation:** Select **Update**.
+- **Data table:** Select how to identify the data table to operate on:
+  - **From list:** Select the table from a drop-down list of all your data tables.
+  - **By Name:** Enter the name of your data table.
+  - **By ID:** Enter the ID of your data table.
+- **Must Match:** Select whether to update rows that match **Any Condition** or **All Conditions** defined in the next step.
+- **Conditions:** Click **Add Condition** to define the data table rows to operate on. You can add multiple conditions. For each one:
+  - **Column:** Select the column you want to compare.
+  - **Condition:** Choose how to compare the column value: **Equals**, **Not Equals**, **Greater Than**, **Greater Than or Equal**, **Less Than**, **Less Than or Equal**, **Is Empty**, or **Is Not Empty**.
+  - **Value:** Enter the value to compare the column against. You can use a fixed value or an expression that references data from previous nodes. This field doesn't exist for **Is Empty** and **Is Not Empty** conditions.
+- **Mapping Column Mode:** Select whether to:
+  - **Map Each Column Manually:** Explicitly select which incoming data fields to map to which column. This allows you to map even when the incoming data field names don't match the data table column names. You can choose to delete certain values from the mapping.
+  - **Map Auomatically:** Allow the node to automatically match data fields to columns by name. For successful mapping, the field names in your incoming data must exactly match the column names in the data table. All fields will be mapped.
+
+### Update row options
+
+Use these options to further refine the action's behavior:
+
+- **Dry Run:** Enable to simulate updating, without modifying the table. The node returns rows that would be updated, including their state before and after the operation.
+
+## Upsert row
+
+Use this operation to upsert into a data table. If a row matching the defined condition(s) exists, it's updated with the provided values. If no matching row exists, a new row is created.
+
+- **Resource:** Select **Row**.
+- **Operation:** Select **Upsert**.
+- **Data table:** Select how to identify the data table to operate on:
+  - **From list:** Select the table from a drop-down list of all your data tables.
+  - **By Name:** Enter the name of your data table.
+  - **By ID:** Enter the ID of your data table.
+- **Must Match:** Select whether to upsert rows that match **Any Condition** or **All Conditions** defined in the next step.
+- **Conditions:** Click **Add Condition** to define the data table rows to operate on. You can add multiple conditions. For each one:
+  - **Column:** Select the column you want to compare.
+  - **Condition:** Choose how to compare the column value: **Equals**, **Not Equals**, **Greater Than**, **Greater Than or Equal**, **Less Than**, **Less Than or Equal**, **Is Empty**, or **Is Not Empty**.
+  - **Value:** Enter the value to compare the column against. You can use a fixed value or an expression that references data from previous nodes. This field doesn't exist for **Is Empty** and **Is Not Empty** conditions.
+- **Mapping Column Mode:** Select whether to:
+  - **Map Each Column Manually:** Explicitly select which incoming data fields to map to which column. This allows you to map even when the incoming data field names don't match the data table column names. You can choose to delete certain values from the mapping.
+  - **Map Auomatically:** Allow the node to automatically match data fields to columns by name. For successful mapping, the field names in your incoming data must exactly match the column names in the data table. All fields will be mapped.
+
+### Upsert row options
+
+Use these options to further refine the action's behavior:
+
+- **Dry Run:** Enable to simulate the upsert operation without modifying the table. The node returns rows that would be affected, including their state before and after the operation.
+
+Use table operations to create, delete, list and update data tables. Refer to the [Data Table node](../) documentation for more information on the node itself.
+
+## Create a data table
+
+Use this operation to create a new data table.
+
+Enter these parameters:
+
+- **Resource:** Select **Table**.
+- **Operation:** Select **Create**.
+- **Name:** Enter a name for the data table, or define using an expression.
+- **Columns:** Click **Add Column** to define parameters for the columns of the data table. You can add multiple columns. For each one:
+  - **Name:** Set a name for the column, or define using an expression.
+  - **Type:** Select the data type for the column: **Boolean**, **Date**, **Number**, or **String**.:
+
+### Create a data table options
+
+Use these options to further refine the action's behavior:
+
+- **Reuse Existing Tables:** Enable to return an existing table if one exists with the same name, without throwing an error.
+
+## Delete a data table
+
+Use this operation to permanently delete an existing data table. This action can't be undone.
+
+Enter these parameters:
+
+- **Resource:** Select **Table**.
+- **Operation:** Select **Delete**.
+- **Data table:** Select how to identify the data table to delete:
+  - **From list:** Select the table from a drop-down list of all your data tables.
+  - **By Name:** Enter the name of your data table.
+  - **By ID:** Enter the ID of your data table
+
+## List data tables
+
+Use this operation to list existing data tables. You can return all tables, all tables up to a defined limit, or filter for tables to return.
+
+Enter these parameters:
+
+- **Resource:** Select **Table**.
+- **Operation:** Select **List**.
+- **Return All:** Enable to return all matching tables. Or, disable and enter a **Limit** for the number of tables to return, for example `50`.
+
+### List data tables options
+
+Use these options to further refine the action's behavior:
+
+- **Filter by Name:** Enter a value or expression to return data tables whose names contain the specified text. Matching is case-insensitive.
+- **Sort Field:** Select a field to sort results on.
+- **Sort Direction:** Select whether to sort results in **Ascending** or **Descending** direction.
+
+## Update a data table
+
+Use this operation to update the name of an existing data tables.
+
+Enter these parameters:
+
+- **Resource:** Select **Table**.
+- **Operation:** Select **Update**.
+- **Data table:** Select how to identify the data table to update:
+  - **From list:** Select the table from a drop-down list of all your data tables.
+  - **By Name:** Enter the name of your data table.
+  - **By ID:** Enter the ID of your data table
+- **New name:** Enter a value or expression to set a new name for the data table.
 
 # Execute Command
 
@@ -50059,6 +58580,10 @@ You can use curl to call REST APIs. If the API documentation of the service you 
 
 Import a curl command:
 
+Import format
+
+This option always imports any parameter values as strings. If you wish to preserve the type of numbers and booleans in your request, switch **Using Fields Below** to **Using JSON** and paste your JSON object containing the parameters.
+
 1. From the HTTP Request node's **Parameters** tab, select **Import cURL**. The **Import cURL command** modal opens.
 1. Paste your curl command into the text box.
 1. Select **Import**. n8n loads the request configuration into the node fields. This overwrites any existing configuration.
@@ -50276,23 +58801,23 @@ The examples included in this section are a sequence. Follow from one to another
 
 ## Templates
 
+**Check workflow templates against Creator Hub guidelines with Gemini and Gmail**
+
+by Oka Hironobu
+
+[View template details](https://n8n.io/workflows/13769-check-workflow-templates-against-creator-hub-guidelines-with-gemini-and-gmail/)
+
+**Generate documents from saved templates and variables using Autype**
+
+by 8Automator
+
+[View template details](https://n8n.io/workflows/13784-generate-documents-from-saved-templates-and-variables-using-autype/)
+
 **Job Brief Analysis with OpenAI to Find Relevant Templates and Log in Google Sheets**
 
 by Jeremiah Wright
 
 [View template details](https://n8n.io/workflows/9019-job-brief-analysis-with-openai-to-find-relevant-templates-and-log-in-google-sheets/)
-
-**Design and Post LinkedIn Content with AI Captions and Custom Templates**
-
-by Gilbert Onyebuchi
-
-[View template details](https://n8n.io/workflows/11620-design-and-post-linkedin-content-with-ai-captions-and-custom-templates/)
-
-**Create Professional Proposals using Dual AI and Google Docs Templates**
-
-by Kean
-
-[View template details](https://n8n.io/workflows/10856-create-professional-proposals-using-dual-ai-and-google-docs-templates/)
 
 [Browse Templates and examples integration templates](https://n8n.io/integrations/remove-duplicates/), or [search all templates](https://n8n.io/workflows/)
 
@@ -50896,7 +59421,7 @@ curl --request GET <https://your-n8n.url/webhook/path>
 Make an HTTP request with a body parameter:
 
 ```
-curl --request GET <https://your-n8n.url/webhook/path> --data 'key=value'
+curl --request POST <https://your-n8n.url/webhook/path> --data 'key=value'
 ```
 
 Make an HTTP request with header parameter:
@@ -50908,7 +59433,7 @@ curl --request GET <https://your-n8n.url/webhook/path> --header 'key=value'
 Make an HTTP request to send a file:
 
 ```
-curl --request GET <https://your-n8n.url/webhook/path> --from 'key=@/path/to/file'
+curl --request POST <https://your-n8n.url/webhook/path> --form 'key=@/path/to/file'
 ```
 
 Replace `/path/to/file` with the path of the file you want to send.
@@ -51597,6 +60122,10 @@ Then:
 1. Give your key a **Name**, like `n8n-integration`.
 1. Select **Copy Key** to copy the key.
 1. Enter this as the **API Key** in your n8n credential.
+1. (Optional) To add custom headers to your API requests:
+   1. Enable the **Add Custom Header** toggle.
+   1. Enter the **Header Name** for your custom header.
+   1. Enter the **Header Value** for your custom header.
 
 Refer to Anthropic's [Intro to Claude](https://docs.anthropic.com/en/docs/intro-to-claude) and [Quickstart](https://docs.anthropic.com/en/docs/quickstart) for more information.
 
@@ -52254,6 +60783,7 @@ Create a [Baserow](https://baserow.io/) account on any hosted Baserow instance o
 ## Supported authentication methods
 
 - Basic auth
+- Token
 
 ## Related resources
 
@@ -52277,6 +60807,29 @@ Follow these steps:
 1. Enter the **Password** for that user account.
 
 Refer to [Baserow's API Authentication documentation](https://baserow.io/docs/apis/rest-api#authentication) for information on creating user accounts.
+
+## Using a token
+
+To configure the database token credential, you'll need:
+
+- Your Baserow **Host**
+- A **Database token** created on Baserow.io, which requires a **Username** and **Password** for login.
+
+### Creating the database token
+
+1. In [Baserow](https://baserow.io/login), log in with your username and password.
+1. Click on your workspace in the top left corner and select **My Settings**.
+1. In the screen that opens, click **Database tokens**.
+1. Click **Create token**.
+1. Enter a **Name** and **Workspace** for the token.
+1. Click **Create token** to finish.
+
+To create the credential in n8n, follow these steps:
+
+1. Enter the **Host** for the Baserow instance:
+   - For a Baserow-hosted instance: leave as `https://api.baserow.io`.
+   - For a self-hosted instance: set to your self-hosted instance API URL.
+1. Enter the **Database Token** you created.
 
 # Beeminder credentials
 
@@ -52672,6 +61225,51 @@ To configure this credential, you'll need:
 - An **API Key**: Refer to the [Chargebee Creating an API key documentation](https://www.chargebee.com/docs/api_keys.html#creating-an-api-key) for steps on how to generate an API key.
 
 Refer to their more general [API authentication documentation](https://apidocs.chargebee.com/docs/api/auth?lang=curl) for further clarification.
+
+# Chroma credentials
+
+You can use these credentials to authenticate the following nodes:
+
+- Chroma Vector Store
+
+## Prerequisites
+
+Create and run a [Chroma](https://www.trychroma.com/home) instance. Refer to the [Running Chroma in Client-Server Mode](https://docs.trychroma.com/docs/run-chroma/client-server) for more information.
+
+## Supported authentication methods
+
+- API key
+- Instance URL
+
+## Related resources
+
+Refer to [Chroma's documentation](https://docs.trychroma.com/docs/overview/getting-started) for more information about the service. Also refer to [Chroma Cloud](https://docs.trychroma.com/cloud/getting-started) for using cloud instance.
+
+View n8n's [Advanced AI](../../../../advanced-ai/) documentation.
+
+View n8n's [Advanced AI](../../../../advanced-ai/) documentation.
+
+## Using API key
+
+To configure this credential, you'll need a [Chroma](https://www.trychroma.com/) account. You'll also need the following:
+
+- An **API Key**
+- Your **Tenant ID**
+- Your **Database Name**
+
+To set it up:
+
+1. Go to the **Cloud Dashboard**.
+1. Create a **Database**
+1. Click **Settings** for the database you want the access to.
+1. Click **Create API key and copy code**
+1. Enter your **API Key**, **Tenant ID** and **Database Name** to n8n credential
+
+## Using Instance URL
+
+To configure this credential, you'll need:
+
+- **Base URL:** The base URL of your Chroma instance. The default value is `http://localhost:8000`
 
 # CircleCI credentials
 
@@ -53296,6 +61894,89 @@ Customer.io has two different API endpoints and generates and stores the keys fo
 The Track API requires a Tracking Site ID; the App API doesn't.
 
 Based on the operation you want to perform, n8n uses the correct API key and its corresponding endpoint.
+
+# Databricks credentials
+
+You can use these credentials to authenticate the following nodes:
+
+- [Databricks](../../app-nodes/n8n-nodes-base.databricks/)
+
+## Prerequisites
+
+- A [Databricks](https://www.databricks.com/) workspace on AWS, Azure, or GCP.
+- A Databricks user account with sufficient permissions for the operations you want to perform.
+
+## Supported authentication methods
+
+- Personal access token
+- OAuth2 (service principal)
+
+## Related resources
+
+Refer to [Databricks' authentication documentation](https://docs.databricks.com/aws/en/dev-tools/auth/) for more information about the service.
+
+## Using a personal access token
+
+To configure this credential, you'll need:
+
+- A **Host**: The URL of your Databricks workspace (for example, `https://adb-1234567890123456.7.azuredatabricks.net`).
+- A **Access Token**: A personal access token generated in your Databricks workspace.
+
+To generate a personal access token:
+
+1. In your Databricks workspace, select your username in the top right corner, then select **Settings**.
+1. Select **Developer**.
+1. Next to **Access tokens**, select **Manage**.
+1. Select **Generate new token**.
+1. Optionally enter a **Comment** to identify the token, then select **Generate**.
+1. Copy the token and save it somewhere safe. You won't be able to view the token again after closing this dialog.
+1. Enter the token as the **Access Token** in your n8n credential.
+
+Token format
+
+Personal access tokens start with `dapi`, for example `dapi1234abcd5678efgh`.
+
+Refer to [Databricks personal access token authentication](https://docs.databricks.com/en/dev-tools/auth/pat.html) for more information.
+
+## Using OAuth2 (service principal)
+
+This method uses a Databricks service principal with the OAuth M2M (machine-to-machine) flow. It's the recommended approach for automated workflows as it doesn't require user interaction.
+
+To configure this credential, you'll need:
+
+- A **Host**: The URL of your Databricks workspace (for example, `https://adb-1234567890123456.7.azuredatabricks.net`).
+- A **Client ID**: The application ID of your service principal.
+- A **Client Secret**: An OAuth secret generated for the service principal.
+
+There are two steps to setting up this credential:
+
+1. [Create a service principal and OAuth secret in Databricks](#create-a-service-principal-and-oauth-secret).
+1. [Set up the credential in n8n](#set-up-the-oauth2-credential).
+
+### Create a service principal and OAuth secret
+
+1. In the Databricks account console, select **User management**.
+1. Select **Service principals**, then select **Add service principal**.
+1. Enter a name for the service principal and select **Add**.
+1. Open the service principal, go to the **Configuration** tab, and grant it the workspace entitlements it needs.
+1. Go to the **Secrets** tab and select **Generate secret**.
+1. Set the secret's lifetime in days (maximum 730 days), then select **Generate**.
+1. Copy the displayed **Secret** and **Client ID** (the same as the application ID). The secret is shown only once.
+
+Workspace assignment
+
+The service principal must be assigned to the workspace it will access. Go to the **Permissions** tab and grant the required users or groups access to manage and use the service principal.
+
+Refer to [Authorize service principal access to Databricks with OAuth](https://docs.databricks.com/en/dev-tools/auth/oauth-m2m.html) for more information.
+
+### Set up the OAuth2 credential
+
+In your n8n credential:
+
+1. Set **Authentication** to **OAuth2**.
+1. Enter your workspace URL as the **Host**.
+1. Enter the **Client ID** you copied from the service principal.
+1. Enter the **Client Secret** you generated.
 
 # Datadog credentials
 
@@ -56358,6 +65039,35 @@ To configure this credential, you'll need:
 
 - An **API Key**: Access your API key in **Settings > Integrations**. Refer to the [API Authentication documentation](https://developer.lemlist.com/#authentication) for more information.
 
+# Lemonade credentials
+
+You can use these credentials to authenticate the following nodes:
+
+- [Lemonade Chat Model](../../cluster-nodes/sub-nodes/n8n-nodes-langchain.lmchatlemonade/)
+- [Lemonade Model](../../cluster-nodes/sub-nodes/n8n-nodes-langchain.lmlemonade/)
+- [Embeddings Lemonade](../../cluster-nodes/sub-nodes/n8n-nodes-langchain.embeddingslemonade/)
+
+## Prerequisites
+
+Lemonade runs AI inference locally. These nodes connect directly to a Lemonade server process running on your machine or network. [Install and run Lemonade server](https://lemonade-server.ai/install_options.html) before creating credentials in n8n.
+
+## Supported authentication methods
+
+- Lemonade server connection
+
+## Related resources
+
+Refer to [Lemonade's documentation](https://lemonade-server.ai/docs/) for more information about the service.
+
+View n8n's [Advanced AI](../../../../advanced-ai/) documentation.
+
+## Configuring Lemonade server connection
+
+To configure this credential, you'll need:
+
+- **Base URL**: The URL of your Lemonade server, including the API path. The default for a local installation is `http://localhost:8000/api/v1`. If you're running n8n in Docker, use `http://host.docker.internal:8000/api/v1` instead. If your Lemonade server is on a remote machine, replace `localhost` with the server's address.
+- **API key** (optional): Optional API key for Lemonade server authentication. This isn't required for default Lemonade installation.
+
 # Line credentials
 
 Deprecated: End of service
@@ -56507,7 +65217,7 @@ To create a new developer app and set up the credential:
 1. Add an **App logo**.
 1. Check the box to agree to the **Legal agreement**.
 1. Select **Create app**.
-1. This should open the **Products** tab. Select the products/APIs you want to enable for your app. For the LinkedIn node to work properly, you must include and configure:
+1. This should open the **Products** tab. Select the products/APIs you want to enable for your app. For the LinkedIn node to work, you must include and configure:
    - **Share on LinkedIn**
    - **Sign In with LinkedIn using OpenID Connect**
    - **Advertising API** (if using it as an organization account rather than an individual)
@@ -56520,6 +65230,120 @@ Posting from organization accounts
 To post as an organization, you need to put your app through LinkedIn's [Community Management App Review](https://learn.microsoft.com/en-us/linkedin/marketing/community-management-app-review) process.
 
 Refer to [Getting Access to LinkedIn APIs](https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access) for more information on scopes and permissions.
+
+## Using Lead Sync API
+
+LinkedIn's Lead Sync API allows you to sync lead form responses from LinkedIn ads and organic forms (company pages, events, products) to your n8n workflows using webhooks. This requires more setup and LinkedIn approval.
+
+### Prerequisites
+
+- A LinkedIn developer app (created using steps above)
+- Your company LinkedIn account linked to your developer app
+- Access to the Lead Sync API product (requires separate application)
+- A publicly accessible HTTPS webhook URL (your n8n workflow webhook URL)
+
+### Setup process
+
+1. **Create a LinkedIn developer app** following the steps in the Community Management OAuth2 or OAuth2 sections above.
+
+1. **Link your company account**: Submit a request to LinkedIn to link your company LinkedIn account to your developer app. This is done through the LinkedIn Developer Portal.
+
+1. **Request Lead Sync API access**:
+
+   - In your [LinkedIn developer app](https://www.linkedin.com/developers/apps/), navigate to the **Products** tab.
+   - Request access to the **Lead Sync API** product.
+
+1. **Configure permissions**: Ensure your app has the `r_marketing_leadgen_automation` permission, which allows you to:
+
+   - Access authenticated member's ad forms and organic forms
+   - Access form responses (leads)
+   - Manage lead notifications (webhooks)
+
+1. **Set up webhook in n8n**:
+
+   - Create a workflow with a Webhook trigger node in n8n.
+   - Copy the webhook URL from n8n (must be HTTPS).
+   - The webhook URL must be publicly accessible and accept POST requests without additional authorization requirements.
+
+1. **Handle the challenge request**:
+
+   - When you register your webhook with LinkedIn, LinkedIn will send a GET request with a `challengeCode` query parameter.
+
+   - Your n8n workflow must respond within 3 seconds with a JSON payload containing:
+
+   - `challengeCode`: The code LinkedIn sent
+
+   - `challengeResponse`: HMAC-SHA256 hash of the challenge code using your app's Client Secret as the key
+
+   - Example response format:
+
+     ```
+     {
+       "challengeCode": "890e4665-4dfe-4ab1-b689-ed553bceeed0",
+       "challengeResponse": "27b1d19678542072a7f1d0ce845d0c78cec22567f413697e25648f44fa3d1514"
+     }
+     ```
+
+1. **Create lead notification subscription**:
+
+   - Use the `leadNotifications` API to create a webhook subscription.
+
+   - You can create subscriptions at different levels:
+
+   - **Owner level**: Receive notifications for all forms under an organization or sponsored account
+
+   - **Form level**: Receive notifications only for specific forms
+
+   - **Associated entity level**: Receive notifications for forms attached to specific entities (ads, events, etc.)
+
+   - Example API call:
+
+     ```
+     POST https://api.linkedin.com/rest/leadNotifications
+     {
+       "webhook": "https://your-n8n-instance.com/webhook/linkedin-leads",
+       "owner": {"organization": "urn:li:organization:123456"},
+       "leadType": "SPONSORED"
+     }
+     ```
+
+1. **Fetch lead form responses**:
+
+   - Once webhook notifications are set up, you'll receive notifications when new leads are submitted.
+   - Use the `leadFormResponses` API to fetch the actual lead data:
+
+   ```
+   GET https://api.linkedin.com/rest/leadFormResponses?owner=(organization:urn%3Ali%3Aorganization%3A123456)&leadType=(leadType:SPONSORED)&q=owner
+   ```
+
+### Lead types
+
+LinkedIn supports different types of leads that can be synced:
+
+- **SPONSORED**: Leads collected from sponsored ads
+- **COMPANY**: Leads collected from company pages
+- **EVENT**: Leads collected from event pages
+- **ORGANIZATION_PRODUCT**: Leads collected from organization product pages
+
+### Webhook validation
+
+LinkedIn periodically re-validates webhook endpoints every 2 hours. If validation fails 3 times in a row, the endpoint will be blocked and events will no longer be sent. Ensure your webhook:
+
+- Responds to challenge requests within 3 seconds
+- Returns a 2xx HTTP status code for all notifications
+- Uses HTTPS (HTTP URLs aren't supported)
+- Is publicly accessible without authentication requirements
+
+### Security
+
+To verify that notifications are from LinkedIn:
+
+1. Check the `X-LI-Signature` header in the POST request
+1. This header contains the HMAC-SHA256 hash of the JSON-encoded POST body, computed using your app's Client Secret
+1. Compute the same hash on your side and verify it matches
+1. Discard any events where the signatures don't match
+
+Refer to LinkedIn's [Lead Sync API documentation](https://learn.microsoft.com/en-us/linkedin/marketing/lead-sync/leadsync) and [Webhook Validation guide](https://learn.microsoft.com/en-us/linkedin/shared/api-guide/webhook-validation) for more information.
 
 ## Using OAuth2
 
@@ -57251,6 +66075,13 @@ If you're using a government cloud tenant, you may also need to update the **Aut
 - US Government: Use `https://login.microsoftonline.us/{tenant}/oauth2/v2.0/authorize` and `https://login.microsoftonline.us/{tenant}/oauth2/v2.0/token`
 - Replace `{tenant}` with your tenant ID or use `common` for multi-tenant apps
 
+### Custom Scopes
+
+Define granular permissions for interacting with the following Microsoft services:
+
+- Microsoft Teams
+- Microsoft Excel
+
 ### Service-specific settings
 
 The following services require extra information for OAuth2:
@@ -57306,6 +66137,46 @@ When attempting to add credentials for a Microsoft360 or Microsoft Entra account
 This message will appear when the account attempting to grant permissions for the credential is managed by a Microsoft Entra. In order to issue the credential, the administrator account needs to grant permission to the user (or "tenant") for that application.
 
 The procedure for this is covered in the [Microsoft Entra documentation](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent).
+
+# Microsoft Agent 365 credentials
+
+You can use these credentials to authenticate the following nodes:
+
+- [Microsoft Agent 365 Trigger](../../cluster-nodes/root-nodes/n8n-nodes-langchain.microsoftagent365trigger/)
+
+Early preview
+
+Microsoft Agent 365 is an early preview feature. You need to be part of the [Frontier preview program](https://adoption.microsoft.com/copilot/frontier-program/) to get early access.
+
+## Prerequisites
+
+- Enrollment in the [Microsoft Frontier preview program](https://adoption.microsoft.com/copilot/frontier-program/)
+- A [Microsoft Azure](https://azure.microsoft.com/) account
+- An Agent 365 blueprint created using the Agent 365 CLI
+
+## Supported authentication methods
+
+- OAuth2 (App Registration)
+
+## Related resources
+
+Refer to [Microsoft Agent 365 developer documentation](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/) for more information about the service.
+
+## Using OAuth2
+
+To configure this credential, you'll need:
+
+- **Tenant ID**: Your Microsoft Entra tenant ID
+- **Client ID**: The Application (client) ID from your Azure app registration
+- **Client Secret**: The secret generated for your app registration
+
+To set up the credential:
+
+1. Find your Tenant ID in [Microsoft Entra ID](https://entra.microsoft.com/#home) and copy it into n8n as the **Tenant ID**.
+1. Open the [Microsoft Application Registration Portal](https://aka.ms/appregistrations) and follow the [custom client app registration guide](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/custom-client-app-registration) for Microsoft Agent 365. Once your custom client app is created, copy the Application (client) ID into n8n as the **Client ID**.
+1. Follow the [credentials guide](https://learn.microsoft.com/en-us/entra/identity-platform/how-to-add-credentials?tabs=client-secret) to generate a client secret and copy the **Secret** in the **Value** column and paste it into n8n as the **Client Secret**.
+
+We recommend using [Agent 365 CLI](https://learn.microsoft.com/en-us/microsoft-agent-365/developer/agent-365-cli) to create your agent blueprint and manifest. You can find more details in the [n8n Sample Agent repository](https://github.com/microsoft/Agent365-Samples/tree/main/nodejs/n8n/sample-agent) for Microsoft Agent 365.
 
 # Microsoft Azure Monitor credentials
 
@@ -57435,6 +66306,95 @@ Microsoft Entra ID credentials use the following scopes by default:
 
 To select different scopes for your credentials, enable the **Custom Scopes** slider and edit the **Enabled Scopes** list. Keep in mind that some features may not work as expected with more restrictive scopes.
 
+## Delegated access for organisation-wide Microsoft integrations
+
+This section explains how an n8n administrator can register a single Entra ID app with delegated permissions, grant admin consent once, and then pre-configure n8n so that other users in the organisation can connect Microsoft services (Outlook, Teams, OneDrive, and others) without completing their own OAuth app registration.
+
+### Register the app
+
+1. In the [Microsoft Entra admin centre](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade/quickStartType~/null/sourceType/Microsoft_AAD_IAM), go to **App registrations** and select **+ New registration**.
+
+   Note
+
+   Register under **App registrations**, not **Enterprise applications**.
+
+1. Enter a meaningful **Name** for the app, for example `n8n Outlook`.
+
+1. Under **Supported account types**, select **Multiple Entra ID tenants**.
+
+1. Under **Allow only certain tenants (Preview)**, select **Manage allowed tenants** and add your tenant. The red banner disappears once your tenant is added.
+
+1. Leave the **Redirect URI** blank for now and select **Register**.
+
+1. On the app overview page, copy the **Application (client) ID**. You'll need this later.
+
+### Generate a client secret
+
+1. On the app overview page, select **Add a certificate or secret** under **Client credentials**.
+
+1. Select **+ New client secret**.
+
+1. Enter a **Description** (for example, `n8n token`) and choose an expiry period that matches your organisation's credentials policy.
+
+1. Select **Add**.
+
+1. Copy the **Value** immediately.
+
+   Warning
+
+   The secret value is only shown once. Don't navigate away without copying it: you will be unable to retrieve it later.
+
+### Configure API permissions
+
+1. In the left navigation, click **API permissions**.
+1. Click **+ Add a permission** > **Microsoft Graph** > **Delegated permissions**.
+1. In the **Select permissions** box, search for each required scope and check the box next to it. Repeat for all scopes needed by the integrations you want to enable. Refer to [Required scopes by integration](#required-scopes-by-integration) below for the full list.
+1. Select **Add permissions**.
+
+### Add the redirect URI
+
+1. In n8n, create a workflow containing a node for one of the Microsoft integrations you want to configure (for example, Microsoft Outlook).
+1. Open the node and select **Set up credential** > **Create new credential**.
+1. Give the credential a meaningful name (for example, `admin@yourorg.com`).
+1. Copy the **OAuth Redirect URL** shown in the n8n credential panel.
+1. Back in Entra, go to the app overview page and select **Add a redirect URI** under **Redirect URIs**.
+1. Select **+ Add redirect URI**, choose **Web**, paste in the URL copied from n8n, and select **Configure**.
+
+### Grant admin consent in n8n
+
+1. In n8n, paste the **Client ID** and **Client Secret** you copied earlier into the credential panel.
+
+1. Select **Connect to [service]** (for example, **Connect to Microsoft Outlook**).
+
+1. In the sign-in popup, check **Consent on behalf of your organization**, then select **Accept**.
+
+   Warning
+
+   You must be signed in as an admin to grant organisation-wide consent. Non-admin accounts will see a message stating that admin approval is required.
+
+1. A success banner in n8n confirms the connection is working and that consent has been granted correctly.
+
+### Pre-configure credentials for users
+
+Once admin consent is granted, use [credential overwrites](../../../../hosting/configuration/credential-overwrites/) to pre-configure the Client ID and Client Secret so users in your organisation can connect without their own app registration. Refer to the [Microsoft OAuth credential overwrites configuration guide](../../../../hosting/configuration/configuration-examples/microsoft-oauth-credential-overwrites/) for Docker and Kubernetes setup instructions.
+
+### Required scopes by integration
+
+The following scopes are required for each Microsoft integration as of March 2026. When configuring API permissions in Entra, add the scopes for every integration you plan to enable.
+
+| Integration                             | Required scopes                                                                                                                                                                                                                                                                                                       |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Microsoft Dynamics**                  | `openid`, `offline_access`                                                                                                                                                                                                                                                                                            |
+| **Microsoft Entra ID**                  | `openid`, `offline_access`, `AccessReview.ReadWrite.All`, `Directory.ReadWrite.All`, `NetworkAccessPolicy.ReadWrite.All`, `DelegatedAdminRelationship.ReadWrite.All`, `EntitlementManagement.ReadWrite.All`, `User.ReadWrite.All`, `Directory.AccessAsUser.All`, `Sites.FullControl.All`, `GroupMember.ReadWrite.All` |
+| **Microsoft Excel**                     | `openid`, `offline_access`, `Files.ReadWrite`                                                                                                                                                                                                                                                                         |
+| **Microsoft Graph Security**            | `SecurityEvents.ReadWrite.All`, `offline_access`                                                                                                                                                                                                                                                                      |
+| **Microsoft OneDrive**                  | `openid`, `offline_access`, `Files.ReadWrite.All`                                                                                                                                                                                                                                                                     |
+| **Microsoft Outlook**                   | `openid`, `offline_access`, `Contacts.Read`, `Contacts.ReadWrite`, `Calendars.Read`, `Calendars.Read.Shared`, `Calendars.ReadWrite`, `Mail.ReadWrite`, `Mail.ReadWrite.Shared`, `Mail.Send`, `Mail.Send.Shared`, `MailboxSettings.Read`                                                                               |
+| **Microsoft SharePoint**                | `openid`, `offline_access`                                                                                                                                                                                                                                                                                            |
+| **Microsoft Teams**                     | `openid`, `offline_access`, `User.Read.All`, `Group.ReadWrite.All`, `Chat.ReadWrite`, `ChannelMessage.Read.All`                                                                                                                                                                                                       |
+| **Microsoft To Do**                     | `openid`, `offline_access`, `Tasks.ReadWrite`                                                                                                                                                                                                                                                                         |
+| **Additional permissions for triggers** | `Chat.Read.All`, `Team.ReadBasic.All`, `Subscription.Read.All`                                                                                                                                                                                                                                                        |
+
 ## Common issues
 
 Here are the known common errors and issues with Microsoft Entra credentials.
@@ -57446,6 +66406,18 @@ When attempting to add credentials for a Microsoft360 or Microsoft Entra account
 This message will appear when the account attempting to grant permissions for the credential is managed by a Microsoft Entra. In order to issue the credential, the administrator account needs to grant permission to the user (or "tenant") for that application.
 
 The procedure for this is covered in the [Microsoft Entra documentation](https://learn.microsoft.com/en-us/entra/identity/enterprise-apps/grant-admin-consent).
+
+### Admin approval required during delegated access setup
+
+If a user sees a screen stating that admin approval is required, it means organisation-wide consent hasn't yet been granted for the app registration.
+
+To resolve this, complete the [Grant admin consent in n8n](#grant-admin-consent-in-n8n) steps above using an Entra ID admin account.
+
+Alternatively, an administrator can grant consent directly in Entra without going through n8n by navigating to:
+
+**Enterprise applications** > [your app] > **Security** > **Permissions** > **Grant admin consent for [your organisation]**
+
+Once consent is granted, standard users can authenticate without encountering the admin approval prompt.
 
 # Microsoft SQL credentials
 
@@ -57892,6 +66864,10 @@ To configure this credential, you'll need:
 - An **API Token**: Generate a token in **Settings > API**.
 
 # Motorhead credentials
+
+Deprecated
+
+The Motorhead project is no longer maintained. The [Motorhead node](../../cluster-nodes/sub-nodes/n8n-nodes-langchain.memorymotorhead/) is deprecated, and will be removed in a future version.
 
 You can use these credentials to authenticate the following nodes:
 
@@ -58582,7 +67558,7 @@ The default **Base URL** is `http://localhost:11434`, but if you've set the `OLL
 
 If you're connecting to Ollama through authenticated proxy services (such as [Open WebUI](https://docs.openwebui.com/getting-started/api-endpoints/#-ollama-api-proxy-support)) you must include an API key. If you don't need authentication, leave this field empty. When provided, the API key is sent as a Bearer token in the `Authorization` header of the request to the Ollama API.
 
-Refer to [How do I configure Ollama server?](https://github.com/ollama/ollama/blob/main/docs/faq.md#how-do-i-configure-ollama-server) for more information.
+Refer to [How do I configure Ollama server?](https://github.com/ollama/ollama/blob/main/docs/faq.mdx#how-do-i-configure-ollama-server) for more information.
 
 ### Ollama and self-hosted n8n
 
@@ -58590,7 +67566,7 @@ If you're self-hosting n8n on the same machine as Ollama, you may run into issue
 
 For this setup, open a specific port for n8n to communicate with Ollama by setting the `OLLAMA_ORIGINS` variable or adjusting `OLLAMA_HOST` to an address the other container can access.
 
-Refer to Ollama's [How can I allow additional web origins to access Ollama?](https://github.com/ollama/ollama/blob/main/docs/faq.md#how-can-i-allow-additional-web-origins-to-access-ollama) for more information.
+Refer to Ollama's [How can I allow additional web origins to access Ollama?](https://docs.ollama.com/faq#how-can-i-allow-additional-web-origins-to-access-ollama) for more information.
 
 # One Simple API credentials
 
@@ -60043,14 +69019,61 @@ You can use these credentials to authenticate the following nodes:
 
 Refer to [Salesforce's developer documentation](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_intro.htm) for more information about the service.
 
+Salesforce External Client Apps
+
+Salesforce is deprecating Connected Apps in favor of External Client Apps. Both methods work with n8n. If you're creating a new integration, use External Client Apps. Existing Connected Apps will continue to work.
+
 ## Using JWT
 
 To configure this credential, you'll need a [Salesforce](https://www.salesforce.com/) account and:
 
 - Your **Environment Type** (Production or Sandbox)
-- A **Client ID**: Generated when you create a connected app.
+- A **Client ID**: Generated when you create an external client app or connected app.
 - Your Salesforce **Username**
 - A **Private Key** for a self-signed digital certificate
+
+### Create an External Client App (recommended)
+
+To set things up, first you'll create a private key and certificate, then an external client app:
+
+1. In n8n, select the **Environment Type** for your connection. Choose the option that best describes your environment from **Production** or **Sandbox**.
+1. Enter your Salesforce **Username**.
+1. Log in to your org in Salesforce.
+1. You'll need a private key and certificate issued by a certification authority. Use your own key/cert or use OpenSSL to create a key and a self-signed digital certificate. Refer to the Salesforce [Create a Private Key and Self-Signed Digital Certificate documentation](https://developer.salesforce.com/docs/atlas.en-us.sfdx_dev.meta/sfdx_dev/sfdx_dev_auth_key_and_cert.htm) for instructions on creating your own key and certificate.
+1. From **Setup** in Salesforce, enter `App Manager` in the Quick Find box, then select **App Manager**.
+1. On the App Manager page, select **New External Client App**.
+1. Enter the required **Basic Info** for your external client app, including a **Name** and **Contact Email address**.
+1. Under **API (Enable OAuth Settings)**, select **Enable OAuth**.
+1. In the **Callback URL** box, add the callback URL: `http://localhost:1717/OauthRedirect` (or your n8n instance URL if self-hosting).
+1. In the **OAuth Scopes** section, select these scopes:
+   - **Full access (full)**
+   - **Perform requests at any time (refresh_token, offline_access)**
+1. In the **Flow Enablement** section, select **Enable JWT Bearer Flow**.
+1. Select **Upload Files** and upload the file that contains your digital certificate, such as `server.crt`.
+1. Under **OAuth Policies**, make sure the following settings are **unchecked**:
+   - **Require Secret for Web Server Flow**
+   - **Require Secret for Refresh Token Flow**
+   - **Require Proof Key for Code Exchange (PKCE) Extension for Supported Authorization Flows**
+1. Select **Save**, then **Continue**.
+1. Copy the **Consumer Key** and add it to your n8n credential as the **Client ID**.
+1. Enter the contents of the private key file in n8n as **Private Key**.
+   - Use the multi-line editor in n8n.
+
+   - Enter the private key in standard PEM key format:
+
+     ```
+     -----BEGIN PRIVATE KEY-----
+     KEY DATA GOES HERE
+     -----END PRIVATE KEY-----
+     ```
+
+Refer to Salesforce's [External Client App Basics](https://help.salesforce.com/s/articleView?id=sf.external_client_app_about.htm&type=5) documentation for more information.
+
+### Create a Connected App (legacy)
+
+Legacy method
+
+Salesforce is deprecating Connected Apps. Use External Client Apps instead for new integrations.
 
 To set things up, first you'll create a private key and certificate, then a connected app:
 
@@ -60084,7 +69107,7 @@ To set things up, first you'll create a private key and certificate, then a conn
 
 These steps are what's required on the n8n side. Salesforce recommends setting refresh token policies, session policies, and OAuth policies too:
 
-14. In Salesforce, select **Back to Manage Connected Apps**.
+17. In Salesforce, select **Back to Manage Connected Apps**.
 01. Select **Manage**.
 01. Select **Edit Policies**.
 01. Review the **Refresh Token Policy** field. Salesforce recommends using expire refresh token after 90 days.
@@ -60100,13 +69123,41 @@ Refer to Salesforce's [Create a Connected App in Your Org](https://developer.sal
 
 To configure this credential, you'll need a [Salesforce](https://www.salesforce.com/) account.
 
-Note for n8n Cloud users
+You will need to select your **Environment Type**. Choose between **Production** and **Sandbox**.
 
-Cloud users don't need to provide connection details. Select **Connect my account** to connect through your browser.
+### Create an External Client App (recommended)
 
-Cloud and hosted users will need to select your **Environment Type**. Choose between **Production** and **Sandbox**.
+If you're [self-hosting](../../../../hosting/) n8n, you'll need to configure OAuth2 from scratch by creating an external client app:
 
-If you're [self-hosting](../../../../hosting/) n8n, you'll need to configure OAuth2 from scratch by creating a connected app:
+1. In n8n, select the **Environment Type** for your connection. Choose the option that best describes your environment from **Production** or **Sandbox**.
+1. Enter your Salesforce **Username**.
+1. Log in to your org in Salesforce.
+1. From **Setup** in Salesforce, enter `App Manager` in the Quick Find box, then select **App Manager**.
+1. On the App Manager page, select **New External Client App**.
+1. Enter the required **Basic Info** for your external client app, including a **Name** and **Contact Email address**.
+1. Under **API (Enable OAuth Settings)**, select **Enable OAuth**.
+1. In the **Callback URL** box, add your n8n OAuth callback URL (for example, `https://your-n8n-instance.com/rest/oauth2-credential/callback`. For n8n Cloud, this will be `https://oauth.n8n.cloud/oauth2/callback`).
+1. In the **OAuth Scopes** section, select these scopes:
+   - **Full access (full)**
+   - **Perform requests at any time (refresh_token, offline_access)**
+1. In the **Flow Enablement** section, select **Enable Authorization Code and Credentials Flow**.
+1. Under **OAuth Policies**, make sure the following settings are **checked**:
+   - **Require Secret for Web Server Flow**
+   - **Require Secret for Refresh Token Flow**
+   - **Require Proof Key for Code Exchange (PKCE) Extension for Supported Authorization Flows**
+1. Select **Save**, then **Continue**.
+1. Copy the **Consumer Key** and add it to your n8n credential as the **Client ID**.
+1. Copy the **Consumer Secret** and add it to your n8n credential as the **Client Secret**.
+
+Refer to Salesforce's [External Client App Basics](https://help.salesforce.com/s/articleView?id=sf.external_client_app_about.htm&type=5) documentation for more information.
+
+### Create a Connected App (legacy)
+
+Legacy method
+
+Salesforce is deprecating Connected Apps. Use External Client Apps instead for new integrations.
+
+If you're [self-hosting](../../../../hosting/) n8n, you can also configure OAuth2 by creating a connected app:
 
 1. In n8n, select the **Environment Type** for your connection. Choose the option that best describes your environment from **Production** or **Sandbox**.
 1. Enter your Salesforce **Username**.
@@ -60130,7 +69181,7 @@ If you're [self-hosting](../../../../hosting/) n8n, you'll need to configure OAu
 
 These steps are what's required on the n8n side. Salesforce recommends setting refresh token policies and session policies, too:
 
-14. In Salesforce, select **Back to Manage Connected Apps**.
+15. In Salesforce, select **Back to Manage Connected Apps**.
 01. Select **Manage**.
 01. Select **Edit Policies**.
 01. Review the **Refresh Token Policy** field. Salesforce recommends using expire refresh token after 90 days.
@@ -60152,7 +69203,7 @@ If you encounter connection issues when authenticating with Salesforce from n8n 
 1. Enable the checkbox for **Approve Connected Apps for Non-Admins**. This checkbox might also appear as **Approve apps connected not installed** depending on your Salesforce language or translation.
 1. Click **Save**.
 
-This permission is not enabled by default, even for administrator profiles, and must be manually activated. Without this permission, you might experience authentication failures when trying to connect n8n to Salesforce.
+This permission isn't enabled by default, even for administrator profiles, and must be manually activated. Without this permission, you might experience authentication failures when trying to connect n8n to Salesforce.
 
 # Salesmate credentials
 
@@ -62874,11 +71925,13 @@ You can use these credentials to authenticate the following nodes:
 
 ## Prerequisites
 
-- Create a [WordPress](https://wordpress.com/) account or deploy WordPress on a server.
+- **Basic auth**: Create a [WordPress](https://wordpress.com/) account or deploy WordPress on a server.
+- **OAuth2**: Create a [WordPress.com](https://wordpress.com/) account with access to the [developer portal](https://developer.wordpress.com/apps/).
 
 ## Supported authentication methods
 
 - Basic auth
+- OAuth2
 
 ## Related resources
 
@@ -62924,12 +71977,46 @@ With Two-Step Authentication enabled, you can now generate an application passwo
 
 ### Set up the credential
 
-Congratulations! You're now ready to set up your n8n credential:
-
 1. Enter your WordPress **Username** in your n8n credential.
 1. Enter the application password you copied above as the **Password** in your n8n credential.
 1. Enter the URL of your WordPress site as the **WordPress URL**.
-1. Optional: Use the **Ignore SSL Issues** to choose whether you want the n8n credential to connect even if SSL certificate validation fails (turned on) or whether to respect SSL certificate validation (turned off).
+1. Optional: Use **Ignore SSL Issues** to choose whether you want the n8n credential to connect even if SSL certificate validation fails (turned on) or whether to respect SSL certificate validation (turned off).
+
+## Using OAuth2
+
+WordPress.com only
+
+OAuth2 authentication works with WordPress.com-hosted sites only. For self-hosted WordPress, use basic auth instead.
+
+To configure this credential, you'll need:
+
+- A **Client ID**: Generated when you create a WordPress.com developer application.
+- A **Client Secret**: Generated when you create a WordPress.com developer application.
+- Your **WordPress.com Site**: Your `.wordpress.com` subdomain or custom domain (for example, `myblog.wordpress.com` or `myblog.com`).
+
+Creating this credential involves two steps:
+
+1. [Create a developer application](#create-a-developer-application).
+1. [Set up the OAuth2 credential](#set-up-the-oauth2-credential).
+
+### Create a developer application
+
+1. Go to your WordPress.com [developer applications](https://developer.wordpress.com/apps/) page.
+1. Select **Create New Application**.
+1. Enter a **Name** for your application, for example `n8n integration`.
+1. Copy the **OAuth Redirect URL** from the **OAuth2 (WordPress.com)** credential screen in n8n. Paste it into the **Redirect URLs** field in WordPress.
+1. Fill out the **Description**, **Website URL**, and other fields as appropriate for your application.
+1. Select **Create** to save the application.
+1. Return to your WordPress.com [developer applications](https://developer.wordpress.com/apps/) page, and click the integration you just created.
+1. Copy the **Client ID** and **Client Secret**.
+
+### Set up the OAuth2 credential
+
+1. In the n8n **OAuth2 (WordPress.com)** credential screen, paste the **Client ID** and **Client Secret** from the previous step.
+1. Enter your WordPress.com site identifier in the **WordPress.com Site** field, for example, `myblog.wordpress.com`.
+1. Click **Connect to WordPress**.
+
+Refer to WordPress's [OAuth2 authentication documentation](https://developer.wordpress.com/docs/oauth2/) for more information.
 
 # Workable credentials
 
@@ -63435,8 +72522,10 @@ To configure this credential, you'll need:
 
 This section contains:
 
-- [OAuth2 single service](oauth-single-service/): Create an OAuth2 credential for a specific service node, such as the Gmail node.
-- [OAuth2 generic](oauth-generic/): Create an OAuth2 credential for use with [custom operations](../../../custom-operations/).
+- [OAuth2 single service](oauth-single-service/): Create an OAuth2 credential for a specific service node, such as the Gmail node. Two options exist:
+  - [Managed OAuth2](oauth-single-service/#managed-oauth2): Sign in with Google directly on n8n, with no setup required on the Google Cloud Console. Available for n8n Cloud users only, for certain Google nodes.
+  - [Custom OAuth2](oauth-single-service/#custom-oauth2): Configure an OAuth2 app in the Google Cloud Console and connect it to your n8n credential.
+- [OAuth2 API (generic)](oauth-generic/): Create an OAuth2 credential for use with [custom operations](../../../custom-operations/).
 - [Service Account](service-account/): Create a [Service Account](https://cloud.google.com/iam/docs/service-account-overview) credential for some specific service nodes.
 - [Google PaLM and Gemini](../googleai/): Get a Google Gemini/Google PaLM API key.
 
@@ -63447,15 +72536,21 @@ There are two authentication methods available for Google services nodes:
 - [OAuth2](https://developers.google.com/identity/protocols/oauth2): Recommended because it's more widely available and easier to set up.
 - [Service Account](https://cloud.google.com/iam/docs/understanding-service-accounts): Refer to the [Google documentation: Understanding service accounts](https://cloud.google.com/iam/docs/understanding-service-accounts) for guidance on when you need a service account.
 
-Note for n8n Cloud users
+### Managed OAuth2 for n8n Cloud users
 
-For the following nodes, you can authenticate by selecting **Sign in with Google** in the OAuth section:
+[Managed OAuth2](oauth-single-service/#managed-oauth2) is available for the following Google nodes, for n8n Cloud users. This provides a simplified credential creation process:
 
 - [Google Calendar](../../app-nodes/n8n-nodes-base.googlecalendar/)
+- [Google Calendar Trigger](../../trigger-nodes/n8n-nodes-base.googlecalendartrigger/)
 - [Google Contacts](../../app-nodes/n8n-nodes-base.googlecontacts/)
+- [Google Docs](../../app-nodes/n8n-nodes-base.googledocs/)
+- [Google Drive](../../app-nodes/n8n-nodes-base.googledrive/)
+- [Google Drive Trigger](../../trigger-nodes/n8n-nodes-base.googledrivetrigger/)
 - [Google Mail](../../app-nodes/n8n-nodes-base.gmail/)
+- [Google Mail Trigger](../../trigger-nodes/n8n-nodes-base.gmailtrigger/)
 - [Google Sheets](../../app-nodes/n8n-nodes-base.googlesheets/)
 - [Google Sheets Trigger](../../trigger-nodes/n8n-nodes-base.googlesheetstrigger/)
+- [Google Slides](../../app-nodes/n8n-nodes-base.googleslides/)
 - [Google Tasks](../../app-nodes/n8n-nodes-base.googletasks/)
 
 ## Compatible nodes
@@ -63495,17 +72590,19 @@ n8n recommends using OAuth2 with the Gmail node.
 
 # Google: OAuth2 generic
 
-This document contains instructions for creating a generic OAuth2 Google credential for use with [custom operations](../../../../custom-operations/).
-
-Note for n8n Cloud users
-
-For the following nodes, you can authenticate by selecting **Sign in with Google** in the OAuth section:
+This document contains instructions for creating a generic Google OAuth2 API credential for use with [custom operations](../../../../custom-operations/).
 
 - [Google Calendar](../../../app-nodes/n8n-nodes-base.googlecalendar/)
+- [Google Calendar Trigger](../../../trigger-nodes/n8n-nodes-base.googlecalendartrigger/)
 - [Google Contacts](../../../app-nodes/n8n-nodes-base.googlecontacts/)
+- [Google Docs](../../../app-nodes/n8n-nodes-base.googledocs/)
+- [Google Drive](../../../app-nodes/n8n-nodes-base.googledrive/)
+- [Google Drive Trigger](../../../trigger-nodes/n8n-nodes-base.googledrivetrigger/)
 - [Google Mail](../../../app-nodes/n8n-nodes-base.gmail/)
+- [Google Mail Trigger](../../../trigger-nodes/n8n-nodes-base.gmailtrigger/)
 - [Google Sheets](../../../app-nodes/n8n-nodes-base.googlesheets/)
 - [Google Sheets Trigger](../../../trigger-nodes/n8n-nodes-base.googlesheetstrigger/)
+- [Google Slides](../../../app-nodes/n8n-nodes-base.googleslides/)
 - [Google Tasks](../../../app-nodes/n8n-nodes-base.googletasks/)
 
 ## Prerequisites
@@ -63530,7 +72627,7 @@ First, create a Google Cloud Console project. If you already have a project, jum
 
 1. In the top menu, select the project dropdown in the top navigation and select **New project** or go directly to the [New Project](https://console.cloud.google.com/projectcreate) page.
 
-1. Enter a **Project name** and select the **Location** for your project.
+1. Enter a **Project name** and select the location (**Organization** and/or **Parent resource**) for your project.
 
 1. Select **Create**.
 
@@ -63681,22 +72778,38 @@ For Google Cloud apps with **Publishing status** set to **Testing** and **User t
 
 This document contains instructions for creating a Google credential for a single service. They're also available as a [video](#video).
 
-Note for n8n Cloud users
-
-For the following nodes, you can authenticate by selecting **Sign in with Google** in the OAuth section:
-
-- [Google Calendar](../../../app-nodes/n8n-nodes-base.googlecalendar/)
-- [Google Contacts](../../../app-nodes/n8n-nodes-base.googlecontacts/)
-- [Google Mail](../../../app-nodes/n8n-nodes-base.gmail/)
-- [Google Sheets](../../../app-nodes/n8n-nodes-base.googlesheets/)
-- [Google Sheets Trigger](../../../trigger-nodes/n8n-nodes-base.googlesheetstrigger/)
-- [Google Tasks](../../../app-nodes/n8n-nodes-base.googletasks/)
-
 ## Prerequisites
 
 - Create a [Google Cloud](https://cloud.google.com/) account.
 
-## Set up OAuth
+## Managed OAuth2
+
+n8n Cloud users can use **Managed OAuth2** for the following nodes:
+
+- [Google Calendar](../../../app-nodes/n8n-nodes-base.googlecalendar/)
+- [Google Calendar Trigger](../../../trigger-nodes/n8n-nodes-base.googlecalendartrigger/)
+- [Google Contacts](../../../app-nodes/n8n-nodes-base.googlecontacts/)
+- [Google Docs](../../../app-nodes/n8n-nodes-base.googledocs/)
+- [Google Drive](../../../app-nodes/n8n-nodes-base.googledrive/)
+- [Google Drive Trigger](../../../trigger-nodes/n8n-nodes-base.googledrivetrigger/)
+- [Google Mail](../../../app-nodes/n8n-nodes-base.gmail/)
+- [Google Mail Trigger](../../../trigger-nodes/n8n-nodes-base.gmailtrigger/)
+- [Google Sheets](../../../app-nodes/n8n-nodes-base.googlesheets/)
+- [Google Sheets Trigger](../../../trigger-nodes/n8n-nodes-base.googlesheetstrigger/)
+- [Google Slides](../../../app-nodes/n8n-nodes-base.googleslides/)
+- [Google Tasks](../../../app-nodes/n8n-nodes-base.googletasks/)
+
+To use **Managed OAuth2**, just click **Sign in with Google** in the credentials screen. No more setup is required in the Google Cloud Console or elsewhere.
+
+If you prefer to use Custom OAuth2, use the dropdown to change the authentication type.
+
+## Custom OAuth2
+
+Managed OAuth2 isn't available for self-hosted n8n users, nor for Google nodes not listed [above](#managed-oauth2). You must create a custom OAuth2 single service credential. This means creating an app in the Google Cloud Console and connecting it to n8n with a Client ID and Client Secret.
+
+The rest of this document covers the full process.
+
+## Set up Custom OAuth2
 
 There are five steps to connecting your n8n credential to Google services:
 
@@ -63714,7 +72827,7 @@ First, create a Google Cloud Console project. If you already have a project, jum
 
 1. In the top menu, select the project dropdown in the top navigation and select **New project** or go directly to the [New Project](https://console.cloud.google.com/projectcreate) page.
 
-1. Enter a **Project name** and select the **Location** for your project.
+1. Enter a **Project name** and select the location (**Organization** and/or **Parent resource**) for your project.
 
 1. Select **Create**.
 
@@ -63791,18 +72904,15 @@ Next, create the OAuth client credentials in Google:
 1. Select **+ Create credentials** > **OAuth client ID**.
 1. In the **Application type** dropdown, select **Web application**.
 1. Google automatically generates a **Name**. Update the **Name** to something you'll recognize in your console.
-1. **If you're self-hosting:** From your n8n credential, copy the **OAuth Redirect URL**. Paste it into the **Authorized redirect URIs** in Google Console. If you're using **n8n cloud**, you can leave this field empty as the OAuth setup is pre-configured, and the callback URL is fixed for that configuration.
+1. From your n8n credential, copy the **OAuth Redirect URL**. Paste it into the **Authorized redirect URIs** in Google Console.
 1. Select **Create**.
 
 ### Finish your n8n credential
 
 With the Google project and credentials fully configured, finish the n8n credential:
 
-- If **self-hosted:**
-
 1. From Google's **OAuth client created** modal, copy the **Client ID**. Enter this in your n8n credential.
 1. From the same Google modal, copy the **Client Secret**. Enter this in your n8n credential.
-   - **If n8n cloud:**
 1. In n8n, select **Sign in with Google** to complete your Google authentication.
 1. **Save** your new credentials.
 
@@ -63852,7 +72962,7 @@ First, create a Google Cloud Console project. If you already have a project, jum
 
 1. In the top menu, select the project dropdown in the top navigation and select **New project** or go directly to the [New Project](https://console.cloud.google.com/projectcreate) page.
 
-1. Enter a **Project name** and select the **Location** for your project.
+1. Enter a **Project name** and select the location (**Organization** and/or **Parent resource**) for your project.
 
 1. Select **Create**.
 
@@ -64080,69 +73190,23 @@ To set up the IMAP credential with a Gmail account, use these settings:
 
 Refer to [Add Gmail to another client](https://support.google.com/mail/answer/7126229?hl=en) for more information. You may need to **Enable IMAP** if you're using a personal Google account before June 2024.
 
+Microsoft has removed Basic Auth for Outlook.com IMAP
+
+Microsoft deprecated Basic Authentication for IMAP in Exchange Online and Outlook.com. As a result, the IMAP node **cannot connect to Outlook.com or Microsoft 365 accounts**. App passwords are not a workaround for this restriction.
+
+**Use the [Microsoft Outlook node](../../../app-nodes/n8n-nodes-base.microsoftoutlook/) instead.** It uses OAuth 2.0, which Microsoft now requires for mail access.
+
+Refer to [Microsoft's deprecation notice](https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/deprecation-of-basic-authentication-exchange-online#what-we-are-changing) for more information.
+
 # Outlook.com IMAP credentials
 
-Follow these steps to configure the IMAP credentials with an Outlook.com account.
+IMAP access for Outlook.com and Microsoft 365 accounts is no longer supported in n8n due to Microsoft's deprecation of Basic Authentication. You cannot use IMAP (with a regular password or app password) to connect to Outlook.com or Microsoft 365 accounts.
 
-## Set up the credentials
+To replace IMAP triggers for incoming email, use the [Microsoft Outlook Trigger node](../../../trigger-nodes/n8n-nodes-base.microsoftoutlooktrigger/), which supports the Message Received event.
 
-To set up the IMAP credential with Outlook.com account, use these settings:
+For general Microsoft Outlook automation, use the [Microsoft Outlook node](../../../app-nodes/n8n-nodes-base.microsoftoutlook/), which uses OAuth 2.0 as required by Microsoft.
 
-1. Enter your Outlook.com email address as the **User**.
-
-1. Enter your Outlook.com password as the **Password**.
-
-   App password
-
-   Outlook.com doesn't require you to use an app password, but if you'd like to for security reasons, refer to [Use an app password](#use-an-app-password).
-
-1. Enter `outlook.office365.com` as the **Host**.
-
-1. For the **Port**, keep the default port number of `993`.
-
-1. Turn on the **SSL/TLS** toggle.
-
-1. Check with your email administrator about whether to **Allow Self-Signed Certificates**.
-
-Refer to Microsoft's [POP, IMAP, and SMTP settings for Outlook.com](https://support.microsoft.com/en-us/office/pop-imap-and-smtp-settings-for-outlook-com-d088b986-291d-42b8-9564-9c414e2aa040) documentation for more information.
-
-## Connection errors
-
-You may receive a connection error if you configured your Outlook.com account as IMAP in multiple email clients. Microsoft is working on a fix for this. For now, try this workaround:
-
-1. Go to [account.live.com/activity](https://account.live.com/activity) and sign in using the email address and password of the affected account.
-1. Under **Recent activity**, find the **Session Type** event that matches the most recent time you received the connection error. Select it to expand the details.
-1. Select **This was me** to approve the IMAP connection.
-1. Retest your n8n credential.
-
-Refer to [What is the Recent activity page?](https://support.microsoft.com/en-us/account-billing/what-is-the-recent-activity-page-23cf5556-4dbe-70da-82c8-bb3a8d8f8016) for more information on using this page.
-
-The source for these instructions is [Outlook.com IMAP connection errors](https://support.microsoft.com/en-us/office/pop-imap-and-smtp-settings-for-outlook-com-d088b986-291d-42b8-9564-9c414e2aa040). Refer to that documentation for more information.
-
-## Use an app password
-
-If you'd prefer to use an app password instead of your email account password:
-
-1. Log into the [My Account](https://myaccount.microsoft.com/) page.
-1. If you have a left navigation option for **Security Info**, jump to [Security Info app password](#security-info-app-password). If you don't have an option for **Security Info**, continue with these instructions.
-1. Go to the [Additional security verification page](https://account.activedirectory.windowsazure.com/Proofup.aspx).
-1. Select **App passwords** and **Create**.
-1. Enter a **Name** for your app password, like `n8n credential`.
-1. Use the option to **copy password to clipboard** and enter this as the **Password** in n8n instead of your email account password.
-
-Refer to Outlook's [Manage app passwords for 2-step verification](https://support.microsoft.com/en-us/account-billing/manage-app-passwords-for-two-step-verification-d6dc8c6d-4bf7-4851-ad95-6d07799387e9) page for more information.
-
-### Security Info app password
-
-If you have a left navigation option for **Security Info**:
-
-1. Select **Security Info**. The Security Info page opens.
-1. Select **+ Add method**.
-1. On the **Add a method** page, select **App password** and then select **Add**.
-1. Enter a **Name** for your app password, like `n8n credential`.
-1. Copy the **Password** and enter this as the **Password** in n8n instead of your email account password.
-
-Refer to Outlook's [Create app passwords from the Security info (preview)](https://support.microsoft.com/en-us/account-billing/create-app-passwords-from-the-security-info-preview-page-d8bc744a-ce3f-4d4d-89c9-eb38ab9d4137) page for more information.
+For more information, refer to [Microsoft's deprecation notice](https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/deprecation-of-basic-authentication-exchange-online#what-we-are-changing).
 
 # Yahoo IMAP credentials
 
@@ -64209,7 +73273,7 @@ To configure this credential, you'll need:
 - Turn **OFF** for port `587` (uses STARTTLS explicit encryption)
 - Turn **OFF** for port `25` (no encryption)
 - **Disable STARTTLS**: When SSL/TLS is disabled, the SMTP server can still try to [upgrade the TCP connection using STARTTLS](https://en.wikipedia.org/wiki/Opportunistic_TLS). Turning this on prevents that behaviour.
-- **Client Host Name**: If needed by your provider, add a client host name. This name identifies the client to the server.
+- **Client Host Name**: This name identifies the client to the server. May not be required for Gmail, Outlook.com, or Yahoo. Leave this field empty unless your email provider or administrator specifically requests it. If you do need to provide a value, use a fully qualified domain name (FQDN) such as `mail.yourdomain.com`. Avoid generic values like `localhost`.
 
 ### Provider instructions
 
@@ -64284,52 +73348,13 @@ Refer to the Outgoing Mail (SMTP) Server settings in [Read Gmail messages on oth
 
 # Outlook.com Send Email credentials
 
-Follow these steps to configure the Send Email credentials with an Outlook.com account.
+Microsoft has removed Basic Auth and App Passwords for Outlook.com SMTP
 
-## Set up the credential
+Microsoft deprecated Basic Authentication and app passwords for SMTP in Exchange Online and Outlook.com. As a result, the Send Email node **cannot connect to Outlook.com or Microsoft 365 accounts** using username/password or app password authentication.
 
-To configure the Send Email credential to use an Outlook.com account:
+**To send email from your Outlook.com or Microsoft 365 account, use the [Microsoft Outlook node](../../../app-nodes/n8n-nodes-base.microsoftoutlook/), which uses OAuth 2.0 as required by Microsoft.**
 
-1. Enter your Outlook.com email address as the **User**.
-
-1. Enter your Outlook.com password as the **Password**.
-
-   App password
-
-   Outlook.com doesn't require you to use an app password, but if you'd like to for security reasons, refer to [Use an app password](#use-an-app-password).
-
-1. Enter `smtp-mail.outlook.com` as the **Host**.
-
-1. Enter `587` for the **Port**.
-
-1. Turn on the **SSL/TLS** toggle.
-
-Refer to Microsoft's [POP, IMAP, and SMTP settings for Outlook.com](https://support.microsoft.com/en-us/office/pop-imap-and-smtp-settings-for-outlook-com-d088b986-291d-42b8-9564-9c414e2aa040) documentation for more information. If the settings above don't work for you, check with your email administrator.
-
-## Use an app password
-
-If you'd prefer to use an app password instead of your email account password:
-
-1. Log into the [My Account](https://myaccount.microsoft.com/) page.
-1. If you have a left navigation option for **Security Info**, jump to [Security Info app password](#security-info-app-password). If you don't have an option for **Security Info**, continue with these instructions.
-1. Go to the [Additional security verification page](https://account.activedirectory.windowsazure.com/Proofup.aspx).
-1. Select **App passwords** and **Create**.
-1. Enter a **Name** for your app password, like `n8n credential`.
-1. Use the option to **copy password to clipboard** and enter this as the **Password** in n8n instead of your email account password.
-
-Refer to Outlook's [Manage app passwords for 2-step verification](https://support.microsoft.com/en-us/account-billing/manage-app-passwords-for-two-step-verification-d6dc8c6d-4bf7-4851-ad95-6d07799387e9) page for more information.
-
-### Security Info app password
-
-If you have a left navigation option for **Security Info**:
-
-1. Select **Security Info**. The Security Info page opens.
-1. Select **+ Add method**.
-1. On the **Add a method** page, select **App password** and then select **Add**.
-1. Enter a **Name** for your app password, like `n8n credential`.
-1. Copy the **Password** and enter this as the **Password** in n8n instead of your email account password.
-
-Refer to Outlook's [Create app passwords from the Security info (preview)](https://support.microsoft.com/en-us/account-billing/create-app-passwords-from-the-security-info-preview-page-d8bc744a-ce3f-4d4d-89c9-eb38ab9d4137) page for more information.
+Refer to [Microsoft's deprecation notice](https://learn.microsoft.com/en-us/exchange/clients-and-mobile-in-exchange-online/deprecation-of-basic-authentication-exchange-online#what-we-are-changing) for more information.
 
 # Yahoo Send Email credentials
 
@@ -64425,39 +73450,39 @@ For usage examples and templates to help you get started, refer to n8n's [Affini
 ## Events
 
 - Field value
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 - Field
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 - File
-- Created
-- Deleted
+  - Created
+  - Deleted
 - List entry
-- Created
-- Deleted
+  - Created
+  - Deleted
 - List
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 - Note
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 - Opportunity
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 - Organization
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 - Person
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 
 ## Related resources
 
@@ -64770,31 +73795,31 @@ For usage examples and templates to help you get started, refer to n8n's [ClickU
 ## Events
 
 - Key result
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 - List
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 - Space
-- Created
-- Deleted
-- Updated
+  - Created
+  - Deleted
+  - Updated
 - Task
-- Assignee updated
-- Comment
+  - Assignee updated
+  - Comment
   - Posted
   - Updated
-- Created
-- Deleted
-- Due date updated
-- Moved
-- Status updated
-- Tag updated
-- Time estimate updated
-- Time tracked updated
-- Updated
+  - Created
+  - Deleted
+  - Due date updated
+  - Moved
+  - Status updated
+  - Tag updated
+  - Time estimate updated
+  - Time tracked updated
+  - Updated
 
 ## Related resources
 
@@ -64920,41 +73945,41 @@ For usage examples and templates to help you get started, refer to n8n's [Custom
 ## Events
 
 - Customer
-- Subscribed
-- Unsubscribe
+  - Subscribed
+  - Unsubscribe
 - Email
-- Bounced
-- Clicked
-- Converted
-- Delivered
-- Drafted
-- Failed
-- Opened
-- Sent
-- Spammed
+  - Bounced
+  - Clicked
+  - Converted
+  - Delivered
+  - Drafted
+  - Failed
+  - Opened
+  - Sent
+  - Spammed
 - Push
-- Attempted
-- Bounced
-- Clicked
-- Delivered
-- Drafted
-- Failed
-- Opened
-- Sent
+  - Attempted
+  - Bounced
+  - Clicked
+  - Delivered
+  - Drafted
+  - Failed
+  - Opened
+  - Sent
 - Slack
-- Attempted
-- Clicked
-- Drafted
-- Failed
-- Sent
+  - Attempted
+  - Clicked
+  - Drafted
+  - Failed
+  - Sent
 - Sms
-- Attempted
-- Bounced
-- Clicked
-- Delivered
-- Drafted
-- Failed
-- Sent
+  - Attempted
+  - Bounced
+  - Clicked
+  - Delivered
+  - Drafted
+  - Failed
+  - Sent
 
 ## Related resources
 
@@ -65274,6 +74299,24 @@ For usage examples and templates to help you get started, refer to n8n's [Google
 - **Event Ended**
 - **Event Started**
 - **Event Updated**
+
+**Automate Email Triage & Meeting Scheduling with Gmail, GPT-4 & Google Calendar**
+
+by Adem Tasin
+
+[View template details](https://n8n.io/workflows/11243-automate-email-triage-and-meeting-scheduling-with-gmail-gpt-4-and-google-calendar/)
+
+**Automate patient intake and AI risk triage with Azure OpenAI, Google, and Slack**
+
+by Rahul Joshi
+
+[View template details](https://n8n.io/workflows/13520-automate-patient-intake-and-ai-risk-triage-with-azure-openai-google-and-slack/)
+
+**Automate Patient Intake & Symptom Triage with AI, Cal.com and Google Services**
+
+by iamvaar
+
+[View template details](https://n8n.io/workflows/6406-automate-patient-intake-and-symptom-triage-with-ai-calcom-and-google-services/)
 
 [Browse Google Calendar Trigger integration templates](https://n8n.io/integrations/google-calendar-trigger/), or [search all templates](https://n8n.io/workflows/)
 
@@ -65837,6 +74880,13 @@ You can configure how the node listens for events.
   - Delete
 - Select **Listen to Channel**, then enter a channel name that the node should monitor.
 
+Postgres event listener and required database permissions
+
+- To listen for trigger events, n8n automatically creates a Postgres trigger on the target table. This trigger is added when you activate a workflow, and removed when you deactivate it.
+- If your workflow is inactive, the trigger is also added when you test the workflow and removed once test event listening stops.
+- The Postgress trigger calls an automatically-created procedure to tell n8n about the event.
+- The user in your Postgres credential must have permissions to create and execute triggers and procedures. In PostgreSQL, this requires superuser access, table ownership, or the TRIGGER privilege - plus CREATE privilege on the schema where the procedure will reside.
+
 ## Related resources
 
 n8n provides an app node for Postgres. You can find the node docs [here](../../app-nodes/n8n-nodes-base.postgres/).
@@ -66026,7 +75076,7 @@ Once you've set the events to trigger on, use the remaining parameters to furthe
 You can further refine the node's behavior when you **Add Option**s:
 
 - **Resolve IDs**: Whether to resolve the IDs to their respective names and return them (turned on) or not (turned off, default).
-- **Usernames or IDs to ignore**: Select usernames or enter a comma-separated string of encoded user IDs to ignore events from. Choose from the list, or specify IDs using an [expression](../../../../code/expressions/).
+- **Usernames or IDs to ignore**: Select usernames or enter a comma-separated string of encoded user IDs to ignore events from. Choose from the list, or specify IDs using an [expression](../../../../data/expressions/).
 
 ## Related resources
 
@@ -67384,11 +76434,50 @@ Developing with the [`n8n-node` tool](../../creating-nodes/build/n8n-node/) ensu
 - Include `n8n-community-node-package` in your package keywords.
 - Make sure that you add your nodes and credentials to the `package.json` file inside the `n8n` attribute.
 - Check your node using the linter (`npm run lint`) and test it locally (`npm run dev`) to ensure it works.
-- Submit the package to the npm registry. Refer to npm's documentation on [Contributing packages to the registry](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry) for more information.
+- Publish the package to npm. If you plan to submit your node for verification through the [n8n Creator Portal](https://creators.n8n.io/nodes), you must publish using a GitHub Actions workflow with a [provenance statement](https://docs.npmjs.com/generating-provenance-statements). See [Publishing to npm](#publishing-to-npm) below.
+
+## Publishing to npm
+
+Required for Creator Portal verification
+
+From May 1st 2026, nodes submitted for verification must be published using GitHub Actions with a [provenance statement](https://docs.npmjs.com/generating-provenance-statements). n8n won't accept verified nodes published directly from a local machine.
+
+To submit your node for verification through the n8n Creator Portal, publish using a GitHub Actions workflow with a provenance statement. Provenance lets anyone cryptographically verify that a specific workflow built the package, from a specific repository and commit. GitHub Actions signs the provenance statement using its OIDC infrastructure.
+
+### New nodes
+
+If you scaffold your node with `npm create @n8n/node`, the scaffolding includes a ready-to-use `publish.yml` workflow. Run `npm run release` locally to bump the version, commit, tag, and push. This triggers the workflow to publish to npm.
+
+### Existing nodes
+
+Add the [publish workflow from the n8n-nodes-starter](https://github.com/n8n-io/n8n-nodes-starter/blob/master/.github/workflows/publish.yml) to your repository at `.github/workflows/publish.yml`.
+
+Also make sure your project has `@n8n/node-cli` version `0.23.0` or later as a `devDependency`, as earlier versions don't support the provenance flag used by the workflow:
+
+```
+npm list @n8n/node-cli
+```
+
+### One-time setup
+
+Configure npm to trust your repository's GitHub Actions workflow so it can publish on your behalf. No long-lived token required:
+
+1. Log in to [npmjs.com](https://www.npmjs.com/) and open your package's settings.
+1. Under **Publish access > Trusted Publishers**, click **Add a publisher**.
+1. Select **GitHub Actions** and fill in:
+   - **Repository owner**: your GitHub username or organisation
+   - **Repository name**: your repository name
+   - **Workflow name**: `publish.yml` (the filename, not the workflow `name:` field)
+
+To use a token instead, create a Granular Access Token on npmjs.com and store it as `NPM_TOKEN` in your repository's Actions secrets. See the comments in the workflow file for details.
 
 ## Submit your node for verification by n8n
 
 n8n vets verified community nodes. Users can discover and install verified community nodes from the nodes panel in n8n. These nodes need to adhere to certain technical and UX standards and constraints.
+
+GitHub Actions publish required for verification
+
+From May 1st 2026, nodes submitted for verification through the [n8n Creator Portal](https://creators.n8n.io/nodes) must be published using GitHub Actions with a provenance statement. See [Publishing to npm](#publishing-to-npm) for setup instructions.
 
 Before submitting your node for review by n8n, you must:
 
@@ -67396,7 +76485,7 @@ Before submitting your node for review by n8n, you must:
 - Make sure that your node follows the [technical guidelines for verified community nodes](../../creating-nodes/build/reference/verification-guidelines/) and that all automated checks pass. Specifically, verified community nodes aren't allowed to use any run-time dependencies.
 - Ensure that your node follows the [UX guidelines](../../creating-nodes/build/reference/ux-guidelines/).
 - Make sure that the node has appropriate documentation in the form of a README in the [npm package](https://docs.npmjs.com/about-package-readme-files) or a related public repository.
-- Submit your node to npm as n8n will fetch it from there for final vetting.
+- Publish your node to npm using a GitHub Actions workflow with provenance, as described in [Publishing to npm](#publishing-to-npm). n8n will fetch it from there for final vetting.
 
 ## Ready to submit?
 
@@ -67612,17 +76701,15 @@ npm install n8n-nodes-nodeName@2.1.0
 
 # Install verified community nodes in the n8n app
 
-Limited to n8n instance owners
+Limited to n8n instance owners and admins
 
-Only the n8n instance owner can install and manage verified community nodes. The instance owner is the person who sets up and manages user management. All members of an n8n instance can use already installed community nodes in their workflows.
-
-Admin accounts can also uninstall any community node, verified or unverified. This helps them remove problematic nodes that may affect the instance's health and functionality.
+The n8n instance owner and admin accounts can install and manage verified community nodes. The instance owner is the person who sets up and manages user management. All members of an n8n instance can use already installed community nodes in their workflows.
 
 ## Install a community node
 
 To install a [verified community node](../../../creating-nodes/deploy/submit-community-nodes/#submit-your-node-for-verification-by-n8n):
 
-1. Go to the **Canvas** and open the **nodes panel** (either by selecting '+' or pressing `Tab`).
+1. Go to the **Canvas** and open the **nodes panel** (either by selecting '+' or pressing `N`).
 1. **Search** for the node that you're looking for. If there is a matching verified community node, you will see a **More from the community** section at the bottom of the nodes panel.
 1. Select the node you want to install. This takes you to a detailed view of the node, showing all the supported actions.
 1. Select **install**. This will install the node for your instance and enable all members to use it in their workflows.
@@ -67716,10 +76803,10 @@ Clone the repository and navigate into the directory:
 
 The starter contains example nodes and credentials. Delete the following directories and files:
 
-- `nodes/ExampleNode`
-- `nodes/HTTPBin`
-- `credentials/ExampleCredentials.credentials.ts`
-- `credentials/HttpBinApi.credentials.ts`
+- `nodes/Example`
+- `nodes/GithubIssues`
+- `credentials/GithubIssuesApi.credentials.ts`
+- `credentials/GithubIssuesOAuth2Api.credentials.ts`
 
 Now create the following directories and files:
 
@@ -67757,7 +76844,8 @@ In this example, the file is `NasaPics.node.ts`. To keep this tutorial short, yo
 Start by adding the import statements:
 
 ```
-import { INodeType, INodeTypeDescription } from 'n8n-workflow';
+import { NodeConnectionTypes } from 'n8n-workflow';
+import type { INodeType, INodeTypeDescription } from 'n8n-workflow';
 ```
 
 #### Step 3.2: Create the main class
@@ -67794,8 +76882,9 @@ description: 'Get data from NASAs API',
 defaults: {
 	name: 'NASA Pics',
 },
-inputs: ['main'],
-outputs: ['main'],
+usableAsTool: true,
+inputs: [ NodeConnectionTypes.Main ],
+outputs: [ NodeConnectionTypes.Main ],
 credentials: [
 	{
 		name: 'NasaPicsApi',
@@ -68005,15 +77094,16 @@ For this tutorial, you'll add one additional field, to allow users to pick a dat
 }
 ```
 
-### Step 4: Set up authentication
+### Step 4: Set up authentication and a credential test
 
-The NASA API requires users to authenticate with an API key.
+The NASA API requires users to authenticate with an API key. You can also send a request to check that the API key works.
 
 Add the following to `nasaPicsApi.credentials.ts`:
 
 ```
 import {
 	IAuthenticateGeneric,
+	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
 } from 'n8n-workflow';
@@ -68032,14 +77122,20 @@ export class NasaPicsApi implements ICredentialType {
 			default: '',
 		},
 	];
-	authenticate = {
+	authenticate: IAuthenticateGeneric = {
 		type: 'generic',
 		properties: {
 			qs: {
 				'api_key': '={{$credentials.apiKey}}'
 			}
 		},
-	} as IAuthenticateGeneric;
+	};
+	test: ICredentialTestRequest = {
+		request: {
+			baseURL: 'https://api.nasa.gov',
+			url: '/apod',
+		},
+	};
 }
 ```
 
@@ -68427,7 +77523,7 @@ This document lists the essential dependencies for developing a node, as well as
 
 To build and test a node, you need:
 
-- Node.js and npm. Minimum version Node 18.17.0. You can find instructions on how to install both using nvm (Node Version Manager) for Linux, Mac, and WSL (Windows Subsystem for Linux) [here](https://github.com/nvm-sh/nvm). For Windows users, refer to Microsoft's guide to [Install NodeJS on Windows](https://docs.microsoft.com/en-us/windows/dev-environment/javascript/nodejs-on-windows).
+- Node.js and npm. Minimum version Node 22.22.0. You can find instructions on how to install both using nvm (Node Version Manager) for Linux, Mac, and WSL (Windows Subsystem for Linux) [here](https://github.com/nvm-sh/nvm). For Windows users, refer to Microsoft's guide to [Install NodeJS on Windows](https://docs.microsoft.com/en-us/windows/dev-environment/javascript/nodejs-on-windows).
 - A local instance of n8n. You can install n8n with `npm install n8n -g`, then follow the steps in [Run your node locally](../../test/run-node-locally/) to test your node.
 - When [building verified community nodes](../../../community-nodes/build-community-nodes/), you must use the [`n8n-node` tool](../n8n-node/) to create and test your node.
 
@@ -68488,10 +77584,10 @@ Clone the repository and navigate into the directory:
 
 The starter contains example nodes and credentials. Delete the following directories and files:
 
-- `nodes/ExampleNode`
-- `nodes/HTTPBin`
-- `credentials/ExampleCredentials.credentials.ts`
-- `credentials/HttpBinApi.credentials.ts`
+- `nodes/Example`
+- `nodes/GithubIssues`
+- `credentials/GithubIssuesApi.credentials.ts`
+- `credentials/GithubIssuesOAuth2Api.credentials.ts`
 
 Now create the following directories and files:
 
@@ -68529,21 +77625,15 @@ In this example, the file is `FriendGrid.node.ts`. To keep this tutorial short, 
 Start by adding the import statements:
 
 ```
-import {
-	IExecuteFunctions,
-} from 'n8n-core';
-
-import {
+import type {
 	IDataObject,
+	IExecuteFunctions,
+	IHttpRequestOptions,
 	INodeExecutionData,
 	INodeType,
 	INodeTypeDescription,
-    NodeConnectionType
 } from 'n8n-workflow';
-
-import {
-	OptionsWithUri,
-} from 'request';
+import { NodeConnectionTypes } from 'n8n-workflow';
 ```
 
 #### Step 3.2: Create the main class
@@ -68582,8 +77672,9 @@ description: 'Consume SendGrid API',
 defaults: {
 	name: 'FriendGrid',
 },
-inputs: [NodeConnectionType.Main],
-outputs: [NodeConnectionType.Main],
+inputs: [NodeConnectionTypes.Main],
+outputs: [NodeConnectionTypes.Main],
+usableAsTool: true,
 credentials: [
 	{
 		name: 'friendGridApi',
@@ -68722,45 +77813,61 @@ Add the following the `execute` method in the `FriendGrid.node.ts`:
 // Handle data coming from previous nodes
 const items = this.getInputData();
 let responseData;
-const returnData = [];
-const resource = this.getNodeParameter('resource', 0) as string;
-const operation = this.getNodeParameter('operation', 0) as string;
+const returnData: INodeExecutionData[] = [];
+const resource = this.getNodeParameter('resource', 0);
+const operation = this.getNodeParameter('operation', 0);
 
 // For each item, make an API call to create a contact
 for (let i = 0; i < items.length; i++) {
-	if (resource === 'contact') {
-		if (operation === 'create') {
-			// Get email input
-			const email = this.getNodeParameter('email', i) as string;
-			// Get additional fields input
-			const additionalFields = this.getNodeParameter('additionalFields', i) as IDataObject;
-			const data: IDataObject = {
-				email,
-			};
+	try {
+		if (resource === 'contact') {
+			if (operation === 'create') {
+				// Get email input
+				const email = this.getNodeParameter('email', i);
+				// Get additional fields input
+				const additionalFields = this.getNodeParameter('additionalFields', i);
+				const data: IDataObject = {
+					email,
+				};
 
-			Object.assign(data, additionalFields);
+				Object.assign(data, additionalFields);
 
-			// Make HTTP request according to https://sendgrid.com/docs/api-reference/
-			const options: OptionsWithUri = {
-				headers: {
-					'Accept': 'application/json',
-				},
-				method: 'PUT',
-				body: {
-					contacts: [
-						data,
-					],
-				},
-				uri: `https://api.sendgrid.com/v3/marketing/contacts`,
-				json: true,
-			};
-			responseData = await this.helpers.requestWithAuthentication.call(this, 'friendGridApi', options);
-			returnData.push(responseData);
+				// Make HTTP request according to https://sendgrid.com/docs/api-reference/
+				const options: IHttpRequestOptions = {
+					headers: {
+						'Accept': 'application/json',
+					},
+					method: 'PUT',
+					body: {
+						contacts: [
+							data,
+						],
+					},
+					url: 'https://api.sendgrid.com/v3/marketing/contacts',
+					json: true,
+				};
+				responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'friendGridApi', options);
+				const executionData = this.helpers.constructExecutionMetaData(
+					this.helpers.returnJsonArray(responseData as IDataObject),
+					{ itemData: { item: i } },
+				);
+
+				returnData.push.apply(returnData, executionData);
+			}
 		}
+	} catch (error) {
+		if (this.continueOnFail()) {
+			const executionData = this.helpers.constructExecutionMetaData(
+				this.helpers.returnJsonArray({ error: error.message }),
+				{ itemData: { item: i } },
+			);
+			returnData.push.apply(returnData, executionData);
+			continue;
+		}
+		throw error;
 	}
 }
-// Map data to n8n data structure
-return [this.helpers.returnJsonArray(returnData)];
+return [returnData];
 ```
 
 Note the following lines of this code:
@@ -68770,7 +77877,7 @@ const items = this.getInputData();
 ... 
 for (let i = 0; i < items.length; i++) {
 	...
-	const email = this.getNodeParameter('email', i) as string;
+	const email = this.getNodeParameter('email', i);
 	...
 }
 ```
@@ -68993,9 +78100,9 @@ Following defined code standards when building your node makes your code more re
 
 The n8n node linter provides automatic checking for many of the node-building standards. You should ensure your node passes the linter's checks before publishing it. Refer to the [n8n node linter](../../../test/node-linter/) documentation for more information.
 
-## Use the starter
+## Use the n8n-node tool
 
-The n8n node starter project includes a recommended setup, dependencies (including the linter), and examples to help you get started. Begin new projects with the [starter](https://github.com/n8n-io/n8n-nodes-starter).
+n8n recommends using the [`n8n-node` CLI tool](../../n8n-node/) to build and test your node. In particular, this is important if you plan on [submitting your node for verification](../../../deploy/submit-community-nodes/#submit-your-node-for-verification-by-n8n). This ensures that your node has the correct structure and follows community node requirements. It also simplifies linting and testing.
 
 ## Write in TypeScript
 
@@ -69281,7 +78388,7 @@ For basic API request failures, catch the error and wrap it in `NodeApiError`:
 
 ```
 try {
-	const response = await this.helpers.requestWithAuthentication.call(
+	const response = await this.helpers.httpRequestWithAuthentication.call(
 		this,
 		credentialType,
 		options
@@ -69296,7 +78403,7 @@ Handle specific HTTP status codes with custom messages:
 
 ```
 try {
-	const response = await this.helpers.requestWithAuthentication.call(
+	const response = await this.helpers.httpRequestWithAuthentication.call(
 		this,
 		credentialType,
 		options
@@ -69304,7 +78411,7 @@ try {
 	return response;
 } catch (error) {
 	if (error.httpCode === "404") {
-		const resource = this.getNodeParameter("resource", 0) as string;
+		const resource = this.getNodeParameter("resource", 0);
 		const errorOptions = {
 			message: `${
 				resource.charAt(0).toUpperCase() + resource.slice(1)
@@ -69353,7 +78460,7 @@ new NodeOperationError(node: INode, error: Error | string | JsonObject, options?
 Use `NodeOperationError` for validating user inputs:
 
 ```
-const email = this.getNodeParameter("email", itemIndex) as string;
+const email = this.getNodeParameter("email", itemIndex);
 
 if (email.indexOf("@") === -1) {
 	const description = `The email address '${email}' in the 'email' field isn't valid`;
@@ -69491,7 +78598,7 @@ New nodes should all use the new helper. You should strongly consider migrating 
 
 # Node codex files
 
-The codex file contains metadata about your node. This file is the JSON file at the root of your node. For example, the [`HttpBin.node.json`](https://github.com/n8n-io/n8n-nodes-starter/blob/master/nodes/HttpBin/HttpBin.node.json) file in the n8n starter.
+The codex file contains metadata about your node. This file is the JSON file at the root of your node. For example, the [`GithubIssues.node.json`](https://github.com/n8n-io/n8n-nodes-starter/blob/master/nodes/GithubIssues/GithubIssues.node.json) file in the n8n starter.
 
 The codex filename must match the node base filename. For example, given a node base file named `MyNode.node.ts`, the codex would be named `MyNode.node.json`.
 
@@ -69549,7 +78656,7 @@ Your node must include:
 
 You can choose whether to place all your node's functionality in one file, or split it out into a base file and other modules, which the base file then imports. Unless your node is very simple, it's a best practice to split it out.
 
-A basic pattern is to separate out operations. Refer to the [HttpBin starter node](https://github.com/n8n-io/n8n-nodes-starter/tree/master/nodes/HttpBin) for an example of this.
+A basic pattern is to separate out operations. Refer to the [GithubIssues starter node](https://github.com/n8n-io/n8n-nodes-starter/tree/master/nodes/GithubIssues) for an example of this.
 
 For more complex nodes, n8n recommends a directory structure. Refer to the [Airtable node](https://github.com/n8n-io/n8n/tree/master/packages/nodes-base/nodes/Airtable) or [Microsoft Outlook node](https://github.com/n8n-io/n8n/tree/master/packages/nodes-base/nodes/Microsoft/Outlook) as examples.
 
@@ -69621,6 +78728,78 @@ As an example, say you want to add versioning to the NasaPics node from the [Dec
             },
         },
     ],
+}
+```
+
+## Feature-based versioning
+
+Feature flags let you control parameter visibility and execution logic based on named features tied to node versions.
+
+### Defining features
+
+Add a `features` object to your node type description. Each feature uses `@version` conditions to specify which versions enable it:
+
+```
+{
+    version: [2, 2.1, 2.2, 2.3, 2.4],
+    features: {
+        useNewApi: { '@version': [{ _cnd: { gte: 2.2 } }] },
+        useLegacyAuth: { '@version': [{ _cnd: { lte: 2.1 } }] },
+        useSpecialMode: { '@version': [2] },
+    },
+    // More basic parameters here
+}
+```
+
+Available conditions: `gte`, `lte`, `gt`, `lt`. Pass a plain version number to match a specific version.
+
+### Using `@feature` in `displayOptions`
+
+Use `@feature` in `displayOptions` to control parameter visibility based on feature flags:
+
+```
+{
+    displayName: 'New API Field',
+    name: 'newApiField',
+    type: 'string',
+    displayOptions: {
+        show: {
+            '@feature': ['useNewApi'],
+        },
+    },
+}
+```
+
+To show a parameter when a feature is **not** enabled, use the condition syntax:
+
+```
+displayOptions: {
+    show: {
+        '@feature': [{ _cnd: { not: 'useNewApi' } }],
+    },
+}
+```
+
+You can combine `@feature` with other display conditions:
+
+```
+displayOptions: {
+    show: {
+        resource: ['myResource'],
+        '@feature': [{ _cnd: { eq: 'useNewApi' } }],
+    },
+}
+```
+
+### Checking features in code
+
+Use `this.isNodeFeatureEnabled()` in execution contexts (such as `IExecuteFunctions` or `IWebhookFunctions`):
+
+```
+if (this.isNodeFeatureEnabled('useNewApi')) {
+    // Process with new API
+} else {
+    // Process with legacy API
 }
 ```
 
@@ -70680,24 +79859,35 @@ Avoid using words like "error", "problem", "failure", "mistake".
 
 Do you want n8n to verify your node?
 
-Consider following these guidelines while building your node if you want to submit it for verification by n8n. Any user with verified community nodes enabled can discover and install verified nodes from n8n's nodes panel across all deployment types (self-hosted and n8n Cloud).
+Follow these guidelines while building your node if you want to submit it for verification by n8n. Any user with verified community nodes enabled can discover and install verified nodes from n8n's nodes panel across all deployment types (self-hosted and n8n Cloud).
+
+Upcoming Changes
+
+From May 1st 2026 you must publish **ALL** community nodes using a GitHub action and include a [provenance statement](https://docs.npmjs.com/generating-provenance-statements)
 
 ## Use the n8n-node tool
 
-All verified community node authors should strongly consider using the [`n8n-node` tool](../../n8n-node/) to create and check their package. This helps n8n ensure quality and consistency by:
+All verified community node authors should use the [`n8n-node` tool](../../n8n-node/) to create and check their package. This helps n8n ensure quality and consistency by:
 
 - Generating the expected package file structure
 - Adding the required metadata and configuration to the `package.json` file
 - Making it easy to lint your code against n8n's standards
 - Allowing you to load your node in a local n8n instance for testing
 
+## Node Types
+
+- The node **MUST** not be an existing node, If your node is an iteration on an existing node create a pull request instead.
+- n8n isn't accepting Logic or Flow control nodes at the moment.
+- Each package should integrate exactly one third-party service. A trigger node for the same service may be included alongside the main node. Packages that wrap multiple unrelated APIs or act as a proxy layer for several services generally don't qualify for verification. Submit each service as its own separate package.
+
 ## Package source verification
 
-- Verify that your npm package repository URL matches the expected GitHub (or other platform) repository.
+- Verify that your npm package repository URL matches the expected GitHub repository.
 - Confirm that the package author / maintainer matches between npm and the repository.
 - Confirm that the git link in npm works and that the repository is public.
 - Make sure your package has proper documentation (README, usage examples, etc.).
 - Make sure your package license is MIT.
+- Packages should be published from a GitHub action and include [provenance](https://docs.npmjs.com/generating-provenance-statements)
 
 ## No external dependencies
 
@@ -70850,6 +80040,14 @@ If you have one version of your node, this can be a number. If you want to suppo
 
 n8n supports two methods of node versioning, but declarative-style nodes must use the light versioning approach. Refer to [Node versioning](../../node-versioning/) for more information.
 
+## `features`
+
+*Object* | *Optional*
+
+Define named feature flags evaluated against the node version. Use features to control parameter visibility with `@feature` in `displayOptions`.
+
+Refer to [Feature-based versioning](../../node-versioning/#feature-based-versioning) for more information.
+
 # Programmatic-style execute() method
 
 The main difference between the declarative and programmatic styles is how they handle incoming data and build API requests. The programmatic style requires an `execute()` method, which reads incoming data and parameters, then builds a request. The declarative style handles requests using the `routing` key in the `operations` object.
@@ -70923,6 +80121,14 @@ Use `version` when using the light versioning approach.
 If you have one version of your node, this can be a number. If you want to support multiple versions, turn this into an array, containing numbers for each node version.
 
 n8n support two methods of node versioning. Programmatic-style nodes can use either. Refer to [Node versioning](../../node-versioning/) for more information.
+
+## `features`
+
+*Object* | *Optional*
+
+Define named feature flags evaluated against the node version. Use features to control parameter visibility with `@feature` in `displayOptions`, or check them in code with `this.isNodeFeatureEnabled()`.
+
+Refer to [Feature-based versioning](../../node-versioning/#feature-based-versioning) for more information.
 
 # Standard parameters
 
@@ -71253,11 +80459,50 @@ Developing with the [`n8n-node` tool](../../build/n8n-node/) ensures that your n
 - Include `n8n-community-node-package` in your package keywords.
 - Make sure that you add your nodes and credentials to the `package.json` file inside the `n8n` attribute.
 - Check your node using the linter (`npm run lint`) and test it locally (`npm run dev`) to ensure it works.
-- Submit the package to the npm registry. Refer to npm's documentation on [Contributing packages to the registry](https://docs.npmjs.com/packages-and-modules/contributing-packages-to-the-registry) for more information.
+- Publish the package to npm. If you plan to submit your node for verification through the [n8n Creator Portal](https://creators.n8n.io/nodes), you must publish using a GitHub Actions workflow with a [provenance statement](https://docs.npmjs.com/generating-provenance-statements). See [Publishing to npm](#publishing-to-npm) below.
+
+## Publishing to npm
+
+Required for Creator Portal verification
+
+From May 1st 2026, nodes submitted for verification must be published using GitHub Actions with a [provenance statement](https://docs.npmjs.com/generating-provenance-statements). n8n won't accept verified nodes published directly from a local machine.
+
+To submit your node for verification through the n8n Creator Portal, publish using a GitHub Actions workflow with a provenance statement. Provenance lets anyone cryptographically verify that a specific workflow built the package, from a specific repository and commit. GitHub Actions signs the provenance statement using its OIDC infrastructure.
+
+### New nodes
+
+If you scaffold your node with `npm create @n8n/node`, the scaffolding includes a ready-to-use `publish.yml` workflow. Run `npm run release` locally to bump the version, commit, tag, and push. This triggers the workflow to publish to npm.
+
+### Existing nodes
+
+Add the [publish workflow from the n8n-nodes-starter](https://github.com/n8n-io/n8n-nodes-starter/blob/master/.github/workflows/publish.yml) to your repository at `.github/workflows/publish.yml`.
+
+Also make sure your project has `@n8n/node-cli` version `0.23.0` or later as a `devDependency`, as earlier versions don't support the provenance flag used by the workflow:
+
+```
+npm list @n8n/node-cli
+```
+
+### One-time setup
+
+Configure npm to trust your repository's GitHub Actions workflow so it can publish on your behalf. No long-lived token required:
+
+1. Log in to [npmjs.com](https://www.npmjs.com/) and open your package's settings.
+1. Under **Publish access > Trusted Publishers**, click **Add a publisher**.
+1. Select **GitHub Actions** and fill in:
+   - **Repository owner**: your GitHub username or organisation
+   - **Repository name**: your repository name
+   - **Workflow name**: `publish.yml` (the filename, not the workflow `name:` field)
+
+To use a token instead, create a Granular Access Token on npmjs.com and store it as `NPM_TOKEN` in your repository's Actions secrets. See the comments in the workflow file for details.
 
 ## Submit your node for verification by n8n
 
 n8n vets verified community nodes. Users can discover and install verified community nodes from the nodes panel in n8n. These nodes need to adhere to certain technical and UX standards and constraints.
+
+GitHub Actions publish required for verification
+
+From May 1st 2026, nodes submitted for verification through the [n8n Creator Portal](https://creators.n8n.io/nodes) must be published using GitHub Actions with a provenance statement. See [Publishing to npm](#publishing-to-npm) for setup instructions.
 
 Before submitting your node for review by n8n, you must:
 
@@ -71265,7 +80510,7 @@ Before submitting your node for review by n8n, you must:
 - Make sure that your node follows the [technical guidelines for verified community nodes](../../build/reference/verification-guidelines/) and that all automated checks pass. Specifically, verified community nodes aren't allowed to use any run-time dependencies.
 - Ensure that your node follows the [UX guidelines](../../build/reference/ux-guidelines/).
 - Make sure that the node has appropriate documentation in the form of a README in the [npm package](https://docs.npmjs.com/about-package-readme-files) or a related public repository.
-- Submit your node to npm as n8n will fetch it from there for final vetting.
+- Publish your node to npm using a GitHub Actions workflow with provenance, as described in [Publishing to npm](#publishing-to-npm). n8n will fetch it from there for final vetting.
 
 ## Ready to submit?
 
@@ -71590,12 +80835,12 @@ Order fields by:
 There are five types of help built in to the GUI:
 
 - Info boxes: yellow boxes that appear between fields. Refer to [UI elements | Notice](../../build/reference/ui-elements/#notice) for more information.
-- Use info boxes for essential information. Don't over-use them. By making them rare, they stand out more and grab the user's attention.
+  - Use info boxes for essential information. Don't over-use them. By making them rare, they stand out more and grab the user's attention.
 - Parameter hints: lines of text displayed beneath a user input field. Use this when there's something the user needs to know, but an info box would be excessive.
 - Node hints: provide help in the input panel, output panel, or node details view. Refer to [UI elements | Hints](../../build/reference/ui-elements/#hints) for more information.
 - Tooltips: callouts that appear when the user hovers over the tooltip icon . Use tooltips for extra information that the user might need.
-- You don't have to provide a tooltip for every field. Only add one if it contains useful information.
-- When writing tooltips, think about what the user needs. Don't just copy-paste API parameter descriptions. If the description doesn't make sense, or has errors, improve it.
+  - You don't have to provide a tooltip for every field. Only add one if it contains useful information.
+  - When writing tooltips, think about what the user needs. Don't just copy-paste API parameter descriptions. If the description doesn't make sense, or has errors, improve it.
 - Placeholder text: n8n can display placeholder text in a field where the user hasn't entered a value. This can help the user know what's expected in that field.
 
 Info boxes, hints, and tooltips can contain links to more information.
@@ -71646,7 +80891,7 @@ When performing an operation on a specific record, such as "update a task commen
 - Wherever possible, provide two ways to specify a record:
   - By choosing from a pre-populated list. You can generate this list using the `loadOptions` parameter. Refer to [Base files](../../build/reference/node-base-files/) for more information.
   - By entering an ID.
-- Name the field `<Record name> name or ID`. For example, **Workspace Name or ID**. Add a tooltip saying "Choose a name from the list, or specify an ID using an expression." Link to n8n's [Expressions](../../../../code/expressions/) documentation.
+- Name the field `<Record name> name or ID`. For example, **Workspace Name or ID**. Add a tooltip saying "Choose a name from the list, or specify an ID using an expression." Link to n8n's [Expressions](../../../../data/expressions/) documentation.
 - Build your node so that it can handle users providing more information than required. For example:
   - If you need a relative path, handle the user pasting in the absolute path.
   - If the user needs to get an ID from a URL, handle the user pasting in the entire URL.
@@ -71705,9 +80950,9 @@ You should use both methods before publishing your node.
 
 # n8n node linter
 
-n8n's node linter, [`eslint-plugin-n8n-nodes-base`](https://github.com/ivov/eslint-plugin-n8n-nodes-base), statically analyzes ("lints") the source code of n8n nodes and credentials in the official repository and in community packages. The linter detects issues and automatically fixes them to help you follow best practices.
+n8n's node linter, [`@n8n/eslint-plugin-community-nodes`](https://github.com/n8n-io/n8n/tree/master/packages/%40n8n/eslint-plugin-community-nodes), statically analyzes ("lints") the source code of n8n nodes and credentials in community packages. The linter detects issues and automatically fixes them to help you follow best practices.
 
-`eslint-plugin-n8n-nodes-base` contains a [collection of rules](https://github.com/ivov/eslint-plugin-n8n-nodes-base#ruleset) for node files (`*.node.ts`), resource description files (`*Description.ts`), credential files (`*.credentials.ts`), and the `package.json` of a community package.
+`@n8n/eslint-plugin-community-nodes` contains a [collection of rules](https://github.com/n8n-io/n8n/tree/master/packages/%40n8n/eslint-plugin-community-nodes#rules) for node files (`*.node.ts`), credential files (`*.credentials.ts`), and the `package.json` of a community package.
 
 ## Setup
 
@@ -71717,7 +80962,7 @@ If using VS Code, install the [ESLint VS Code extension](https://marketplace.vis
 
 Don't edit the configuration file
 
-[`.eslintrc.js`](https://github.com/n8n-io/n8n-nodes-starter/blob/master/.eslintrc.js) contains the configuration for `eslint-plugin-n8n-nodes-base`. Don't edit this file.
+[`eslint.config.mjs`](https://github.com/n8n-io/n8n-nodes-starter/blob/master/eslint.config.mjs) contains the ESLint configuration provided by [`@n8n/node-cli`](https://www.npmjs.com/package/@n8n/node-cli). Don't edit this file.
 
 ## Usage
 
@@ -71732,7 +80977,7 @@ In both cases, VS Code lints in the background as you work on your project. Hove
 You can also run the linter manually:
 
 - Run `npm run lint` to lint and view detected issues in your console.
-- Run `npm run lintfix` to lint and automatically fix issues. The linter fixes violations of rules [marked as automatically fixable](https://github.com/ivov/eslint-plugin-n8n-nodes-base#ruleset).
+- Run `npm run lint:fix` to lint and automatically fix issues. The linter fixes violations of rules [marked as automatically fixable](https://github.com/n8n-io/n8n/tree/master/packages/%40n8n/eslint-plugin-community-nodes#rules).
 
 Both commands can run in the root directory of your community package, or in `/packages/nodes-base/` in the main repository.
 
@@ -71740,9 +80985,9 @@ Both commands can run in the root directory of your community package, or in `/p
 
 Instead of fixing a rule violation, you can also make an exception for it, so the linter doesn't flag it.
 
-To make a lint exception from VS Code: hover over the issue and click on `Quick fix` (or `cmd+.` in macOS) and select **Disable {rule} for this line**. Only disable rules for a line where you have good reason to. If you think the linter is incorrectly reporting an issue, please [report it in the linter repository](https://github.com/ivov/eslint-plugin-n8n-nodes-base/issues).
+To make a lint exception from VS Code: hover over the issue and click on `Quick fix` (or `cmd+.` in macOS) and select **Disable {rule} for this line**. Only disable rules for a line where you have good reason to. If you think the linter is incorrectly reporting an issue, please [report it in the n8n repository](https://github.com/n8n-io/n8n/issues).
 
-To add a lint exception to a single file, add a code comment. In particular, TSLint rules may not show up in VS Code and may need to be turned off using code comments. Refer to the [TSLint documentation](https://palantir.github.io/tslint/usage/rule-flags/) for more guidance.
+To add a lint exception to a single file, add a code comment. Refer to the [ESLint documentation](https://eslint.org/docs/latest/use/configure/rules#disabling-rules) for more guidance.
 
 # Run your node locally
 
@@ -71849,7 +81094,7 @@ The AI Assistant offers a range of tools to support you:
 - **Debug helper**: Identify and troubleshoot node execution issues in your workflows to keep them running without issues.
 - **Answer n8n questions**: Get instant answers to your n8n-related questions, whether they're about specific features or general functionality.
 - **Coding support**: Receive guidance on coding, including SQL and JSON, to optimize your nodes and data processing.
-- **Expression assistance**: Learn how to create and refine [expressions](../../code/expressions/) to get the most out of your workflows.
+- **Expression assistance**: Learn how to create and refine [expressions](../../data/expressions/) to get the most out of your workflows.
 - **Credential setup tips**: Find out how to set up and manage node [credentials](../../integrations/builtin/credentials/) securely and efficiently.
 
 ## Tips for getting the most out of the Assistant
@@ -72069,6 +81314,7 @@ Outbound traffic may appear to originate from any of:
 - 4.184.78.240/28
 - 20.79.32.32/28
 - 51.116.119.64/28
+- 51.107.180.112/28
 
 # Cloud concurrency
 
@@ -72203,7 +81449,7 @@ For Cloud versions of n8n, n8n is considered both a Controller and a Processor a
 
 The n8n Data Processing Agreement includes the [Standard Contractual Clauses (SCCs)](https://ec.europa.eu/info/law/law-topic/data-protection/international-dimension-data-protection/standard-contractual-clauses-scc_en). These clarify how n8n handles your data, and they update n8n's GDPR policies to cover the latest standards set by the European Commission.
 
-You can find a list of n8n sub-processors [here](#sub-processors).
+You can find a list of n8n sub-processors [here](https://n8n.io/legal/sub-processors/).
 
 Self-hosted n8n
 
@@ -72215,18 +81461,7 @@ Email help@n8n.io to make an account deletion request.
 
 ### Sub-processors
 
-This is a list of sub-processors authorized to process customer data for n8n's service. n8n audits each sub-processor's security controls and applicable regulations for the protection of personal data.
-
-| Sub-processor name | Purpose                | Contact details                                                                                                                                         | Geographic location of processing |
-| ------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| Microsoft Azure    | Cloud service provider | Microsoft Azure 1 Microsoft Way Redmond WA 98052 USA Contact information: https://privacy.microsoft.com/en-GB/privacystatement#mainhowtocontactusmodule | Germany (West Central Region)     |
-| Hetzner Online     | Cloud service provider | Hetzner Online GmbH Industriestr. 25 91710 Gunzenhausen Germany data-protection@hetzner.com                                                             | Germany                           |
-| OpenAI             | AI provider            | 1455 3rd Street San Francisco, CA 94158 United States                                                                                                   | US                                |
-| Anthropic          | AI provider            | Anthropic Ireland, Limited 6th Floor South Bank House, Barrow Street, Dublin 4 Ireland                                                                  | US                                |
-| Google Vertex AI   | AI provider            | Google LLC, 1600 Amphitheatre Parkway, Mountain View, CA 94043, United States                                                                           | EU, US                            |
-| LangChain          | AI provider            | LangChain, Inc. Delaware                                                                                                                                | US                                |
-
-Subscribe [here](https://n8n-community.typeform.com/to/FdeRxSkH?typeform-source=n8n.io) to receive updates when n8n adds or changes a sub-processor.
+The sub-processor list has moved to [n8n.io/legal/sub-processors](https://n8n.io/legal/sub-processors/).
 
 ### GDPR for self-hosted users
 
@@ -72404,7 +81639,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## How to update n8n
 
@@ -73605,7 +82840,7 @@ This release includes an overhaul of the Slack node, adding new operations and a
 View the [commits](https://github.com/n8n-io/n8n/compare/n8n@0.213.0...n8n@0.214.0) for this version.\
 **Release date:** 2023-02-03
 
-This release contains new features, node enhancements, and bug fixes. The expressions editor now supports autocomplete for some [built in data transformation functions](../../code/builtin/data-transformation-functions/). The new features also include two of interest to node builders: a way to allow users to drag and drop data keys, and the new HTML editor component.
+This release contains new features, node enhancements, and bug fixes. The expressions editor now supports autocomplete for some built in data transformation functions. The new features also include two of interest to node builders: a way to allow users to drag and drop data keys, and the new HTML editor component.
 
 Breaking changes
 
@@ -73615,7 +82850,7 @@ Please note that this version contains a breaking change to Luxon. You can read 
 
 #### Autocomplete in the Extension editor
 
-[Data transformation functions](../../code/builtin/data-transformation-functions/) now have autocomplete support in the Expression editor.
+Data transformation functions now have autocomplete support in the Expression editor.
 
 - Core: export OpenAPI spec for external tools.
 - Core: set custom Cache-Control headers for static assets.
@@ -73852,7 +83087,7 @@ View the [commits](https://github.com/n8n-io/n8n/compare/n8n@0.210.1...n8n@0.210
 
 #### Typeahead for expressions
 
-When using [expressions](../../code/expressions/), n8n will now offer you suggestions as you type.
+When using [expressions](../../data/expressions/), n8n will now offer you suggestions as you type.
 
 ### Bug fixes
 
@@ -75805,7 +85040,7 @@ View the [commits](https://github.com/n8n-io/n8n/compare/n8n@0.171.1...n8n@0.172
 
 ### Bug fixes
 
-**core**: Luxon now applies the correct timezone. Refer to [Luxon](../../code/cookbook/luxon/) for more information.\
+**core**: Luxon now applies the correct timezone. Refer to [Luxon](../../data/specific-data-types/luxon/) for more information.\
 **core**: fixed an issue with localization that was preventing i18n files from loading.\
 [Action Network Node:](../../integrations/builtin/app-nodes/n8n-nodes-base.actionnetwork/) Fix a pagination issue and add credentials test.
 
@@ -78898,7 +88133,7 @@ Stable and Beta versions
 
 n8n releases a new minor version most weeks. The `stable` version is for production use. `beta` is the most recent release. The `beta` version may be unstable. To report issues, use the [forum](https://community.n8n.io/c/questions/12).
 
-Current `stable`: 2.4.7 Current `beta`: 2.6.2
+Current `stable`: 2.15.0 Current `beta`: 2.16.0
 
 ## How to update n8n
 
@@ -78920,6 +88155,114 @@ n8n uses [semantic versioning](https://semver.org/). All version numbers are in 
 Older versions
 
 You can find the release notes for older versions of n8n [here](../0-x/)
+
+## n8n@1.123.30
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.29...n8n@1.123.30) for this version.\
+**Release date:** 2026-04-09
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.29
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.28...n8n@1.123.29) for this version.\
+**Release date:** 2026-04-08
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.28
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.27...n8n@1.123.28) for this version.\
+**Release date:** 2026-04-02
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.27
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.26...n8n@1.123.27) for this version.\
+**Release date:** 2026-03-25
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.26
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.25...n8n@1.123.26) for this version.\
+**Release date:** 2026-03-25
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.25
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.24...n8n@1.123.25) for this version.\
+**Release date:** 2026-03-13
+
+This release contains a bug fix.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.24
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.23...n8n@1.123.24) for this version.\
+**Release date:** 2026-03-13
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.23
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.22...n8n@1.123.23) for this version.\
+**Release date:** 2026-03-04
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.22
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.21...n8n@1.123.22) for this version.\
+**Release date:** 2026-02-25
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.20
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.19...n8n@1.123.20) for this version.\
+**Release date:** 2026-02-06
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.19
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.18...n8n@1.123.19) for this version.\
+**Release date:** 2026-02-06
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
+
+## n8n@1.123.18
+
+View the [commits](https://github.com/n8n-io/n8n/compare/n8n@1.123.17...n8n@1.123.18) for this version.\
+**Release date:** 2026-01-29
+
+This release contains bug fixes.
+
+For full release details, refer to [Releases](https://github.com/n8n-io/n8n/releases) on GitHub.
 
 ## n8n@1.123.16
 
@@ -79177,8 +88520,8 @@ User provisioning is only available on n8n Enterprise.
 - The AI Workflow Builder now uses improved internal best-practice instructions, which helps it generate higher quality workflows for users.
 - Core updates allow creating data tables from CSV files, configurable workflow statistics, and improved user role provisioning for enterprise, including SSO settings integration.
 - Enterprise customers using Single Sign On via SAML or OIDC can now provision the instance role and project role of each user in their organisation from their Identity Provider.
-- See the [new SAML documentation](../../user-management/saml/setup/#instance-and-project-access-provisioning)
-- See the [new OIDC documentation](../../user-management/oidc/setup/#instance-and-project-access-provisioning)
+  - See the [new SAML documentation](../../user-management/saml/setup/#instance-and-project-access-provisioning)
+  - See the [new OIDC documentation](../../user-management/oidc/setup/#instance-and-project-access-provisioning)
 - The editor features a dismissable callout for scaling mode, CSV download for data tables, custom project roles (Beta), and enhanced data table visibility.
 - Additional improvements include Stripe billing meter events, and updates to binary data handling and workflow search.
 
@@ -79245,7 +88588,7 @@ Once connected, these platforms can discover and interact with your workflows di
 - To keep access organized and auditable, consider using a workspace or team account when connecting on behalf of an organization.
 - All platforms connected to your instance MCP will have access to each of the workflows you have enabled. At this time, you cannot limit access of individual workflows to particular platforms.
 
-This feature simplifies integration and improves visibility across AI platforms that support MCP, helping you use your n8n workflows directly in the tools where you already work and experiment. [Learn more in documentation.](../../advanced-ai/accessing-n8n-mcp-server/)
+This feature simplifies integration and improves visibility across AI platforms that support MCP, helping you use your n8n workflows directly in the tools where you already work and experiment. [Learn more in documentation.](../../advanced-ai/mcp/accessing-n8n-mcp-server/)
 
 Enable MCP for an instance in instance settings.
 
@@ -83586,7 +92929,7 @@ This release adds the [Microsoft OneDrive Trigger node](../../integrations/built
 
 #### New data transformation functions
 
-This release introduces new [data transformation functions](../../code/builtin/data-transformation-functions/):
+This release introduces new data transformation functions:
 
 **String**
 
@@ -84850,7 +94193,7 @@ Although JavaScript remains the default language, you can now also select Python
 
 Feature availability
 
-- Available on Enterprise.
+- Available on Business and Enterprise plans.
 - You must be an n8n instance owner or instance admin to enable and configure source control.
 - Instance owners and instance admins can push changes to and pull changes from the connected repository.
 - Project admins can push changes to the connected repository. They can't pull changes from the repository.
@@ -84878,7 +94221,7 @@ Related sections:
 
 Feature availability
 
-- Available on Enterprise.
+- Available on Business and Enterprise plans.
 - You must be an n8n instance owner or instance admin to enable and configure source control.
 - Instance owners and instance admins can push changes to and pull changes from the connected repository.
 - Project admins can push changes to the connected repository. They can't pull changes from the repository.
@@ -84982,7 +94325,7 @@ To push work to Git:
 
    Pull and push buttons when menu is open
 
-1. In the **Commit and push changes** modal, select which workflows you want to push. You can filter by status (new, modified, deleted) and search for workflows. n8n automatically pushes tags, and variable and credential stubs.
+1. In the **Commit and push changes** modal, select which workflows and data tables you want to push. You can filter by status (new, modified, deleted) and search for items. n8n automatically pushes tags, and variable and credential stubs.
 
 n8n pushes the current saved version, not the published version, of the workflow. You need to then separately publish versions on the remote server.
 
@@ -85106,7 +94449,7 @@ Required permissions for your token:
 
 1. In **Settings** > **Environments** in n8n, select **Connect**. n8n connects to your Git repository.
 1. Under **Instance settings**, choose which branch you want to use for the current n8n instance.
-1. **Optional**: select **Protected instance** to prevent users editing workflows in this instance. This is useful for protecting production instances.
+1. **Optional**: select **Protected instance** to prevent users editing source-controlled resources in this instance. This is useful for protecting production instances.
 1. **Optional**: choose a custom color for the instance. This will appear in the menu next to the source control push and pull buttons. It helps users know which instance they're in.
 1. Select **Save settings**.
 
@@ -85114,7 +94457,7 @@ Required permissions for your token:
 
 Feature availability
 
-- Available on Enterprise.
+- Available on Business and Enterprise plans.
 
 - You must be an n8n instance owner or instance admin to enable and configure source control.
 
@@ -85268,7 +94611,7 @@ This is the simplest pattern.
 
 Feature availability
 
-- Available on Enterprise.
+- Available on Business and Enterprise plans.
 
 - You must be an n8n instance owner or instance admin to enable and configure source control.
 
@@ -85428,7 +94771,7 @@ When the changes include new variable or credential stubs, n8n notifies you that
 
 How deleted resources are handled
 
-When workflows, credentials, variables, and tags are deleted from the repository, your local versions of these resources aren't deleted automatically. Instead, when you pull repository changes, n8n notifies you about any outdated resources and asks if you'd like to delete them.
+When workflows, credentials, variables, tags, and data tables are deleted from the repository, your local versions of these resources aren't deleted automatically. Instead, when you pull repository changes, n8n notifies you about any outdated resources and asks if you'd like to delete them.
 
 ### Workflow and credential owner may change on pull
 
@@ -85441,6 +94784,20 @@ If the same owner is available on both instances (matching email), the owner rem
 If the original owner is a [project](../../../user-management/rbac/):
 
 n8n tries to match the original project name to a project name on the new instance. If no matching project exists, n8n creates a new project with the name, assigns the current user as project owner, and imports the workflows and credentials to the project.
+
+### Auto publish workflows on pull
+
+When pulling, you can choose to automatically publish workflows using the **Auto publish** dropdown in the pull modal. This has three modes:
+
+- **Off** (default): Don't attempt to publish any workflows. Workflows keep their current local publish state.
+- **If workflow already published**: Only attempt to publish workflows that are already published on this instance. New workflows aren't published.
+- **On**: Attempt to publish all pulled workflows, including new ones.
+
+n8n never auto publishes archived workflows, regardless of the auto publish setting.
+
+After a pull with auto publish enabled, n8n displays a results modal showing which workflows were successfully published and which failed. Publishing can fail if a workflow has validation errors or missing credentials.
+
+Auto publish is also available through the [API](../../../api/api-reference/) using the `autoPublish` parameter on the pull endpoint, with values `none`, `published`, or `all`.
 
 ### Pulling may cause brief service interruption
 
@@ -85462,7 +94819,7 @@ To push work to Git:
 
    Pull and push buttons when menu is open
 
-1. In the **Commit and push changes** modal, select which workflows you want to push. You can filter by status (new, modified, deleted) and search for workflows. n8n automatically pushes tags, and variable and credential stubs.
+1. In the **Commit and push changes** modal, select which workflows and data tables you want to push. You can filter by status (new, modified, deleted) and search for items. n8n automatically pushes tags, and variable and credential stubs.
 
 n8n pushes the current saved version, not the published version, of the workflow. You need to then separately publish versions on the remote server.
 
@@ -85476,6 +94833,7 @@ n8n commits the following to Git:
 - Workflows, including their tags and the email address of the workflow owner. You can choose which workflows to push.
 - Credential stubs - ID, name and type. Any other fields are included only if they are [expressions](https://docs.n8n.io/code/expressions/). You can choose which credentials to push.
 - Variable stubs (ID and name)
+- Data table schemas (table name and column definitions, not row data). You can choose which data tables to push.
 - Projects
 - Folders
 
@@ -85515,6 +94873,24 @@ On push:
 
 - n8n overwrites the entire variables and tags files.
 - If a credential already exists, n8n overwrites it with the changes, but doesn't apply these changes to existing credentials on pull.
+
+### Data tables
+
+n8n syncs data table schemas (table structure and column definitions) across environments. Row data isn't synced.
+
+On push:
+
+- You can select which data tables to include.
+- n8n exports the table name, column names, column types, and column order.
+
+On pull:
+
+- n8n creates new data tables that don't exist locally.
+- For existing data tables, n8n updates the schema to match the version in Git. This includes adding new columns and removing columns that no longer exist in the remote version.
+
+Column removal causes data loss
+
+If a pulled data table has columns removed compared to your local version, n8n deletes those columns and their data. This can't be undone. n8n displays a warning in the pull modal when this will happen.
 
 Manage credentials with an external secrets vault
 
@@ -85566,7 +94942,7 @@ Add a third node to message each customer and tell them their description. Use t
 1. Select the **Add node** connector on the Edit Fields node.
 1. Search for **Customer Messenger**. n8n shows a list of nodes that match the search.
 1. Select **Customer Messenger (n8n training)** to add the node to the [canvas](../../glossary/#canvas-n8n). n8n opens the node automatically.
-1. Use [expressions](../../code/expressions/) to map in the **Customer ID** and create the **Message**:
+1. Use [expressions](../../data/expressions/) to map in the **Customer ID** and create the **Message**:
    1. In the **INPUT** panel select the **Schema** tab.
 
    1. Drag **Edit Fields1** > **customer_id** into the **Customer ID** field in the node settings.
@@ -85649,7 +95025,7 @@ Credentials are private pieces of information issued by apps and services to aut
    1. Select the **Credential for NASA API** dropdown.
    1. Select **Create new credential**. n8n opens the credentials view.
    1. Go to [NASA APIs](https://api.nasa.gov/) and fill out the form from the **Generate API Key** link. The NASA site generates the key and emails it to the address you entered.
-   1. Check your email account for the API key. Copy the key, and paste it into **API Key** in n8n.
+   1. Check your email account for the API key. If you don’t see it, check your junk or spam folder. Copy the key, and paste it into **API Key** in n8n.
    1. Select **Save**.
    1. Close the credentials screen. n8n returns to the node. The new credentials should be automatically selected in **Credential for NASA API**.
 
@@ -85669,7 +95045,7 @@ Credentials are private pieces of information issued by apps and services to aut
 
       This generates a date in the correct format, seven days before the current date. Date and time formats in n8n...
 
-   n8n uses Luxon to work with date and time, and also provides two variables for convenience: `$now` and `$today`. For more information, refer to [Expressions > Luxon](../../code/cookbook/luxon/).
+   n8n uses Luxon to work with date and time, and also provides two variables for convenience: `$now` and `$today`. For more information, refer to [Expressions > Luxon](../../data/specific-data-types/luxon/).
 
 1. Close the **Edit Expression** modal to return to the NASA node.
 
@@ -86191,6 +95567,8 @@ Custom roles are available on Self-hosted Enterprise and Cloud Enterprise plans.
 
 **Available from:** n8n version 1.122.0 (released November 24, 2025)
 
+Secret vault scopes are available from n8n version `2.13.0`
+
 Instance roles vs project roles
 
 n8n has two types of roles: * **Instance roles** ([account types](../../account-types/)): Owner, Admin, and Member roles that span the entire n8n instance and all projects * **Project roles**: Roles that apply within a specific project (Admin, Editor, Viewer, and custom roles)
@@ -86215,6 +95593,8 @@ To create a custom role:
    - **Folder permissions**: Create, read, update, delete, list, or move folders
    - **Data table permissions**: Create, read, update, delete, list project tables, read/write rows
    - **Project variable permissions**: Create, read, update, delete, or list project variables
+   - **Secret vault permissions**: Create, view, update, delete, and sync (reload) vaults of a project
+   - **Secrets permission**: Use secrets in credentials
    - **Source control**: Push to source control
 1. Select **Create role**.
 
@@ -86280,13 +95660,18 @@ Custom roles use permission scopes to define what users can do within a project.
 - `workflow:create` - Create new workflows
 - `workflow:read` - View workflow details
 - `workflow:update` - Edit workflows
-- `workflow:publish` - Publish and unpublish workflows
+- `workflow:publish` - Publish workflows
+- `workflow:unpublish` - Unpublish workflows
 - `workflow:delete` - Delete workflows
 - `workflow:list` - View workflows in project
-- `workflow:execute` - Manually execute workflows
 - `workflow:execute-chat` - Execute workflows via chat interface
 - `workflow:move` - Move workflows between projects
 - `workflow:share` - Share workflows with other users
+- `workflow:updateRedactionSetting` - Manage the data redaction policy for workflows
+
+### Execution scopes
+
+- `execution:reveal` - Reveal redacted execution data (refer to [Execution data redaction](../../../workflows/executions/execution-data-redaction/))
 
 ### Credential scopes
 
@@ -86332,6 +95717,15 @@ Custom roles use permission scopes to define what users can do within a project.
 - `projectVariable:update` - Edit variable values
 - `projectVariable:delete` - Delete variables
 
+### Secret vault scopes
+
+- `secretsVaults:view` - View secret vaults in a project
+- `secretsVaults:create` - Create new secret vaults within project
+- `secretsVaults:edit` - Edit secret vault configuration
+- `secretsVaults:delete` - Delete secret vaults of a project
+- `secretsVaults:sync` - Reload a vault's secrets
+- `secrets:list` - Use secrets in credentials
+
 ### Source control scopes
 
 - `sourceControl:push` - Push changes to source control
@@ -86342,19 +95736,19 @@ These are example custom project roles you can create for common use cases. Reme
 
 ### Workflow Developer
 
-A role for users who work only with workflows: * `workflow:create`, `workflow:read`, `workflow:update`, `workflow:delete`, `workflow:list`, `workflow:execute` * `credential:read`, `credential:list` (view credentials but not modify) * `project:list`, `project:read`
+A role for users who work only with workflows: * `workflow:create`, `workflow:read`, `workflow:update`, `workflow:delete`, `workflow:list` * `credential:read`, `credential:list` (view credentials but not modify) * `project:list`, `project:read`
 
 ### Credential Manager
 
 A role for users who manage credentials: * `credential:create`, `credential:read`, `credential:update`, `credential:delete`, `credential:list`, `credential:share` * `workflow:read`, `workflow:list` (view workflows to understand credential usage) * `project:list`, `project:read`
 
+### Secrets User
+
+A role for users who need to use external secrets in credentials but not manage vaults: * `secrets:list` (use secrets in credentials expressions) * `credential:create`, `credential:read`, `credential:update`, `credential:list` (manage credentials with secrets) * `workflow:read`, `workflow:list` * `project:list`, `project:read`
+
 ### Workflow Publisher
 
-A role for users who can publish workflows without full edit access: * `workflow:read`, `workflow:list`, `workflow:publish` * `credential:read`, `credential:list` * `project:list`, `project:read`
-
-### Read-Only with Execute
-
-A role for users who can view and run workflows but not modify them: * `workflow:read`, `workflow:list`, `workflow:execute` * `credential:read`, `credential:list` * `project:list`, `project:read`
+A role for users who can publish workflows without full edit access: * `workflow:read`, `workflow:list`, `workflow:publish`, `workflow:unpublish` * `credential:read`, `credential:list` * `project:list`, `project:read`
 
 Combining scopes
 
@@ -86431,7 +95825,9 @@ Moving workflows or credentials removes all existing sharing. Be aware that this
 
 ## Using external secrets in projects
 
-To use [external secrets](../../../external-secrets/) in a project, you must have an [instance owner or instance admin](../../account-types/) as a member of the project.
+From version `2.13.0`, instance owners and admins can enable [external secrets](../../../external-secrets/) access for project editors and admins. Refer to [Access for project roles](../../../external-secrets/#access-for-project-roles) for details on enabling this and the permissions each role gets.
+
+In older versions (or when the opt-in toggle is off), using external secrets in a project requires an [instance owner or instance admin](../../account-types/) as a member of the project.
 
 # RBAC role types
 
@@ -86464,16 +95860,20 @@ Role types and account types
 
 Role types and [account types](../../account-types/) are different things. Every account has one type. The account can have different role types for different [projects](../projects/).
 
-| Permission                      | Admin | Editor | Viewer |
-| ------------------------------- | ----- | ------ | ------ |
-| View workflows in the project   |       |        |        |
-| View credentials in the project |       |        |        |
-| View executions                 |       |        |        |
-| Edit credentials and workflows  |       |        |        |
-| Add workflows and credentials   |       |        |        |
-| Execute workflows               |       |        |        |
-| Manage members                  |       |        |        |
-| Modify the project              |       |        |        |
+| Permission                          | Admin | Editor | Viewer |
+| ----------------------------------- | ----- | ------ | ------ |
+| View workflows in the project       |       |        |        |
+| View credentials in the project     |       |        |        |
+| View executions                     |       |        |        |
+| Edit credentials and workflows      |       |        |        |
+| Add workflows and credentials       |       |        |        |
+| Execute workflows                   |       |        |        |
+| Manage members                      |       |        |        |
+| Modify the project                  |       |        |        |
+| Use external secrets in credentials | \*    | \*     |        |
+| Manage project secret vaults        | \*    |        |        |
+
+\* Requires **Enable external secrets for project roles** to be enabled by an instance owner or admin. Refer to [Access for project roles](../../../external-secrets/#access-for-project-roles). This is available from n8n version `2.13.0`.
 
 [Variables](../../../code/variables/) and [tags](../../../workflows/tags/) aren't affected by RBAC: they're global across the n8n instance.
 
@@ -86488,8 +95888,108 @@ This section tells you how to enable SAML SSO (single sign-on) in n8n. It assume
 
 - [Set up SAML](setup/): a general guide to setting up SAML in n8n, and links to resources for common IdPs.
 - [Okta Workforce Identity SAML setup](okta/): step-by-step guidance to configuring Okta.
+- [Azure AD SAML setup](azuread/): step-by-step guidance to configuring with Azure AD.
 - [Troubleshooting](troubleshooting/): a list of things to check if you encounter issues.
 - [Managing users with SAML](managing/): performing user management tasks with SAML enabled.
+
+# Azure AD SAML setup
+
+This document provides instructions for configuring Azure AD to send role information to n8n via SAML attributes. This enables automatic role assignment based on Azure AD group membership.
+
+## Prerequisites
+
+You need an Azure AD account with access to Enterprise Applications, and the redirect URL and entity ID from n8n's SAML settings.
+
+Read the [Set up SAML](../setup/) guide first.
+
+## What n8n requires
+
+n8n expects a custom SAML attribute to be included in the SAML assertion:
+
+| **Attribute Name** | **Data Type** | **Purpose**                            |
+| ------------------ | ------------- | -------------------------------------- |
+| n8n_instance_role  | String        | Controls the user's global role in n8n |
+
+Valid values for `n8n_instance_role`:
+
+| **Value**         | **Description**                                                                                                   |
+| ----------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `global:owner`    | Full instance owner access                                                                                        |
+| `global:admin`    | Administrator access                                                                                              |
+| `global:member`   | Regular member access (default if not specified)                                                                  |
+| `global:chatUser` | Restricted, non-technical role in n8n designed for securely interacting with AI agents via the Chat Hub interface |
+
+## Setup
+
+**Step 1: Configure Standard SAML Attributes**
+
+1. In your Azure AD portal, navigate to your n8n Enterprise Application.
+
+1. Go to **Single sign-on** > **Attributes & Claims**.
+
+1. Ensure these standard attributes are configured:
+
+   | **Claim Name**                                                       | **Source Attribute**   |
+   | -------------------------------------------------------------------- | ---------------------- |
+   | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress` | user.mail              |
+   | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/firstname`    | user.givenname         |
+   | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/lastname`     | user.surname           |
+   | `http://schemas.xmlsoap.org/ws/2005/05/identity/claims/upn`          | user.userprincipalname |
+
+**Step 2: Add the n8n_instance_role Claim**
+
+This claim uses conditional logic to emit different role values based on Azure AD group membership.
+
+1. In **Attributes & Claims**, click **Add new claim**.
+
+1. Configure the basic settings:
+
+   - **Name**: `n8n_instance_role`
+   - **Namespace**: leave empty
+   - **Source**: `Attribute`
+
+1. Expand **Claim conditions** and click **Add condition**.
+
+1. Add conditions for each Azure AD group (in priority order):
+
+   | **User Type** | **Scoped Groups** | **Source** | **Value**         |
+   | ------------- | ----------------- | ---------- | ----------------- |
+   | Members       | n8n-chatusers     | Attribute  | `global:chatUser` |
+   | Members       | n8n-users         | Attribute  | `global:member`   |
+   | Members       | n8n-admins        | Attribute  | `global:admin`    |
+   | Members       | n8n-owners        | Attribute  | `global:owner`    |
+
+Condition order
+
+Conditions are evaluated in order. Place the most privileged group (owners) at the end.
+
+5. Click **Save**.
+
+### Testing the configuration
+
+1. In n8n, go to **Settings** > **SSO**.
+1. Set **User role provisioning** to `Instance role`.
+1. Click **Test settings**.
+1. Verify the SAML response shows the correct `n8n_instance_role` value.
+
+### Troubleshooting
+
+**Claim not appearing in SAML response**
+
+- Verify the user is a member of at least one of the configured groups.
+- Check that the groups are assigned to the Enterprise Application.
+- Ensure conditions are configured with `Attribute` as the source.
+- Use a browser extension plugin like 'SAML Chrome Panel' to view the application SAML response.
+
+**User gets wrong role**
+
+- Check condition order (most privileged group should be last).
+
+## References
+
+- [n8n SAML Setup](https://docs.n8n.io/user-management/saml/setup/)
+- [n8n Okta Guide (reference)](https://docs.n8n.io/user-management/saml/okta/)
+- [Azure AD Claims Customization](https://learn.microsoft.com/en-us/entra/identity-platform/saml-claims-customization)
 
 # Manage users with SAML
 
@@ -86853,18 +96353,19 @@ You can restore a previous workflow version, or make a copy of it:
 
 1. On the version you want to restore or copy, select **Options** .
 1. Choose what you want to do:
-   - **Restore this version**: replace your current workflow with the selected version.
+   - **Restore version**: replace your current workflow with the selected version.
    - **Clone to new workflow**: create a new workflow based on the selected version.
    - **Open version in new tab**: open a second tab displaying the selected version. Use this to compare versions.
    - **Download**: download the version as JSON.
+   - **Name version**: give the version a name and description. Named versions are protected from automatic pruning. Refer to [Naming versions](../publish/#naming-versions) for more details. Available on Pro and Enterprise plans.
 
 # Saving and publishing workflows
 
-n8n automatically saves your workflow changes every 5 seconds while you're editing. When you're ready to put the workflow into production, publish your workflow. This approach prevents accidental production changes while enabling safe iteration and review.
+n8n auto saves your workflow while you're editing. When you're ready to put the workflow into production, publish your workflow. This approach prevents accidental production changes while enabling safe iteration and review.
 
 ## How saving works
 
-Changes save automatically every 5 seconds while you edit. No manual save button is required, though you can still use Ctrl+S or Cmd+S if preferred. All edits remain in draft until you publish.
+Changes save automatically as you edit, typically within 1 to 5 seconds. No manual save button is required. All edits remain in draft until you publish.
 
 ## How publishing works
 
@@ -86874,13 +96375,17 @@ Publishing makes your workflow live and locks it to a specific version. Producti
 - Schedules will run at the times you've defined
 - Events from connected apps will trigger this workflow
 
-**Initial state: You open the workflow**
+**Initial state** When you open a workflow with no publishable changes, the Publish button is disabled.
 
-**Changed state: Autosaved changes yet to be published**
+**Ready to publish** When the workflow is not yet published but has changes, the button becomes active.
 
-**Published state: All changes published**
+**Published, up to date** The workflow is currently published and there are no new changes since the last publish.
 
-**Changed state: New changes yet to be published**
+**Published, has changes** The workflow is published, but you've made changes since the last publish that haven't gone live yet.
+
+**Published, invalid changes** The workflow is published, but it's not in a state to be republished (no trigger requires publishing).
+
+**Published, error** The workflow is published, but there are errors in your recent changes that need to be fixed before you can publish again.
 
 ## How collaboration works
 
@@ -86892,7 +96397,7 @@ Only one person can edit a workflow at a time. If someone else is currently edit
 
 ## Checking publishing status
 
-On the **Workflows** page, each workflow displays an indicator showing whether it is **Published** or **Not Published**. You will also be able to see the same indicator on the canvas header.
+On the **Workflows** page, if a workflow is published an indicator will be displayed on the card.
 
 ## Publishing a workflow
 
@@ -86900,11 +96405,34 @@ The **Publish** button in the canvas header is enabled whenever there are unpubl
 
 Each time you make a change to a workflow, n8n autosaves those changes to a new version of the workflow. These saved versions go live in production only when you publish the workflow after the changes.
 
-1. Click the **Publish** button to open the publishing modal
+1. Click the **Publish** button (or use hotkey `Shift` + `p`) to open the publishing modal
 1. The version name defaults to a UUID. Customize the name if you'd like and add a description of the version.
 1. Click **Publish** to make your changes live in production. Production executions always point to the currently published version.
 
 If you only update workflow settings, n8n will re-publish the version without requiring you to take any action.
+
+## Naming versions
+
+Feature availability
+
+Named versions are available on Pro and Enterprise Cloud plans, and Enterprise self-hosted plans.
+
+Named versions let you give a meaningful name and description to any workflow version. This helps you identify important milestones in your workflow's development. Named versions are also protected from automatic [version history pruning](../history/), so they persist indefinitely.
+
+To name a version from the canvas header:
+
+1. Select the dropdown arrow next to the **Publish** button (or use hotkey `Cmd/Ctrl` + `s`).
+1. Select **Name version**.
+1. Enter a name and optional description.
+1. Select **Save**.
+
+To name a version from the version history page:
+
+1. Open the version history by selecting the history icon in the header.
+1. On the version you want to name, select **Options** .
+1. Select **Name version**.
+1. Enter a name and optional description.
+1. Select **Save**.
 
 ## Managing version history
 
@@ -86913,12 +96441,14 @@ View and manage version history by clicking the history icon in the header. In t
 - Unpublish the workflow to remove it from production
 - Restore a previous version. Restoring lets you work on a version without affecting the production execution.
 - Publish another version of the workflow
+- Name a version to protect it from pruning
 
-## Unpublishing a Workflow
+## How to unpublish a workflow
 
 Unpublish a workflow from either:
 
-- The workflow settings menu
+- The dropdown arrow next to the **Publish** button in the canvas header (or use hotkey `Cmd/Ctrl` + `u`).
+- In the workflow list
 - The version history page (unpublish action on published versions)
 
 # Workflow settings
@@ -86987,6 +96517,16 @@ If set to **Save**, the workflow resumes from where it stopped in case of an err
 Whether n8n should cancel the current workflow execution after a certain amount of time elapses.
 
 When enabled, the **Timeout After** option appears. Here, you can set the time (in hours, minutes, and seconds) after which the workflow should timeout. For n8n Cloud users, n8n enforces a maximum available timeout for each plan.
+
+### Redact production execution data
+
+Controls whether n8n redacts execution data from production (non-manually triggered) executions. When set to **Redact**, n8n hides the input and output data of each node and replaces it with a redacted indicator.
+
+### Redact manual execution data
+
+Controls whether n8n redacts execution data from manually triggered executions. When set to **Redact**, n8n hides the input and output data of each node and replaces it with a redacted indicator.
+
+Refer to [Execution data redaction](../executions/execution-data-redaction/) for details on redaction policies, revealing data, and permission requirements.
 
 ### Estimated time saved
 
@@ -87130,7 +96670,7 @@ Most sub-workflow conversions work without issues, but there are some caveats an
 
   n8n adds suffixes like `_firstItem`, `_lastItem`, and `_allItems` to variable names accessed by these functions. This helps preserve information about the original expression, since item ordering may be different in the sub-workflow context.
 
-- **The `itemMatching` function requires a fixed index**: You can't use expressions for the index value when using the [`itemMatching` function](../../code/builtin/output-other-nodes/). You must pass it a fixed number.
+- **The `itemMatching` function requires a fixed index**: You can't use expressions for the index value when using the [`itemMatching` function](../../data/data-mapping/referencing-other-nodes/). You must pass it a fixed number.
 
 # Tags
 
@@ -87202,14 +96742,24 @@ Your API must provide the same endpoints and data structure as n8n's.
 
 The endpoints are:
 
-| Method | Path                          |
-| ------ | ----------------------------- |
-| GET    | /templates/workflows/`<id>`   |
-| GET    | /templates/search             |
-| GET    | /templates/collections/`<id>` |
-| GET    | /templates/collections        |
-| GET    | /templates/categories         |
-| GET    | /health                       |
+| Method | Path                          | Purpose                                      |
+| ------ | ----------------------------- | -------------------------------------------- |
+| GET    | `/templates/workflows/<id>`   | Fetch template metadata for preview/browsing |
+| GET    | `/workflows/templates/<id>`   | Fetch workflow data to import onto canvas    |
+| GET    | `/templates/search`           | Search for workflow templates                |
+| GET    | `/templates/collections/<id>` | Get a specific template collection           |
+| GET    | `/templates/collections`      | List all template collections                |
+| GET    | `/templates/categories`       | List all template categories                 |
+| GET    | `/health`                     | Health check endpoint                        |
+
+Critical: Two different response formats required
+
+The two workflow endpoints require **different response formats**:
+
+- **`/templates/workflows/{id}`**: Returns the template itself, which includes the workflow in the `workflow` key
+- **`/workflows/templates/{id}`**: Returns the workflow the template contains
+
+See Schemas below for details.
 
 ### Query parameters
 
@@ -87229,11 +96779,43 @@ The `/templates/collections` endpoint accepts the following query parameters:
 | `category` | comma-separated list of strings (categories) | The categories to search within |
 | `search`   | string                                       | The search query                |
 
-### Data schema
+### Schemas
 
-You can explore the data structure of the items in the response object returned by endpoints here:
+The key difference between the two workflow endpoints:
+
+```
+// GET /templates/workflows/{id} returns (wrapped):
+{
+  "workflow": {
+    "id": 123,
+    "name": "...",
+    "totalViews": 1000,
+    // ... see full workflow item schema below
+    "workflow": {    // actual workflow definition
+      "nodes": [...],
+      "connections": {}
+    }
+  }
+}
+
+// GET /workflows/templates/{id} returns (flat):
+{
+  "id": 123,
+  "name": "...",
+  "workflow": {      // actual workflow definition
+    "nodes": [...],
+    "connections": {}
+  }
+}
+```
+
+Detailed schemas for response objects:
 
 Show `workflow` item data schema
+
+Used by `/templates/workflows/{id}` endpoint (wrapped in a `workflow` key).
+
+This schema describes the template metadata used for displaying templates in search/browse UI. It includes a nested `workflow` property that contains the actual importable workflow definition.
 
 ```
 {
@@ -87429,18 +97011,79 @@ Show `workflow` item data schema
           "typeVersion"
         ]
       }
+    },
+    "description": {
+      "type": "string"
+    },
+    "image": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "url": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "categories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "number"
+          },
+          "name": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "workflowInfo": {
+      "type": "object",
+      "properties": {
+        "nodeCount": {
+          "type": "number"
+        },
+        "nodeTypes": {
+          "type": "object"
+        }
+      }
+    },
+    "workflow": {
+      "type": "object",
+      "properties": {
+        "nodes": {
+          "type": "array"
+        },
+        "connections": {
+          "type": "object"
+        },
+        "settings": {
+          "type": "object"
+        },
+        "pinData": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "nodes",
+        "connections"
+      ]
     }
   },
   "required": [
     "id",
     "name",
     "totalViews",
-    "price",
-    "purchaseUrl",
-    "recentViews",
     "createdAt",
     "user",
-    "nodes"
+    "nodes",
+    "workflow"
   ]
 }
 ```
@@ -87519,10 +97162,7 @@ Show `collection` item data schema
 
 You can also interactively explore n8n's API endpoints:
 
-<https://api.n8n.io/templates/categories>\
-<https://api.n8n.io/templates/collections>\
-<https://api.n8n.io/templates/search>\
-<https://api.n8n.io/health>
+<https://api.n8n.io/templates/categories> <https://api.n8n.io/templates/collections> <https://api.n8n.io/templates/search> <https://api.n8n.io/health>
 
 You can [contact us](mailto:help@n8n.io) for more support.
 
@@ -87660,6 +97300,19 @@ To change the Sticky Note color:
 
 1. Hover over the Sticky Note
 1. Select **Change color**
+1. Choose from seven preset colors, or click the rainbow gradient button to select a custom color
+
+### Custom colors
+
+In addition to the seven preset colors, you can select any custom color for your sticky notes:
+
+1. Click the button with the rainbow gradient and plus icon
+1. Use the color picker to select your desired color, or enter a hex color code (for example, `#FF5733`)
+1. Click **Apply** to set the color
+
+Your recently used custom colors (up to 8) are automatically saved and displayed in the color picker for quick access.
+
+Custom colors feature theme-aware borders that automatically adjust for optimal visibility in both light and dark modes.
 
 ## Sticky Note positioning
 
@@ -87731,6 +97384,10 @@ There are two execution modes:
 - Manual: run workflows manually when testing. Select **Execute Workflow** to start a manual execution. You can do manual executions of active workflows, but n8n recommends keeping your workflow set to **Inactive** while developing and testing.
 - Production: a production workflow is one that runs automatically. To enable this, set the workflow to **Active**.
 
+## How executions count towards quotas:
+
+[Paid plans](https://n8n.io/pricing/), whether cloud or self-hosted, have an execution limit quota. Only production executions count towards this quota. These are executions started automatically by triggers, schedules, or polling. Manual executions aren't counted. This distinction applies regardless of the instance environment, such as development or production.
+
 ## Execution lists
 
 n8n provides two execution lists:
@@ -87739,6 +97396,10 @@ n8n provides two execution lists:
 - [All executions](all-executions/): this list shows all executions for all your workflows.
 
 n8n supports [adding custom data to executions](custom-executions-data/).
+
+## Execution data redaction
+
+You can redact execution data to protect sensitive information. Redaction hides the input and output data of workflow executions while preserving execution metadata like status, timing, and node names. Refer to [Execution data redaction](execution-data-redaction/) for details.
 
 # All executions
 
@@ -87916,6 +97577,126 @@ When using loops (with the [Loop over Items](../../../integrations/builtin/core-
 
 Executing a node again clears its dirty status. You can do this manually by triggering the whole workflow, or by running a [partial execution](../manual-partial-and-production-executions/#partial-executions) with **Execute step** on the individual node or any node which follows it.
 
+# Execution data redaction
+
+Feature availability
+
+Data redaction is available on Enterprise Self-hosted and Enterprise Cloud plans.
+
+**Available from:** n8n version 2.16.0
+
+Execution data redaction lets you hide the input and output data of workflow executions. This helps protect sensitive information like personal data, authentication tokens, and financial records from users who can view the workflow but don't need to see the underlying data.
+
+When you enable redaction, execution metadata (status, timing, node names) remains visible, but n8n replaces the actual data payload processed by each node with a redacted indicator.
+
+## Why use execution data redaction
+
+Workflows often process data that the workflow builder or viewers shouldn't have access to outside of n8n. Common scenarios include:
+
+- **PII and compliance**: Workflows handling customer personal data (emails, addresses, financial records) need to meet GDPR, SOC 2, or internal security standards.
+- **Cross-department workflows**: A workflow built by one team processes sensitive data from another team that the builder wouldn't have access to otherwise.
+- **Least privilege principle**: Limiting data visibility to only those who need it, rather than everyone with workflow view access.
+
+Before execution data redaction, the only option was to disable execution history entirely at the workflow level, which removed all visibility into workflow success or failure status. Execution data redaction preserves execution monitoring while hiding the sensitive data payload.
+
+## Configure redaction settings
+
+You configure redaction per workflow in the workflow settings. You need the **Manage data redaction** (`workflow:updateRedactionSetting`) scope to change these settings.
+
+To configure redaction:
+
+1. Open your workflow.
+1. Select the **three dots icon** in the upper-right corner.
+1. Select **Settings**.
+1. Find the **Redact production execution data** and **Redact manual execution data** settings.
+1. For each setting, choose either **Default - Do not redact** or **Redact**.
+1. Select **Save**.
+
+### Redaction settings explained
+
+There are two independent toggles that control redaction:
+
+| Setting                              | What it controls                                                                                                                                                                                               |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Redact production execution data** | Controls whether n8n redacts data from production (non-manually triggered) executions. Production executions include those triggered by webhooks, schedules, or other triggers when the workflow stays active. |
+| **Redact manual execution data**     | Controls whether n8n redacts data from manually triggered executions. Manual executions include those you start by selecting **Execute Workflow** in the editor.                                               |
+
+## What redacted data looks like
+
+When n8n redacts an execution:
+
+- n8n replaces all input and output data for each node with an empty object.
+- n8n removes binary data (files, images).
+- n8n redacts error messages, preserving only the error type and HTTP status code (for API errors) to aid in troubleshooting.
+- The execution viewer displays a **"Data redacted"** indicator with a shredder icon instead of the usual data tables.
+- Execution metadata remains visible: node names, execution status (success/failure), timing information, and the workflow structure.
+
+Error information
+
+When n8n redacts execution data, it also redacts error details to prevent sensitive information from leaking through error messages. Only the error type (for example, `NodeApiError`) and HTTP status code remain. This provides enough information to identify the category of failure without exposing data.
+
+## Reveal redacted data
+
+Users with the **Reveal execution data** (`execution:reveal`) scope can temporarily view redacted execution data for a specific execution. Instance owners and admins have this scope by default.
+
+To reveal data:
+
+1. Open the execution in the execution viewer.
+1. Select the **Reveal data** button displayed in the redacted data area.
+1. Review the confirmation dialog. It explains that:
+   - The system logs the action in the audit trail.
+   - You should only reveal data if you have a legitimate reason.
+   - Unnecessary access may violate your organization's policy.
+1. Select **Reveal data** to confirm.
+
+The execution data becomes visible for that execution in the current session.
+
+### Audit logging
+
+[Log streaming](../../../log-streaming/) tracks all reveal actions. Two audit events are available:
+
+| Event                                     | Description                                                                                                                                                                |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `n8n.audit.execution.data.revealed`       | n8n emits this event when a user reveals redacted execution data. Includes the user, execution ID, workflow ID, timestamp, IP address, and the redaction policy in effect. |
+| `n8n.audit.execution.data.reveal_failure` | n8n emits this event when it denies a reveal attempt (for example, due to insufficient permissions). Includes the same fields plus the rejection reason.                   |
+
+These events integrate with your existing log streaming destinations (syslog, webhooks, Sentry) and support compliance reporting and access auditing.
+
+## Permission scopes
+
+Execution data redaction introduces the following permission scope that you can assign through [custom project roles](../../../user-management/rbac/custom-roles/):
+
+| Scope                             | Purpose                                                                                                                          |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `workflow:updateRedactionSetting` | Allows modifying the redaction policy in workflow settings. Displayed as **Manage data redaction** in the role configuration UI. |
+
+By default, instance owners, admins, and project admins have the permissions to enable or disable redaction and to reveal redacted data. You can create custom roles to give additional users, such as workflow builders, the ability to update the data redaction setting.
+
+## Best practices
+
+### Choosing the right redaction policy
+
+| Scenario                                                                                   | Recommended setting                              |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------ |
+| Workflows processing PII, financial data, or authentication tokens in production           | Redact production execution data                 |
+| Workflows where even test data is sensitive (for example, using copies of production data) | Redact both production and manual execution data |
+| Workflows processing non-sensitive data, or during initial development                     | No redaction                                     |
+
+### General recommendations
+
+- **Start with production redaction**: For most workflows handling sensitive data, redacting production executions while keeping manual executions visible provides a good balance between security and ease of debugging.
+- **Redact manual data when needed**: If your test environment uses real or production-like data, enable manual execution redaction as well.
+- **Use log streaming**: Enable [log streaming](../../../log-streaming/) to capture reveal audit events. This provides an audit trail for compliance and allows you to monitor who accesses sensitive execution data.
+- **Review redaction settings during workflow reviews**: Include redaction policy as part of your workflow review or approval process, particularly for workflows that handle cross-department or customer-facing data.
+
+## Security considerations
+
+- n8n applies redaction at the API level and never sends redacted data to the browser.
+- When you [create custom nodes](../../../integrations/creating-nodes/overview/), you can declare specific output fields as sensitive (using `sensitiveOutputFields` in the node type definition). n8n always redacts these fields and prevents revealing them, even for users with reveal access.
+- If the redaction service can't resolve a node's type definition (for example, after uninstalling a community node), n8n fully redacts all output data for that node. This fail-closed approach prevents unknown nodes from leaking sensitive fields.
+- Redaction doesn't change how execution data is stored in the database. The underlying data isn't encrypted or stored differently when redaction is enabled. Redaction controls visibility at the API layer.
+- When redaction is enabled, execution data is also automatically redacted from [log streaming](../../../log-streaming/) and logging output.
+
 # Manual, partial, and production executions
 
 There are some important differences in how n8n executes workflows manually (by clicking the **Execute Workflow** button) and automatically (when the workflow is **Active** and triggered by an event or schedule).
@@ -87928,7 +97709,7 @@ Manual executions make building workflows easier by allowing you to iteratively 
 
 Pinning execution data
 
-When performing manual executions, you can use [data pinning](../../../data/data-pinning/) to "pin" or "freeze" the output data of a node. You can optionally [edit the pinned data](../../../data/data-editing/) as well.
+When performing manual executions, you can use [data pinning](../../../data/data-pinning/) to "pin" or "freeze" the output data of a node. You can optionally edit the pinned data as well.
 
 On future runs, instead of executing the pinned node, n8n will substitute the pinned data and continue following the flow logic. This allows you to iterate without operating on variable data or repeating queries to external services. Production executions ignore all pinned data.
 

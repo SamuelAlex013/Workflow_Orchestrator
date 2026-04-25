@@ -113,11 +113,11 @@ class WorkflowAwareRetriever(RAGRetrieverWithReranking):
         # Detect workflow intent
         intent = self.detect_workflow_intent(query)
         
-        print(f"\n🔍 Workflow Intent Analysis:")
-        print(f"   Is workflow: {intent['is_workflow']}")
-        print(f"   Trigger integration: {intent['trigger_integration']}")
-        print(f"   Action integration: {intent['action_integration']}")
-        print(f"   Detected integrations: {intent['detected_integrations']}")
+        # print(f"\n🔍 Workflow Intent Analysis:")
+        # print(f"   Is workflow: {intent['is_workflow']}")
+        # print(f"   Trigger integration: {intent['trigger_integration']}")
+        # print(f"   Action integration: {intent['action_integration']}")
+        # print(f"   Detected integrations: {intent['detected_integrations']}")
         
         if not intent['is_workflow']:
             # Single-concept query - use normal retrieval
