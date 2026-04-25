@@ -36,4 +36,4 @@ app.include_router(workflow_router)
 def root():
     return {"status": "ok", "version": "0.1.0"}
 
-# Run with: uvicorn backend.app.main:app --host
+# Run with: uvicorn backend.app.main:app --reload

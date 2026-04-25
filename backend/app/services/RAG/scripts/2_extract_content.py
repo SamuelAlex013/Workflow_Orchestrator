@@ -6,8 +6,16 @@ import tiktoken
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from typing import List, Dict, Tuple
 
+BASE_DIR = Path(__file__).resolve().parent
 
-INPUT_MD = Path(__file__).parent.parent / "docs" / "n8n_official_docs.md"
+# Preferred source docs locations (first existing file is used)
+SOURCE_DOC_CANDIDATES = [
+    # Workspace-level docs path used in this repository
+    BASE_DIR.parents[4] / "data" / "docs" / "n8n_official_docs.md",
+    # Legacy path (kept for backward compatibility)
+    BASE_DIR.parent / "docs" / "n8n_official_docs.md",
+]
+
 OUTPUT_JSONL = Path(__file__).parent.parent / "data" / "chunks.jsonl"
 
 
@@ -206,8 +214,17 @@ def parse_markdown_with_headers(content: str) -> List[Dict[str, any]]:
     return sections
 
 def main():
+    input_md = next((p for p in SOURCE_DOC_CANDIDATES if p.exists()), None)
+    if input_md is None:
+        searched = "\n".join(f"  - {p}" for p in SOURCE_DOC_CANDIDATES)
+        raise FileNotFoundError(
+            "Could not locate n8n_official_docs.md. Looked in:\n"
+            f"{searched}\n\n"
+            "Place the docs file in one of these locations and retry."
+        )
 
-    content = INPUT_MD.read_text(encoding="utf-8")
+    print(f"📘 Using source docs: {input_md}")
+    content = input_md.read_text(encoding="utf-8")
 
     # Parse markdown with custom header-aware parser
     sections = parse_markdown_with_headers(content)
