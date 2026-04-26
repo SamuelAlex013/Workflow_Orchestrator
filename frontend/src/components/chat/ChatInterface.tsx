@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { MessageBubble } from "./MessageBubble";
 import { InputArea } from "./InputArea";
 import { sendChatMessageStream, WorkflowApiError, type ChatMode, type StreamMetadata } from "@/lib/workflowApi";
 
 type Mode = "general" | "workflow_planning" | "advanced_automation";
 
-interface Message {
+export interface Message {
     id: string;
     sender: "user" | "assistant";
     content: string;
@@ -20,7 +21,9 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
+    /** Existing session ID — passed when loading a saved session from /chat/[chatId] */
     conversationId?: string;
+    /** Pre-loaded messages from MongoDB when opening an existing session */
     initialMessages?: Message[];
 }
 
@@ -28,18 +31,26 @@ export function ChatInterface({
     conversationId,
     initialMessages = [],
 }: ChatInterfaceProps) {
+    const router = useRouter();
     const [messages, setMessages] = useState<Message[]>(initialMessages);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
+    /**
+     * sessionId tracks the active MongoDB session.
+     * - If conversationId was passed in (existing chat), we start with that.
+     * - For a brand-new chat (/chat page), sessionId starts null and is
+     *   created lazily on the first message send.
+     */
+    const [sessionId, setSessionId] = useState<string | null>(conversationId ?? null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
-    // Auto-scroll to bottom
+    // Auto-scroll to bottom whenever messages change
     useEffect(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    // Clear error after 5 seconds
+    // Clear error banner after 5 seconds
     useEffect(() => {
         if (error) {
             const timer = setTimeout(() => setError(null), 5000);
@@ -47,7 +58,51 @@ export function ChatInterface({
         }
     }, [error]);
 
+    // ─── Session helpers ──────────────────────────────────────────────────────
+
+    /** Create a new session in MongoDB. Returns the new sessionId. */
+    const createSession = useCallback(async (firstMessage: string, mode: Mode): Promise<string | null> => {
+        try {
+            const title = firstMessage.slice(0, 60) + (firstMessage.length > 60 ? "…" : "");
+            const res = await fetch("/api/sessions", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ title, mode }),
+            });
+            if (!res.ok) throw new Error("Failed to create session");
+            const data = await res.json();
+            return data.sessionId as string;
+        } catch (err) {
+            console.error("Could not create session:", err);
+            return null;  // Non-fatal: chat still works, just won't persist
+        }
+    }, []);
+
+    /** Persist a single message to MongoDB. Fire-and-forget (non-blocking). */
+    const persistMessage = useCallback(async (
+        sid: string,
+        sender: "user" | "assistant",
+        content: string,
+        metadata?: { sources?: string[]; confidence?: string; model?: string }
+    ) => {
+        try {
+            await fetch(`/api/sessions/${sid}/messages`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ sender, content, ...metadata }),
+            });
+        } catch (err) {
+            console.error("Could not persist message:", err);
+            // Non-fatal: the chat UI continues working even if persist fails
+        }
+    }, []);
+
+    // ─── Main send handler ────────────────────────────────────────────────────
+
     const handleSendMessage = useCallback(async (content: string, mode?: Mode) => {
+        const currentMode = mode ?? "general";
+
+        // Build the optimistic user message for instant UI display
         const userMessage: Message = {
             id: Date.now().toString(),
             sender: "user",
@@ -56,8 +111,6 @@ export function ChatInterface({
         };
 
         const assistantMessageId = (Date.now() + 1).toString();
-        
-        // Create initial empty assistant message for streaming
         const assistantMessage: Message = {
             id: assistantMessageId,
             sender: "assistant",
@@ -71,41 +124,63 @@ export function ChatInterface({
         setStreamingMessageId(assistantMessageId);
         setError(null);
 
+        // ── Resolve or create the MongoDB session ────────────────────────────
+        let activeSid = sessionId;
+
+        if (!activeSid) {
+            // First message of a brand-new chat — create the session now
+            activeSid = await createSession(content, currentMode);
+            if (activeSid) {
+                setSessionId(activeSid);
+                // Redirect URL to the permanent chat URL without a full page reload
+                window.history.replaceState(null, "", `/chat/${activeSid}`);
+            }
+        }
+
+        // Persist the user message immediately (don't await — non-blocking)
+        if (activeSid) {
+            persistMessage(activeSid, "user", content);
+        }
+
+        // ── Streaming response from FastAPI ──────────────────────────────────
+        let finalContent = "";
+        let finalMetadata: { sources?: string[]; confidence?: string; model?: string } = {};
+
         try {
-            // Map frontend mode to API mode
-            const apiMode: ChatMode = mode === "workflow_planning" ? "workflow_planning" : "general";
-            
-            // Call the streaming API
+            const apiMode: ChatMode =
+                currentMode === "workflow_planning" ? "workflow_planning" : "general";
+
             await sendChatMessageStream(content, apiMode, {
                 onToken: (token: string) => {
-                    setMessages((prev) => 
-                        prev.map((msg) => 
-                            msg.id === assistantMessageId 
+                    finalContent += token;
+                    setMessages((prev) =>
+                        prev.map((msg) =>
+                            msg.id === assistantMessageId
                                 ? { ...msg, content: msg.content + token }
                                 : msg
                         )
                     );
                 },
                 onMetadata: (metadata: StreamMetadata) => {
-                    setMessages((prev) => 
-                        prev.map((msg) => 
-                            msg.id === assistantMessageId 
-                                ? { 
-                                    ...msg, 
-                                    sources: metadata.sources,
-                                    confidence: metadata.confidence,
-                                    model: metadata.model,
-                                }
+                    finalMetadata = {
+                        sources: metadata.sources,
+                        confidence: metadata.confidence,
+                        model: metadata.model,
+                    };
+                    setMessages((prev) =>
+                        prev.map((msg) =>
+                            msg.id === assistantMessageId
+                                ? { ...msg, ...finalMetadata }
                                 : msg
                         )
                     );
                 },
                 onError: (errorMsg: string) => {
-                    setMessages((prev) => 
-                        prev.map((msg) => 
-                            msg.id === assistantMessageId 
-                                ? { 
-                                    ...msg, 
+                    setMessages((prev) =>
+                        prev.map((msg) =>
+                            msg.id === assistantMessageId
+                                ? {
+                                    ...msg,
                                     content: `❌ **Error**\n\n${errorMsg}`,
                                     isError: true,
                                     isStreaming: false,
@@ -116,26 +191,31 @@ export function ChatInterface({
                     setError(errorMsg);
                 },
                 onDone: () => {
-                    setMessages((prev) => 
-                        prev.map((msg) => 
-                            msg.id === assistantMessageId 
+                    setMessages((prev) =>
+                        prev.map((msg) =>
+                            msg.id === assistantMessageId
                                 ? { ...msg, isStreaming: false }
                                 : msg
                         )
                     );
                     setStreamingMessageId(null);
+
+                    // Persist the completed assistant message once streaming is done
+                    if (activeSid && finalContent) {
+                        persistMessage(activeSid, "assistant", finalContent, finalMetadata);
+                    }
                 },
             });
         } catch (err) {
             console.error("API Error:", err);
-            
+
             let errorContent: string;
-            
+
             if (err instanceof WorkflowApiError) {
                 if (err.isServiceUnavailable) {
                     errorContent = "⚠️ **Service Unavailable**\n\nThe AI services are still initializing. Please wait a moment and try again.\n\nMake sure the backend server is running on port 8000.";
                 } else if (err.isNotFound) {
-                    errorContent = "🔍 **No Relevant Information Found**\n\nI couldn't find relevant documentation to answer your question. Try rephrasing or asking about a different n8n topic.";
+                    errorContent = "🔍 **No Relevant Information Found**\n\nI couldn't find relevant documentation to answer your question. Try rephrasing or asking about a different topic.";
                 } else if (err.isValidationError) {
                     errorContent = "❌ **Invalid Request**\n\nYour message couldn't be processed. Please ensure your query is between 1-1000 characters.";
                 } else {
@@ -147,11 +227,11 @@ export function ChatInterface({
                 errorContent = "❌ **Unexpected Error**\n\nSomething went wrong. Please try again.";
             }
 
-            setMessages((prev) => 
-                prev.map((msg) => 
-                    msg.id === assistantMessageId 
-                        ? { 
-                            ...msg, 
+            setMessages((prev) =>
+                prev.map((msg) =>
+                    msg.id === assistantMessageId
+                        ? {
+                            ...msg,
                             content: errorContent,
                             isError: true,
                             isStreaming: false,
@@ -164,7 +244,7 @@ export function ChatInterface({
             setIsLoading(false);
             setStreamingMessageId(null);
         }
-    }, []);
+    }, [sessionId, createSession, persistMessage]);
 
     return (
         <div className="flex flex-col h-full">

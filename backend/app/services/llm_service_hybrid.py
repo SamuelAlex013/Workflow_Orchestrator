@@ -80,12 +80,9 @@ class LLMService:
                 self.active_backend = "gemini"
                 print("🎯 Using Gemini API as primary LLM")
             else:
-                raise ValueError(
-                    "No LLM backend available!\n"
-                    "Install Ollama: https://ollama.com/download\n"
-                    "Then run: ollama pull llama3.2\n"
-                    "OR set GOOGLE_API_KEY environment variable"
-                )
+                self.active_backend = "mock"
+                print("⚠️  No real LLM backend available! Entering MOCK MODE for testing.")
+                print("   To use real AI: Install Ollama or set GOOGLE_API_KEY.")
         elif self.backend == "ollama" or self.backend == "llama":
             if not self.ollama_available:
                 raise ValueError("Ollama not available. Run: ollama pull llama3.2")
@@ -223,9 +220,12 @@ Answer:"""
             if self.active_backend == "ollama":
                 answer = self._call_ollama(user_prompt, system_prompt, max_tokens, temperature)
                 model_name = f"llama3.2 (local)"
-            else:  # gemini
+            elif self.active_backend == "gemini":
                 answer = self._call_gemini(user_prompt, system_prompt, max_tokens, temperature)
                 model_name = self.gemini_model
+            else:  # mock
+                answer = self._get_mock_response(query)
+                model_name = "Mock AI (Test Mode)"
             
             return {
                 "answer": answer,
@@ -329,8 +329,10 @@ Answer:"""
         # Stream from appropriate backend
         if self.active_backend == "ollama":
             yield from self._stream_ollama(user_prompt, system_prompt, max_tokens, temperature)
-        else:
+        elif self.active_backend == "gemini":
             yield from self._stream_gemini(user_prompt, system_prompt, max_tokens, temperature)
+        else:  # mock
+            yield from self._stream_mock(query)
     
     def _stream_ollama(self, prompt: str, system_prompt: str, max_tokens: int, temperature: float):
         """Stream from Ollama API."""
@@ -406,6 +408,28 @@ Answer:"""
                     
         except Exception as e:
             yield f"\n\n[Error streaming from Gemini: {str(e)}]"
+
+    def _get_mock_response(self, query: str) -> str:
+        """Return a static mock response for testing."""
+        return (
+            "I see you're asking about n8n! Currently, the AI backend (Ollama/Gemini) is not connected, "
+            "so I'm responding in **Mock Mode**.\n\n"
+            "This mode allows you to test the **Session Handling** and **MongoDB Persistence** features. "
+            "When I finish this message, it will be automatically saved to your conversation history.\n\n"
+            "To connect a real LLM:\n"
+            "1. Start Ollama locally.\n"
+            "2. Or add a `GOOGLE_API_KEY` to your environment.\n\n"
+            "Your question was: " + query
+        )
+
+    def _stream_mock(self, query: str):
+        """Stream a mock response token by token."""
+        response = self._get_mock_response(query)
+        import time
+        # Split by words to simulate token streaming
+        for word in response.split(" "):
+            yield word + " "
+            time.sleep(0.05)  # Simulate network latency
 
     def generate_workflow_description(
         self,
