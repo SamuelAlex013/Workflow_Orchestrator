@@ -1,9 +1,9 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { MessageSquarePlus, Menu, ChevronLeft, Moon, Sun } from "lucide-react";
+import { MessageSquarePlus, Menu, ChevronLeft, Moon, Sun, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import Image from "next/image";
@@ -22,25 +22,62 @@ interface SidebarProps {
     onToggle?: () => void;
 }
 
-export function Sidebar({ conversations, isCollapsed: controlledCollapsed, onToggle }: SidebarProps) {
+export function Sidebar({ conversations: initialConversations, isCollapsed: controlledCollapsed, onToggle }: SidebarProps) {
     const pathname = usePathname();
+    const router = useRouter();
     const [internalCollapsed, setInternalCollapsed] = useState(false);
     const { user } = useUser();
     const { theme, toggleTheme } = useTheme();
 
-    // Use controlled state if provided, otherwise use internal state
+    // Local copy so we can optimistically remove deleted sessions
+    const [conversations, setConversations] = useState<Conversation[]>(initialConversations);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [hoveredId, setHoveredId] = useState<string | null>(null);
+
+    // Sync if parent re-renders with new data
+    useEffect(() => {
+        setConversations(initialConversations);
+    }, [initialConversations]);
+
     const isCollapsed = controlledCollapsed ?? internalCollapsed;
     const handleToggle = onToggle ?? (() => setInternalCollapsed(!internalCollapsed));
 
-    // Handle mobile state - always start collapsed on mobile
     const [isMobile, setIsMobile] = useState(false);
-    
     useEffect(() => {
         const checkMobile = () => setIsMobile(window.innerWidth < 768);
         checkMobile();
-        window.addEventListener('resize', checkMobile);
-        return () => window.removeEventListener('resize', checkMobile);
+        window.addEventListener("resize", checkMobile);
+        return () => window.removeEventListener("resize", checkMobile);
     }, []);
+
+    // ─── Delete handler ───────────────────────────────────────────────────────
+    const handleDelete = async (e: React.MouseEvent, convId: string) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (!window.confirm("Delete this conversation? This cannot be undone.")) return;
+
+        setDeletingId(convId);
+
+        try {
+            const res = await fetch(`/api/sessions/${convId}`, { method: "DELETE" });
+            if (res.ok) {
+                // Optimistic UI: remove immediately
+                setConversations((prev) => prev.filter((c) => c.id !== convId));
+
+                // If we deleted the currently-open chat, navigate to /chat
+                if (pathname.includes(convId)) {
+                    router.push("/chat");
+                }
+            } else {
+                alert("Failed to delete the conversation. Please try again.");
+            }
+        } catch {
+            alert("Network error while deleting. Please try again.");
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     return (
         <>
@@ -55,9 +92,7 @@ export function Sidebar({ conversations, isCollapsed: controlledCollapsed, onTog
             {/* Sidebar */}
             <div className={cn(
                 "h-screen bg-white dark:bg-[#1E293B] border-r border-slate-200 dark:border-slate-700/50 flex flex-col transition-all duration-300 z-50",
-                // Width transitions
                 isCollapsed ? "w-16" : "w-72",
-                // Mobile positioning
                 isMobile && "fixed",
                 isMobile && isCollapsed && "-translate-x-full",
                 !isMobile && "relative"
@@ -71,15 +106,12 @@ export function Sidebar({ conversations, isCollapsed: controlledCollapsed, onTog
                             aria-label="Expand sidebar"
                             title="Expand sidebar"
                         >
-                            <ChevronLeft 
-                                size={18} 
-                                className="text-gray-500 dark:text-gray-400 rotate-180" 
-                            />
+                            <ChevronLeft size={18} className="text-gray-500 dark:text-gray-400 rotate-180" />
                         </button>
                     </div>
                 )}
 
-                {/* Header with App Icon & Toggle - only when expanded */}
+                {/* Header */}
                 {(!isCollapsed || isMobile) && (
                     <div className="p-3 border-b border-gray-200/50 dark:border-gray-800/50">
                         <div className="flex items-center justify-between">
@@ -91,18 +123,13 @@ export function Sidebar({ conversations, isCollapsed: controlledCollapsed, onTog
                                     Workflow Orchestrator
                                 </h1>
                             </div>
-                            
-                            {/* Desktop Collapse Button */}
                             {!isMobile && (
                                 <button
                                     onClick={handleToggle}
                                     className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-all"
                                     aria-label="Collapse sidebar"
                                 >
-                                    <ChevronLeft 
-                                        size={16} 
-                                        className="text-gray-500 dark:text-gray-400" 
-                                    />
+                                    <ChevronLeft size={16} className="text-gray-500 dark:text-gray-400" />
                                 </button>
                             )}
                         </div>
@@ -127,40 +154,78 @@ export function Sidebar({ conversations, isCollapsed: controlledCollapsed, onTog
 
                 {/* Conversations List */}
                 <div className="flex-1 overflow-y-auto px-2">
+                    {conversations.length === 0 && !isCollapsed && (
+                        <p className="text-xs text-slate-400 dark:text-slate-500 text-center mt-4 px-2">
+                            No conversations yet. Start a new chat!
+                        </p>
+                    )}
                     <div className="space-y-1">
                         {conversations.map((conv) => {
                             const isActive = pathname.includes(conv.id);
+                            const isDeleting = deletingId === conv.id;
+
                             return (
-                                <Link
+                                <div
                                     key={conv.id}
-                                    href={`/chat/${conv.id}`}
-                                    onClick={() => isMobile && handleToggle()}
-                                    className={cn(
-                                        "block rounded-xl transition-all",
-                                        isCollapsed && !isMobile ? "p-3 flex justify-center" : "px-4 py-3",
-                                        isActive
-                                            ? "bg-indigo-50 dark:bg-sky-900/20 text-indigo-700 dark:text-sky-300 border-l-2 border-indigo-500 dark:border-sky-500"
-                                            : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300"
-                                    )}
-                                    title={conv.title || "Untitled Conversation"}
+                                    className="relative group"
+                                    onMouseEnter={() => setHoveredId(conv.id)}
+                                    onMouseLeave={() => setHoveredId(null)}
                                 >
-                                    {isCollapsed && !isMobile ? (
-                                        <span className="text-lg">
-                                            {conv.mode === "workflow_planning" ? "📋" : "💬"}
-                                        </span>
-                                    ) : (
-                                        <div className="flex items-start justify-between">
-                                            <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium truncate">
-                                                    {conv.title || "Untitled Conversation"}
-                                                </p>
-                                                <p className="text-xs opacity-60 mt-1">
-                                                    {conv.mode === "workflow_planning" ? "📋 Workflow Planning" : "💬 General"}
-                                                </p>
+                                    <Link
+                                        href={`/chat/${conv.id}`}
+                                        onClick={() => isMobile && handleToggle()}
+                                        className={cn(
+                                            "block rounded-xl transition-all",
+                                            isCollapsed && !isMobile ? "p-3 flex justify-center" : "px-4 py-3 pr-10",
+                                            isActive
+                                                ? "bg-indigo-50 dark:bg-sky-900/20 text-indigo-700 dark:text-sky-300 border-l-2 border-indigo-500 dark:border-sky-500"
+                                                : "hover:bg-slate-100 dark:hover:bg-slate-800/50 text-slate-700 dark:text-slate-300",
+                                            isDeleting && "opacity-40 pointer-events-none"
+                                        )}
+                                        title={conv.title || "Untitled Conversation"}
+                                    >
+                                        {isCollapsed && !isMobile ? (
+                                            <span className="text-lg">
+                                                {conv.mode === "workflow_planning" ? "📋" : "💬"}
+                                            </span>
+                                        ) : (
+                                            <div className="flex items-start justify-between">
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium truncate">
+                                                        {conv.title || "Untitled Conversation"}
+                                                    </p>
+                                                    <p className="text-xs opacity-60 mt-1">
+                                                        {conv.mode === "workflow_planning" ? "📋 Workflow Planning" : "💬 General"}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
+                                    </Link>
+
+                                    {/* Delete button — only visible on hover, only when expanded */}
+                                    {!isCollapsed && !isMobile && hoveredId === conv.id && (
+                                        <button
+                                            onClick={(e) => handleDelete(e, conv.id)}
+                                            disabled={isDeleting}
+                                            className={cn(
+                                                "absolute right-2 top-1/2 -translate-y-1/2",
+                                                "p-1.5 rounded-lg",
+                                                "text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400",
+                                                "hover:bg-red-50 dark:hover:bg-red-900/20",
+                                                "transition-all duration-150",
+                                                isDeleting && "opacity-50 cursor-not-allowed"
+                                            )}
+                                            title="Delete conversation"
+                                            aria-label="Delete conversation"
+                                        >
+                                            {isDeleting ? (
+                                                <div className="w-3.5 h-3.5 border border-current border-t-transparent rounded-full animate-spin" />
+                                            ) : (
+                                                <Trash2 size={14} />
+                                            )}
+                                        </button>
                                     )}
-                                </Link>
+                                </div>
                             );
                         })}
                     </div>
@@ -227,7 +292,7 @@ export function Sidebar({ conversations, isCollapsed: controlledCollapsed, onTog
                 </div>
             </div>
 
-            {/* Mobile Toggle Button (Fixed position when sidebar is collapsed) */}
+            {/* Mobile Toggle Button */}
             {isMobile && isCollapsed && (
                 <button
                     onClick={handleToggle}

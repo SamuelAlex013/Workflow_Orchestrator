@@ -7,11 +7,11 @@ from .api.workflow_router import router as workflow_router, initialize_services
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    print("🚀 Starting Workflow Orchestrator...")
+    print("[START] Starting Workflow Orchestrator...")
     await initialize_services()
-    print("✅ Ready")
+    print("[READY] Workflow Orchestrator is ready.")
     yield
-    print("🛑 Shutting down...")
+    print("[STOP] Shutting down...")
 
 
 app = FastAPI(

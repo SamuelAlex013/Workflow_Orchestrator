@@ -17,7 +17,30 @@ export default function RootLayout({
     children: React.ReactNode;
 }>) {
     return (
-        <ClerkProvider>
+        <ClerkProvider
+            appearance={{
+                variables: {
+                    colorPrimary: "#6366f1", // indigo-500
+                },
+                elements: {
+                    card: "shadow-2xl border border-slate-200 dark:border-slate-800",
+                    headerTitle: "text-slate-900 dark:text-white",
+                    headerSubtitle: "text-slate-600 dark:text-slate-400"
+                }
+            }}
+            localization={{
+                signIn: {
+                    start: {
+                        title: "Sign in to Workflow Orchestrator",
+                    }
+                },
+                signUp: {
+                    start: {
+                        title: "Create Workflow Orchestrator Account",
+                    }
+                }
+            }}
+        >
             <html lang="en" suppressHydrationWarning>
                 <body className={inter.className} suppressHydrationWarning>
                     <ThemeProvider>
