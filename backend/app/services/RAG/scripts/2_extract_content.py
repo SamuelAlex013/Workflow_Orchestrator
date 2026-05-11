@@ -2,6 +2,7 @@ import json
 import hashlib
 from pathlib import Path
 import re
+import argparse
 import tiktoken
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from typing import List, Dict, Tuple
@@ -213,8 +214,34 @@ def parse_markdown_with_headers(content: str) -> List[Dict[str, any]]:
     
     return sections
 
-def main():
-    input_md = next((p for p in SOURCE_DOC_CANDIDATES if p.exists()), None)
+
+def parse_args(argv: List[str] | None = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="Extract markdown docs into chunked JSONL for RAG")
+    parser.add_argument(
+        "--source-doc",
+        type=str,
+        default=None,
+        help="Absolute path to source markdown docs file (defaults to n8n auto-discovery)",
+    )
+    parser.add_argument(
+        "--output-jsonl",
+        type=str,
+        default=str(OUTPUT_JSONL),
+        help="Output chunks JSONL path",
+    )
+    parser.add_argument(
+        "--source-label",
+        type=str,
+        default=None,
+        help="Optional source label to write in chunk metadata (defaults to source file name)",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: List[str] | None = None):
+    args = parse_args(argv)
+
+    input_md = Path(args.source_doc) if args.source_doc else next((p for p in SOURCE_DOC_CANDIDATES if p.exists()), None)
     if input_md is None:
         searched = "\n".join(f"  - {p}" for p in SOURCE_DOC_CANDIDATES)
         raise FileNotFoundError(
@@ -223,7 +250,15 @@ def main():
             "Place the docs file in one of these locations and retry."
         )
 
+    if not input_md.exists():
+        raise FileNotFoundError(f"Source docs file not found: {input_md}")
+
+    output_jsonl = Path(args.output_jsonl)
+    source_label = args.source_label or input_md.name
+
     print(f"📘 Using source docs: {input_md}")
+    print(f"💾 Output JSONL path: {output_jsonl}")
+    print(f"🏷️  Source label: {source_label}")
     content = input_md.read_text(encoding="utf-8")
 
     # Parse markdown with custom header-aware parser
@@ -267,7 +302,7 @@ def main():
                 "id": generate_chunk_id(split_text, {"header_path": header_path}),
                 "text": split_text,
                 "metadata": {
-                    "source": "n8n_official_docs.md",
+                    "source": source_label,
                     "header_path": header_path,
                     "last_header": last_header,
                     "chunk_index": chunk_index,
@@ -285,8 +320,8 @@ def main():
             final_chunks.append(chunk_data)
             chunk_index += 1
 
-    OUTPUT_JSONL.parent.mkdir(parents=True, exist_ok=True)
-    with OUTPUT_JSONL.open("w", encoding="utf-8") as f:
+    output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+    with output_jsonl.open("w", encoding="utf-8") as f:
         for chunk in final_chunks:
             f.write(json.dumps(chunk, ensure_ascii=False) + "\n")
     
@@ -341,7 +376,7 @@ def main():
     print(f"\n📋 Workflow Patterns:")
     for pattern, count in sorted(pattern_counts.items(), key=lambda x: x[1], reverse=True):
         print(f"   {pattern}: {count}")
-    print(f"\n💾 Output saved to: {OUTPUT_JSONL}")
+    print(f"\n💾 Output saved to: {output_jsonl}")
     print("=" * 70)
 
 if __name__ == "__main__":

@@ -144,7 +144,8 @@ class LLMService:
         query: str,
         context_chunks: List[Dict],
         max_tokens: int = 1000,
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        platform: str = "n8n",
     ) -> Dict[str, any]:
         """
         Synthesize an answer from RAG context using available LLM.
@@ -172,7 +173,8 @@ class LLMService:
             metadata = chunk.get('metadata', {})
             text = chunk.get('text', '')
             header_path = metadata.get('header_path', 'Unknown')
-            sources.append(header_path)
+            source_doc = metadata.get('source', 'unknown')
+            sources.append(f"{source_doc} :: {header_path}")
             context_parts.append(f"[Source {i}: {header_path}]\n{text}")
         
         context = "\n\n".join(context_parts)
@@ -182,8 +184,8 @@ class LLMService:
         confidence = "high" if avg_distance < 0.5 else ("medium" if avg_distance < 0.8 else "low")
         
         # Build prompts
-        system_prompt = """You are an expert n8n workflow automation assistant. 
-        Your role is to help users understand how to build workflows in n8n by 
+        system_prompt = f"""You are an expert {platform} workflow automation assistant. 
+        Your role is to help users understand how to build workflows in {platform} by 
         providing clear, accurate answers based on the official documentation.
 
 Guidelines:
@@ -281,7 +283,8 @@ Answer:"""
         query: str,
         context_chunks: List[Dict],
         max_tokens: int = 1000,
-        temperature: float = 0.7
+        temperature: float = 0.7,
+        platform: str = "n8n",
     ):
         """
         Stream answer tokens from RAG context using available LLM.
@@ -298,7 +301,7 @@ Answer:"""
         context = "\n\n".join(context_parts)
         
         # Build prompts
-        system_prompt = """You are an expert n8n workflow automation assistant. Your role is to help users understand how to build workflows in n8n by providing clear, accurate answers based on the official documentation.
+        system_prompt = f"""You are an expert {platform} workflow automation assistant. Your role is to help users understand how to build workflows in {platform} by providing clear, accurate answers based on the official documentation.
 
 Guidelines:
 1. Answer the user's question using ONLY the provided documentation context
@@ -434,7 +437,8 @@ Answer:"""
     def generate_workflow_description(
         self,
         query: str,
-        context_chunks: List[Dict]
+        context_chunks: List[Dict],
+        platform: str = "n8n",
     ) -> Dict[str, any]:
         """Generate structured workflow description."""
         # Build context
@@ -450,12 +454,12 @@ Answer:"""
         
         context = "\n\n".join(context_parts)
         
-        system_prompt = """You are an n8n workflow architect. Design clear, actionable workflow structures.
+        system_prompt = f"""You are a {platform} workflow architect. Design clear, actionable workflow structures.
 Output must be structured with clear sections. Keep it concise."""
 
         user_prompt = f"""User Request: {query}
 
-Relevant n8n Documentation:
+Relevant {platform} Documentation:
 {context}
 
 Design a workflow with this EXACT format:

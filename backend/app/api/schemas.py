@@ -1,6 +1,6 @@
 """Pydantic models for API schemas."""
 from pydantic import BaseModel, Field
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Literal
 
 
 # Document Search
@@ -55,6 +55,7 @@ class WorkflowAskRequest(BaseModel):
     temperature: float = Field(0.7, ge=0, le=1)
     max_answer_tokens: int = Field(2000, ge=100, le=4000)
     include_sources: bool = True
+    platform: Literal["n8n", "zapier", "make"] = "n8n"
 
 
 class WorkflowAskResponse(BaseModel):
@@ -64,11 +65,13 @@ class WorkflowAskResponse(BaseModel):
     confidence: str
     model: str
     retrieved_chunks: int
+    platform: Literal["n8n", "zapier", "make"]
 
 
 class WorkflowDesignRequest(BaseModel):
     description: str = Field(..., min_length=10, max_length=500)
     top_k: int = Field(5, ge=1, le=10)
+    platform: Literal["n8n", "zapier", "make"] = "n8n"
 
 
 class WorkflowDesignResponse(BaseModel):
@@ -76,3 +79,6 @@ class WorkflowDesignResponse(BaseModel):
     required_nodes: List[str]
     suggested_structure: str
     model: str
+    sources: List[str] = []
+    retrieved_chunks: int = 0
+    platform: Literal["n8n", "zapier", "make"]

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, FormEvent, KeyboardEvent, useRef, useEffect } from "react";
-import { Send, ChevronDown, Lock } from "lucide-react";
+import { Send, ChevronDown, Zap, Network, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Mode = "general" | "workflow_planning" | "advanced_automation";
@@ -9,25 +9,21 @@ type Mode = "general" | "workflow_planning" | "advanced_automation";
 const MODE_OPTIONS = [
     {
         id: "general",
-        label: "General Automation",
-        shortLabel: "General",
-        icon: "💬",
-        description: "General information, FAQs, and explanations about n8n automation"
+        label: "n8n",
+        shortLabel: "n8n",
+        icon: Network,
     },
     {
         id: "workflow_planning",
-        label: "Workflow Planning",
-        shortLabel: "Planning",
-        icon: "📋",
-        description: "Planning, structuring, and discussing n8n workflows conceptually"
+        label: "Zapier",
+        shortLabel: "Zapier",
+        icon: Zap,
     },
     {
         id: "advanced_automation",
-        label: "Advanced Automation",
-        shortLabel: "Advanced",
-        icon: "🔒",
-        locked: true,
-        description: "Workflow visualization and creation - Authorized users only"
+        label: "Make",
+        shortLabel: "Make",
+        icon: Wrench,
     },
 ];
 
@@ -79,13 +75,7 @@ export function InputArea({ onSendMessage, disabled = false }: InputAreaProps) {
         }
     };
 
-    const handleModeSelect = (mode: string, locked?: boolean) => {
-        if (locked) {
-            alert("🔒 Advanced Automation is a premium feature available only to authorized users.");
-            setShowModeDropdown(false);
-            return;
-        }
-
+    const handleModeSelect = (mode: string) => {
         setSelectedMode(mode as Mode);
         // Remove @ from input if present
         if (input.endsWith("@")) {
@@ -95,6 +85,7 @@ export function InputArea({ onSendMessage, disabled = false }: InputAreaProps) {
     };
 
     const selectedModeOption = MODE_OPTIONS.find(m => m.id === selectedMode) || MODE_OPTIONS[0];
+    const SelectedModeIcon = selectedModeOption.icon;
 
     return (
         <div className="bg-transparent px-4 py-4 md:px-6 w-full">
@@ -107,15 +98,19 @@ export function InputArea({ onSendMessage, disabled = false }: InputAreaProps) {
                             type="button"
                             onClick={() => setShowModeDropdown(!showModeDropdown)}
                             className={cn(
-                                "flex items-center justify-center gap-1.5 px-3 rounded-xl self-stretch",
+                                "flex items-center justify-center gap-1.5 px-3 rounded-xl self-stretch sm:min-w-[130px]",
                                 "bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm",
                                 "border border-slate-200/80 dark:border-slate-600/80",
                                 "hover:bg-white dark:hover:bg-slate-800 hover:border-slate-300 dark:hover:border-slate-500",
                                 "transition-all text-sm font-medium text-gray-700 dark:text-gray-300"
                             )}
                         >
-                            <span className="text-base">{selectedModeOption.icon}</span>
-                            <span className="hidden sm:inline">{selectedModeOption.shortLabel || selectedModeOption.label}</span>
+                            <span className="hidden sm:flex flex-col items-center gap-0 whitespace-nowrap text-center">
+                                {SelectedModeIcon && (
+                                    <SelectedModeIcon size={16} className="flex-shrink-0 text-indigo-600 dark:text-sky-400" />
+                                )}
+                                <span className="text-sm leading-none mt-0.5">{selectedModeOption.shortLabel || selectedModeOption.label}</span>
+                            </span>
                             <ChevronDown size={14} className={cn(
                                 "transition-transform",
                                 showModeDropdown && "rotate-180"
@@ -124,48 +119,37 @@ export function InputArea({ onSendMessage, disabled = false }: InputAreaProps) {
 
                         {/* Mode Dropdown */}
                         {showModeDropdown && (
-                            <div className="absolute bottom-full left-0 mb-2 w-72 bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
+                            <div className="absolute bottom-full left-0 mb-2 w-full bg-white dark:bg-gray-900 rounded-xl shadow-2xl border border-gray-200 dark:border-gray-700 overflow-hidden z-50">
                                 <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                                     <p className="text-xs font-medium text-gray-500 dark:text-gray-400">
                                         Select Mode
                                     </p>
                                 </div>
-                                {MODE_OPTIONS.map((mode) => (
+                                {MODE_OPTIONS.map((mode) => {
+                                    const Icon = mode.icon;
+                                    return (
                                     <button
                                         key={mode.id}
                                         type="button"
-                                        onClick={() => handleModeSelect(mode.id, mode.locked)}
+                                        onClick={() => handleModeSelect(mode.id)}
                                         className={cn(
                                             "w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800 last:border-b-0",
-                                            mode.locked && "bg-gray-50/50 dark:bg-gray-800/50",
                                             selectedMode === mode.id && "bg-indigo-50 dark:bg-sky-950/20 border-l-2 border-indigo-500 dark:border-sky-500"
                                         )}
                                     >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex items-start gap-2 flex-1">
-                                                <span className="text-lg mt-0.5">{mode.icon}</span>
-                                                <div className="flex-1">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-medium text-sm text-gray-900 dark:text-white">
-                                                            {mode.label}
-                                                        </span>
-                                                        {mode.locked && (
-                                                            <Lock size={12} className="text-gray-400" />
-                                                        )}
-                                                    </div>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                                        {mode.description}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                            {mode.locked && (
-                                                <span className="px-2 py-0.5 text-xs font-medium bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded">
-                                                    Locked
+                                        <div className="flex items-center justify-center">
+                                            <div className="flex flex-col items-center gap-1">
+                                                {Icon && (
+                                                    <Icon size={18} className="text-indigo-600 dark:text-sky-400" />
+                                                )}
+                                                <span className="font-medium text-sm text-gray-900 dark:text-white text-center">
+                                                    {mode.label}
                                                 </span>
-                                            )}
+                                            </div>
                                         </div>
                                     </button>
-                                ))}
+                                    );
+                                })}
                             </div>
                         )}
                     </div>
