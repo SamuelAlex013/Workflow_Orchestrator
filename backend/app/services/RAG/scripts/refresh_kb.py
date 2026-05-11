@@ -44,6 +44,10 @@ def refresh_knowledge_base(
     reset_index: bool,
     run_test: bool,
     test_query: str,
+    source_doc: str | None,
+    source_label: str | None,
+    output_jsonl: str,
+    vector_store_dir: str,
 ) -> int:
     start = time.time()
 
@@ -55,7 +59,12 @@ def refresh_knowledge_base(
     if not skip_extract:
         print("\n[1/2] Running chunk extraction...")
         extract_module = _load_module(EXTRACT_SCRIPT, "extract_content_module")
-        extract_module.main()
+        extract_argv: list[str] = ["--output-jsonl", output_jsonl]
+        if source_doc:
+            extract_argv.extend(["--source-doc", source_doc])
+        if source_label:
+            extract_argv.extend(["--source-label", source_label])
+        extract_module.main(extract_argv)
         print("✅ Chunk extraction complete")
     else:
         print("\n[1/2] Skipped chunk extraction (--skip-extract)")
@@ -65,7 +74,11 @@ def refresh_knowledge_base(
     if not skip_build:
         print("\n[2/2] Building vector store...")
         build_module = _load_module(BUILD_SCRIPT, "build_vector_store_module")
-        index, metadata_list, text_list, model = build_module.build_vector_store(reset=reset_index)
+        index, metadata_list, text_list, model = build_module.build_vector_store(
+            reset=reset_index,
+            chunks_file=Path(output_jsonl),
+            vector_db_path=Path(vector_store_dir),
+        )
         print("✅ Vector store build complete")
 
         if run_test:
@@ -103,6 +116,30 @@ def parse_args() -> argparse.Namespace:
         default="telegram trigger to database",
         help="Query for smoke test",
     )
+    parser.add_argument(
+        "--source-doc",
+        type=str,
+        default=None,
+        help="Absolute path to source markdown docs file",
+    )
+    parser.add_argument(
+        "--source-label",
+        type=str,
+        default=None,
+        help="Optional source label written to chunk metadata",
+    )
+    parser.add_argument(
+        "--output-jsonl",
+        type=str,
+        default=str(SCRIPT_DIR.parent / "data" / "chunks.jsonl"),
+        help="Output chunks JSONL path",
+    )
+    parser.add_argument(
+        "--vector-store-dir",
+        type=str,
+        default=str(SCRIPT_DIR.parent / "data" / "vector_store"),
+        help="Output FAISS vector store directory",
+    )
     return parser.parse_args()
 
 
@@ -114,6 +151,10 @@ def main() -> int:
         reset_index=not args.no_reset,
         run_test=args.test,
         test_query=args.query,
+        source_doc=args.source_doc,
+        source_label=args.source_label,
+        output_jsonl=args.output_jsonl,
+        vector_store_dir=args.vector_store_dir,
     )
 
 

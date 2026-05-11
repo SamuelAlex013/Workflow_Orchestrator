@@ -27,6 +27,11 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     const isUser = message.sender === "user";
     const { user } = useUser();
     const [showSources, setShowSources] = useState(false);
+    const formattedTime = message.isStreaming
+        ? "Generating..."
+        : new Date(message.createdAt)
+            .toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            .toUpperCase();
 
     return (
         <div className={cn("flex gap-4 mb-6 animate-in fade-in slide-in-from-bottom-4 duration-500", isUser && "justify-end")}>
@@ -81,7 +86,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
                     {(!message.isStreaming || message.content) && (
                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200/30 dark:border-gray-700/30">
                             <span className="text-xs opacity-60">
-                                {message.isStreaming ? "Generating..." : new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                {formattedTime}
                             </span>
                         
                             {/* Confidence & Model indicator for assistant messages */}

@@ -1,11 +1,11 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs";
-import { MessageSquarePlus, Menu, ChevronLeft, Moon, Sun, Trash2 } from "lucide-react";
+import { MessageSquarePlus, Menu, ChevronLeft, Moon, Sun, Trash2, Bot, Zap } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { useTheme } from "@/contexts/ThemeContext";
 
@@ -34,10 +34,34 @@ export function Sidebar({ conversations: initialConversations, isCollapsed: cont
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [hoveredId, setHoveredId] = useState<string | null>(null);
 
+    const refreshConversations = useCallback(async () => {
+        try {
+            const res = await fetch("/api/sessions", { cache: "no-store" });
+            if (!res.ok) return;
+
+            const data = await res.json();
+            if (!Array.isArray(data.sessions)) return;
+
+            setConversations(data.sessions);
+        } catch {
+            // Ignore transient refresh failures; sidebar keeps existing data
+        }
+    }, []);
+
     // Sync if parent re-renders with new data
     useEffect(() => {
         setConversations(initialConversations);
     }, [initialConversations]);
+
+    // Listen for client-side session updates (e.g., first message creates a new session)
+    useEffect(() => {
+        const onRefresh = () => {
+            void refreshConversations();
+        };
+
+        window.addEventListener("sessions:refresh", onRefresh);
+        return () => window.removeEventListener("sessions:refresh", onRefresh);
+    }, [refreshConversations]);
 
     const isCollapsed = controlledCollapsed ?? internalCollapsed;
     const handleToggle = onToggle ?? (() => setInternalCollapsed(!internalCollapsed));
@@ -117,7 +141,7 @@ export function Sidebar({ conversations: initialConversations, isCollapsed: cont
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-indigo-500 dark:bg-sky-500 flex items-center justify-center shadow-md flex-shrink-0">
-                                    <span className="text-white font-bold text-base">WO</span>
+                                    <Bot size={18} className="text-white" />
                                 </div>
                                 <h1 className="text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap">
                                     Workflow Orchestrator
@@ -185,8 +209,12 @@ export function Sidebar({ conversations: initialConversations, isCollapsed: cont
                                         title={conv.title || "Untitled Conversation"}
                                     >
                                         {isCollapsed && !isMobile ? (
-                                            <span className="text-lg">
-                                                {conv.mode === "workflow_planning" ? "📋" : "💬"}
+                                            <span className="inline-flex items-center justify-center">
+                                                {conv.mode === "workflow_planning" ? (
+                                                    <Zap size={16} className="text-indigo-600 dark:text-sky-400" />
+                                                ) : (
+                                                    <Bot size={16} className="text-indigo-600 dark:text-sky-400" />
+                                                )}
                                             </span>
                                         ) : (
                                             <div className="flex items-start justify-between">
@@ -195,7 +223,7 @@ export function Sidebar({ conversations: initialConversations, isCollapsed: cont
                                                         {conv.title || "Untitled Conversation"}
                                                     </p>
                                                     <p className="text-xs opacity-60 mt-1">
-                                                        {conv.mode === "workflow_planning" ? "📋 Workflow Planning" : "💬 General"}
+                                                        {conv.mode === "workflow_planning" ? "Zapier" : "n8n"}
                                                     </p>
                                                 </div>
                                             </div>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { Bot, Zap, Network, Wrench } from "lucide-react";
 import { MessageBubble } from "./MessageBubble";
 import { InputArea } from "./InputArea";
 import { sendChatMessageStream, WorkflowApiError, type ChatMode, type StreamMetadata } from "@/lib/workflowApi";
@@ -64,10 +65,12 @@ export function ChatInterface({
     const createSession = useCallback(async (firstMessage: string, mode: Mode): Promise<string | null> => {
         try {
             const title = firstMessage.slice(0, 60) + (firstMessage.length > 60 ? "…" : "");
+            // Backend session schema currently supports only "general" and "workflow_planning"
+            const persistMode = mode === "workflow_planning" ? "workflow_planning" : "general";
             const res = await fetch("/api/sessions", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ title, mode }),
+                body: JSON.stringify({ title, mode: persistMode }),
             });
             if (!res.ok) throw new Error("Failed to create session");
             const data = await res.json();
@@ -134,6 +137,10 @@ export function ChatInterface({
                 setSessionId(activeSid);
                 // Redirect URL to the permanent chat URL without a full page reload
                 window.history.replaceState(null, "", `/chat/${activeSid}`);
+                // Immediate client-side sidebar refresh hook
+                window.dispatchEvent(new Event("sessions:refresh"));
+                // Refresh server data (layout/sidebar sessions) so the new conversation appears immediately
+                router.refresh();
             }
         }
 
@@ -147,8 +154,7 @@ export function ChatInterface({
         let finalMetadata: { sources?: string[]; confidence?: string; model?: string } = {};
 
         try {
-            const apiMode: ChatMode =
-                currentMode === "workflow_planning" ? "workflow_planning" : "general";
+            const apiMode: ChatMode = currentMode;
 
             await sendChatMessageStream(content, apiMode, {
                 onToken: (token: string) => {
@@ -165,7 +171,9 @@ export function ChatInterface({
                     finalMetadata = {
                         sources: metadata.sources,
                         confidence: metadata.confidence,
-                        model: metadata.model,
+                        model: metadata.platform
+                            ? `${metadata.model} (${metadata.platform} KB)`
+                            : metadata.model,
                     };
                     setMessages((prev) =>
                         prev.map((msg) =>
@@ -244,7 +252,7 @@ export function ChatInterface({
             setIsLoading(false);
             setStreamingMessageId(null);
         }
-    }, [sessionId, createSession, persistMessage]);
+    }, [sessionId, createSession, persistMessage, router]);
 
     return (
         <div className="flex flex-col h-full">
@@ -254,7 +262,7 @@ export function ChatInterface({
                     {messages.length === 0 ? (
                         <div className="text-center py-16">
                             <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-indigo-500 dark:bg-sky-500 mb-4 shadow-lg shadow-indigo-500/25 dark:shadow-sky-500/25">
-                                <span className="text-3xl">🤖</span>
+                                <Bot size={28} className="text-white" />
                             </div>
                             <h2 className="text-2xl font-semibold text-slate-900 dark:text-white mb-2">
                                 Welcome to Workflow Orchestrator
@@ -264,14 +272,17 @@ export function ChatInterface({
                                 Type @ to switch modes or select a model above.
                             </p>
                             <div className="mt-6 flex flex-wrap justify-center gap-2">
-                                <div className="px-3 py-1.5 rounded-lg bg-indigo-100 dark:bg-sky-900/30 text-indigo-700 dark:text-sky-300 text-sm font-medium">
-                                    Workflow Planning
+                                <div className="px-3 py-1.5 rounded-lg bg-indigo-100 dark:bg-sky-900/30 text-indigo-700 dark:text-sky-300 text-sm font-medium flex items-center gap-2">
+                                    <Zap size={14} />
+                                    <span>Zapier</span>
                                 </div>
-                                <div className="px-3 py-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium">
-                                    n8n Integration
+                                <div className="px-3 py-1.5 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 text-sm font-medium flex items-center gap-2">
+                                    <Network size={14} />
+                                    <span>n8n</span>
                                 </div>
-                                <div className="px-3 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-sm font-medium">
-                                    Automation Guidance
+                                <div className="px-3 py-1.5 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300 text-sm font-medium flex items-center gap-2">
+                                    <Wrench size={14} />
+                                    <span>Make</span>
                                 </div>
                             </div>
                         </div>

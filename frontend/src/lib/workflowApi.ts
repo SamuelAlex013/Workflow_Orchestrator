@@ -45,6 +45,7 @@ export interface WorkflowAskRequest {
     temperature?: number;
     max_answer_tokens?: number;
     include_sources?: boolean;
+    platform?: "n8n" | "zapier" | "make";
 }
 
 export interface WorkflowAskResponse {
@@ -54,11 +55,13 @@ export interface WorkflowAskResponse {
     confidence: "high" | "medium" | "low";
     model: string;
     retrieved_chunks: number;
+    platform: "n8n" | "zapier" | "make";
 }
 
 export interface WorkflowDesignRequest {
     description: string;
     top_k?: number;
+    platform?: "n8n" | "zapier" | "make";
 }
 
 export interface WorkflowDesignResponse {
@@ -66,6 +69,9 @@ export interface WorkflowDesignResponse {
     required_nodes: string[];
     suggested_structure: string;
     model: string;
+    sources: string[];
+    retrieved_chunks: number;
+    platform: "n8n" | "zapier" | "make";
 }
 
 // Health Check Types
@@ -172,6 +178,7 @@ export interface StreamMetadata {
     confidence: string;
     model: string;
     retrieved_chunks: number;
+    platform?: "n8n" | "zapier" | "make";
 }
 
 // ============================================
@@ -203,6 +210,7 @@ function processSSELine(
                     confidence: data.confidence || "medium",
                     model: data.model || "unknown",
                     retrieved_chunks: data.retrieved_chunks || 0,
+                    platform: data.platform,
                 });
                 break;
             case "token":
@@ -340,7 +348,20 @@ export const workflowService = {
 // Convenience Functions for Chat Integration
 // ============================================
 
-export type ChatMode = "general" | "workflow_planning" | "workflow_creation";
+export type ChatMode = "general" | "workflow_planning" | "advanced_automation" | "workflow_creation";
+
+function platformForMode(mode: ChatMode): "n8n" | "zapier" | "make" {
+    switch (mode) {
+        case "workflow_planning":
+            return "zapier";
+        case "advanced_automation":
+            return "make";
+        case "workflow_creation":
+        case "general":
+        default:
+            return "n8n";
+    }
+}
 
 /**
  * Send a chat message and get a response based on the selected mode (non-streaming)
@@ -355,6 +376,8 @@ export async function sendChatMessage(
     model: string;
     metadata?: WorkflowDesignResponse;
 }> {
+    const platform = platformForMode(mode);
+
     switch (mode) {
         case "workflow_planning":
         case "workflow_creation": {
@@ -362,10 +385,11 @@ export async function sendChatMessage(
             const designResponse = await workflowService.design({
                 description: message,
                 top_k: 5,
+                platform,
             });
             return {
                 answer: formatWorkflowDesignResponse(designResponse),
-                sources: [],
+                sources: designResponse.sources || [],
                 confidence: "high",
                 model: designResponse.model,
                 metadata: designResponse,
@@ -380,6 +404,7 @@ export async function sendChatMessage(
                 temperature: 0.7,
                 max_answer_tokens: 2000,
                 include_sources: true,
+                platform,
             });
             return {
                 answer: askResponse.answer,
@@ -404,6 +429,8 @@ export async function sendChatMessageStream(
         onDone: () => void;
     }
 ): Promise<void> {
+    const platform = platformForMode(mode);
+
     if (mode === "workflow_planning" || mode === "workflow_creation") {
         // Design endpoint doesn't support streaming, fallback to regular call
         const response = await sendChatMessage(message, mode);
@@ -431,6 +458,7 @@ export async function sendChatMessageStream(
             temperature: 0.7,
             max_answer_tokens: 2000,
             include_sources: true,
+            platform,
         },
         callbacks.onToken,
         callbacks.onMetadata,
